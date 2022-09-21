@@ -3,5 +3,5 @@
                        "bases/behave_components/src"]
  :ring-server-options {:port 8080 :join? false}
  :ring-handler        behave.core/development-app
- :open-url            false
+ :open-url            true
  :clean-outputs       true}
