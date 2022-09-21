@@ -24,9 +24,8 @@
                                "bases/datom_store/src"
 
                                ;; Projects
-                               "projects/behave/src/cljc"
-                               "projects/behave/src/cljs"
                                "projects/behave/src/clj"
+                               "projects/behave/src/cljs"
 
                                "projects/behave/resources"]
 
@@ -53,6 +52,7 @@
                                                                   :sha "acb80fc5c99cc2f3eba516fdb2317eb28629c3a4"}
 
                               ;; ClojureScript Deps
+                              com.bhauman/figwheel-main          {:mvn/version "0.2.18"}
                               org.clojure/clojurescript          {:mvn/version "1.10.866"}
                               org.clojure/core.async             {:mvn/version "1.2.603"}
                               binaryage/devtools                 {:mvn/version "1.0.5"}
