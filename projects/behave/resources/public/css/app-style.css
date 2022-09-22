@@ -1,19 +1,12 @@
 @charset "UTF-8";
 
-/* -- App -- */
-#app {
-  width: 100%;
-  height: 100vh;
-}
-/* -- End App -- */
-
 /* -- Page -- */
 .page {
-  grid-template-columns: 2fr 14fr;
-  grid-auto-rows: 2fr 8fr;
-  column-gap: 60px;
-  row-gap: 30px;
   display: grid;
+  grid-auto-rows: 2fr 8fr;
+  grid-template-columns: 2fr 14fr;
+  row-gap: 30px;
+  column-gap: 60px;
   height: 100vh;
   background-color: var(--gray-2);
 }
@@ -21,17 +14,17 @@
 
 /* -- Sidebar Container -- */
 .sidebar-container {
-  flex-direction: column;
   display: flex;
+  flex-direction: column;
   width: 180px;
 }
 /* -- End Sidebar Container -- */
 
 /* -- Container -- */
 .container {
+  display: grid;
   grid-template-columns: 6fr 4fr;
   column-gap: 30px;
-  display: grid;
 }
 /* -- End Container -- */
 
@@ -48,8 +41,8 @@
 /* -- End Top Bar -- */
 
 .toolbar {
-  flex-direction: row;
   display: flex;
+  flex-direction: row;
 }
 
 /* -- Sidebar -- */
@@ -73,8 +66,8 @@
 
 /* -- Sidebar Group -- */
 .sidebar-group {
-  flex-direction: column;
   display: flex;
+  flex-direction: column;
   align-items: center;
   background-color: var(--white);
   box-shadow: 0px 2px 3px var(--black);
@@ -84,8 +77,8 @@
   margin-top: 20px;
 }
 .sidebar-group__module {
-  flex-direction: column;
   display: flex;
+  flex-direction: column;
   align-items: center;
   height: 80px;
 }
@@ -113,8 +106,8 @@
 
 /* -- Work Style Select -- */
 .workflow-select__header {
-  flex-direction: column;
   display: flex;
+  flex-direction: column;
   padding: 30px;
   border-bottom: 1px solid var(--gray-3);
   background-color: var(--gray-1);
@@ -126,14 +119,14 @@
 }
 
 .workflow-select__header > .tab .button {
-  flex-direction: row;
   display: flex;
+  flex-direction: row;
   cursor: default;
 }
 
 .workflow-select__header__title {
-  flex-direction: row;
   display: flex;
+  flex-direction: row;
   padding: 13px;
 }
 
@@ -190,8 +183,8 @@
 }
 
 .wizard-navigation {
-  flex-direction: row;
   display: flex;
+  flex-direction: row;
   justify-content: space-between;
   padding: 10px;
 }
@@ -207,9 +200,9 @@
 }
 
 .wizard-group__outputs {
+  display: flex;
   flex-direction: row;
   flex-wrap: wrap;
-  display: flex;
   padding-bottom: 20px;
 }
 
