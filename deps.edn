@@ -12,6 +12,7 @@
          "components/datom_utils/src"
          "components/dom_utils/src"
          "components/ds_schema_utils/src"
+         "components/html2idf/src"
          "components/markdown2hiccup/src"
          "components/number_utils/src"
          "components/triple_store/src"
