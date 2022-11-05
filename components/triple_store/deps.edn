@@ -1,0 +1,4 @@
+{:paths ["src" "resources"]
+ :deps {arachne-framework/aristotle {:git/url "https://github.com/arachne-framework/aristotle"
+                                     :sha     "a41a854c33974f4b45ddf110803d880e9c08e22a"}}
+ :aliases {:test {:extra-paths ["test"]}}}

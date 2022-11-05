@@ -1,0 +1,140 @@
+@prefix : <http://lod.fs.usda.gov/vocab/> .
+@prefix dc: <http://purl.org/dc/elements/1.1/> .
+@prefix qb: <http://purl.org/linked-data/cube#> .
+@prefix bhp: <http://behave.fs.usda.gov/> .
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix fsv: <http://lod.fs.usda.gov/vocab/> .
+@prefix fsvu: <http://lod.fs.usda.gov/vocab/units/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix qudt: <http://qudt.org/2.1/schema/qudt> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix unit: <http://qudt.org/2.1/vocab/unit> .
+@prefix xmls: <http://www.w3.org/2001/XMLSchema#> .
+@prefix quantitykind: <http://qudt.org/2.1/vocab/quantitykind> .
+@base <http://lod.fs.usda.gov/0.1/vocab/> .
+
+<http://lod.fs.usda.gov/0.1/vocab/> rdf:type owl:Ontology ;
+                                     owl:versionIRI <http://lod.fs.udsa.gov/0.1/vocab/> ;
+                                     owl:imports <http://qudt.org/2.1/schema/qudt> ,
+                                                 <http://qudt.org/2.1/vocab/quantitykind> ,
+                                                 <http://qudt.org/2.1/vocab/unit> ;
+                                     dct:creator "Richard Sheperd"^^xmls:string .
+
+#################################################################
+#    Annotation properties
+#################################################################
+
+###  http://qudt.org/2.1/schema/qudthasQuantityKind
+qudt:hasQuantityKind rdf:type owl:AnnotationProperty .
+
+
+#################################################################
+#    Object Properties
+#################################################################
+
+###  http://lod.fs.usda.gov/vocab/hasChild
+fsv:hasChild rdf:type owl:ObjectProperty ;
+             owl:inverseOf fsv:hasParent ;
+             rdfs:label "has Child"@en .
+
+
+###  http://lod.fs.usda.gov/vocab/hasGroup
+fsv:hasGroup rdf:type owl:ObjectProperty ;
+             rdfs:subPropertyOf fsv:hasChild ;
+             owl:inverseOf fsv:hasParentGroup ;
+             rdfs:domain fsv:Group ,
+                         fsv:Submodule ;
+             rdfs:range fsv:Group ,
+                        fsv:Submodule ;
+             rdfs:comment "Allows groups to nest within submodules & groups."@en ;
+             rdfs:label "has Group"@en .
+
+
+###  http://lod.fs.usda.gov/vocab/hasModule
+fsv:hasModule rdf:type owl:ObjectProperty ;
+              rdfs:subPropertyOf fsv:hasParent ;
+              owl:inverseOf fsv:hasSubmodule ;
+              rdf:type owl:TransitiveProperty .
+
+
+###  http://lod.fs.usda.gov/vocab/hasParent
+fsv:hasParent rdf:type owl:ObjectProperty ;
+              rdfs:label "has Parent"@en .
+
+
+###  http://lod.fs.usda.gov/vocab/hasParentGroup
+fsv:hasParentGroup rdf:type owl:ObjectProperty ;
+                   rdfs:subPropertyOf fsv:hasParent .
+
+
+###  http://lod.fs.usda.gov/vocab/hasSubmodule
+fsv:hasSubmodule rdf:type owl:ObjectProperty ;
+                 rdfs:subPropertyOf fsv:hasChild ;
+                 rdfs:domain fsv:Module ;
+                 rdfs:range fsv:Submodule ;
+                 rdfs:comment "Allows submodules to nest within a module."@en ;
+                 rdfs:label "has Submodule" .
+
+
+#################################################################
+#    Classes
+#################################################################
+
+###  http://lod.fs.usda.gov/vocab/Concept
+fsv:Concept rdf:type owl:Class ;
+            rdfs:comment "A 'Concept' specific to the Forest Service domain."@en ;
+            rdfs:label "Concept"@en .
+
+
+###  http://lod.fs.usda.gov/vocab/ContinuousVariable
+fsv:ContinuousVariable rdf:type owl:Class ;
+                       rdfs:subClassOf fsv:Variable ;
+                       rdfs:comment "'Continuous Variable' specific to the Forest Service domain."@en ;
+                       rdfs:label "Continuous Variable" .
+
+
+###  http://lod.fs.usda.gov/vocab/DiscreteVariable
+fsv:DiscreteVariable rdf:type owl:Class ;
+                     rdfs:subClassOf fsv:Variable ;
+                     rdfs:comment "'Discrete Variable' is a property that has a discrete set of values which specific to the Forest Service domain."@en ;
+                     rdfs:label "Discrete Variable" .
+
+
+###  http://lod.fs.usda.gov/vocab/Group
+fsv:Group rdf:type owl:Class ;
+          rdfs:subClassOf fsv:Concept ;
+          rdfs:label "Group"@en .
+
+
+###  http://lod.fs.usda.gov/vocab/Module
+fsv:Module rdf:type owl:Class ;
+           rdfs:subClassOf fsv:Concept ;
+           rdfs:comment "'Module' which groups multiple 'Submodules' domain."@en ;
+           rdfs:label "Module"@en .
+
+
+###  http://lod.fs.usda.gov/vocab/Submodule
+fsv:Submodule rdf:type owl:Class ;
+              rdfs:subClassOf fsv:Concept ;
+              rdfs:comment "A 'Submodule' is nested inside of a 'Module' and can have multiple 'Groups' nested under it."@en ;
+              rdfs:label "Submodule"@en .
+
+
+###  http://lod.fs.usda.gov/vocab/TextVariable
+fsv:TextVariable rdf:type owl:Class ;
+                 rdfs:subClassOf fsv:Variable ;
+                 rdfs:comment "'Text Variable' specific to the Forest Service domain."@en ;
+                 rdfs:label "Text Variable" .
+
+
+###  http://lod.fs.usda.gov/vocab/Variable
+fsv:Variable rdf:type owl:Class ;
+             rdfs:subClassOf fsv:Concept ;
+             rdfs:comment "A 'Variable' specific to the Forest Service domain."@en ;
+             rdfs:label "Variable" ,
+                        "Variable"@en .
+
+###  Generated by the OWL API (version 4.5.9.2019-02-01T07:24:44Z) https://github.com/owlcs/owlapi

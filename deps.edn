@@ -14,6 +14,7 @@
          "components/ds_schema_utils/src"
          "components/markdown2hiccup/src"
          "components/number_utils/src"
+         "components/triple_store/src"
          "components/server/src"
          "components/string_utils/src"
          "components/transport/src"
@@ -31,6 +32,8 @@
          "projects/behave/resources"]
 
  :deps {;; Clojure Deps
+        arachne-framework/aristotle        {:git/url "https://github.com/arachne-framework/aristotle"
+                                            :sha     "a41a854c33974f4b45ddf110803d880e9c08e22a"}
         bidi/bidi                          {:mvn/version "2.1.6"}
         clj-http/clj-http                  {:mvn/version "3.10.1"}
         bk/ring-gzip                       {:mvn/version "0.3.0"}

@@ -1,0 +1,1 @@
+(ns triple-store.interface)
