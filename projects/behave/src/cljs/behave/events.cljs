@@ -1,5 +1,7 @@
 (ns behave.events
-  (:require [re-frame.core :as rf]))
+  (:require [re-frame.core :as rf]
+            [behave.worksheet.events]
+            [behave.wizard.events]))
 
 ;;; Initialization
 
