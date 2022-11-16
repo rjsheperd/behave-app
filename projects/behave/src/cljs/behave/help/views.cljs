@@ -55,7 +55,6 @@
        (map help-section (next current-node)))]))
 
 (defn- help-content [help-keys & [children]]
-  (println help-keys)
   [:div.help-area__content
    (cond
      children
