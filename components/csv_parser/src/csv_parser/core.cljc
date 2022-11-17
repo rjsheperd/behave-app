@@ -6,6 +6,10 @@
 (defn- numeric? [n]
   (re-matches #"^[0-9].*" n))
 
+(defn parse-float [s]
+  #?(:clj  (Float/parseFloat s)
+     :cljs (js/parseFloat s)))
+
 (defn parse-csv [text & [col-parser]]
   (let [[header & rows] (str/split text #"\n")
         header          (str/split header #",")]
@@ -14,13 +18,13 @@
        (into {} (map-indexed (fn [i col]
                                [(nth header i)
                                 (if (numeric? col)
-                                  (js/parseFloat col) col)])
+                                  (parse-float col) col)])
                              (str/split row #","))))
      rows)))
 
 (defn fetch-csv [csv-url]
   #?(:clj
-     (println "Not implemented yet.")
+     (slurp csv-url)
 
      :cljs
      (go
