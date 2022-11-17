@@ -101,3 +101,98 @@
                     [?o :output/group-variable-uuid ?uuid]
                     [?o :output/enabled? true]]
     :variables [ws-uuid]}))
+
+(rp/reg-sub
+ :worksheet/_results-table
+ (fn [_ [_ ws-uuid]]
+   {:type  :query
+    :query '[:find  [?t ...]
+             :in    $ ?ws-uuid
+             :where [?w :worksheet/uuid ?ws-uuid]
+                    [?w :worksheet/result-table ?t]]
+    :variables [ws-uuid]}))
+
+(rp/reg-sub
+ :worksheet/_results-table-headers
+ (fn [[_ ws-uuid]]
+   (rf/subscribe [:worksheet/_results-table ws-uuid]))
+ (fn [tables _]
+   (let [table (first tables)]
+     {:type  :query
+      :query '[:find  [?h ...]
+               :in    $ ?t
+               :where [?t :result-table/headers ?h]]
+      :variables [table]})))
+
+(rp/reg-sub
+ :worksheet/results-table-headers
+ (fn [[_ ws-uuid]]
+   (rf/subscribe [:worksheet/_results-table-headers ws-uuid]))
+ (fn [headers _]
+   {:type    :pull-many
+    :pattern '[*]
+    :ids     headers}))
+
+(rp/reg-sub
+ :worksheet/_results-table-rows
+ (fn [[_ ws-uuid]]
+   (rf/subscribe [:worksheet/_results-table ws-uuid]))
+ (fn [tables _]
+   {:type  :query
+    :query '[:find  [?r ...]
+             :in    $ ?t
+             :where [?t :result-table/rows ?r]]
+    :variables [(first tables)]}))
+
+(rp/reg-sub
+ :worksheet/results-table-rows
+ (fn [[_ ws-uuid]]
+   (rf/subscribe [:worksheet/_results-table-rows ws-uuid]))
+ (fn [rows _]
+   {:type    :pull-many
+    :pattern '[*]
+    :ids     rows}))
+
+(rp/reg-sub
+ :worksheet/_results-table-cells
+ (fn [[_ ws-uuid _]]
+   (rf/subscribe [:worksheet/_results-table ws-uuid]))
+ (fn [tables [_ _ row-id]]
+   {:type  :query
+    :query '[:find  [?c ...]
+             :in    $ ?t ?row-id
+             :where [?t :result-table/rows ?r]
+                    [?r :result-row/id ?row-id]
+                    [?r :result-row/cells ?c]]
+    :variables [(first tables) row-id]}))
+
+(rp/reg-sub
+ :worksheet/results-table-cells
+ (fn [[_ ws-uuid row-id]]
+   (rf/subscribe [:worksheet/_results-table-cells ws-uuid row-id]))
+ (fn [cells _]
+   {:type    :pull-many
+    :pattern '[* {:result-cell/header [*]}]
+    :ids     cells}))
+
+(rp/reg-sub
+ :worksheet/_results-table-column
+ (fn [[_ ws-uuid _]]
+   (rf/subscribe [:worksheet/_results-table ws-uuid]))
+ (fn [tables [_ _ group-variable-uuid]]
+   {:type  :query
+    :query '[:find  [?c ...]
+             :in    $ ?t ?group-variable-uuid
+             :where [?t :result-table/headers ?h]
+                    [?h :result-header/group-variable-uuid ?group-variable-uuid]
+                    [?c :result-cell/header ?h]]
+    :variables [(first tables) group-variable-uuid]}))
+
+(rp/reg-sub
+ :worksheet/results-table-column
+ (fn [[_ ws-uuid row-id]]
+   (rf/subscribe [:worksheet/_results-table-column ws-uuid row-id]))
+ (fn [cells _]
+   {:type    :pull-many
+    :pattern '[* {:result-cell/header [*]}]
+    :ids     cells}))
