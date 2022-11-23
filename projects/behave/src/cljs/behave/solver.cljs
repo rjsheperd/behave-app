@@ -1,6 +1,8 @@
 (ns behave.solver
-  (:require [re-frame.core      :as rf]
-            [clojure.string     :as str]
+  (:require [clojure.string     :as str]
+            [datascript.core    :as d]
+            [re-frame.core      :as rf]
+            [behave.vms.store   :refer [vms-conn]]
             [behave.lib.contain :as contain]
             [behave.lib.enums   :as enum]
             [behave.lib.units   :as units]))
@@ -10,53 +12,48 @@
       (str/includes? parameter-type "Units")))
 
 (defn parsed-value [group-variable-uuid value]
-  (let [[kind] @(rf/subscribe [:vms/query '[:find  [?kind]
-                                            :in    $ ?gv-uuid
-                                            :where [?gv :bp/uuid ?gv-uuid]
-                                                   [?v :variable/group-variables ?gv]
-                                                   [?v :variable/kind ?kind]]
-                               group-variable-uuid])]
+  (let [[kind] (d/q '[:find  [?kind]
+                      :in    $ ?gv-uuid
+                      :where [?gv :bp/uuid ?gv-uuid]
+                             [?v :variable/group-variables ?gv]
+                             [?v :variable/kind ?kind]] @@vms-conn group-variable-uuid)]
     (condp = kind
       "discrete"   (get enum/contain-tactic value)
       "continuous" (js/parseFloat value)
       "text"       value)))
 
 (defn fn-params [function-id]
-  (sort-by #(nth % 3) @(rf/subscribe [:vms/query '[:find ?p ?name ?type ?order
-                                                   :keys [:db/id :name :type :order]
-                                                   :in $ ?fn
-                                                   :where [?fn :function/parameters ?p]
-                                                          [?p :parameter/name ?name]
-                                                          [?p :parameter/type ?type]
-                                                          [?p :parameter/order ?order]]
-                       function-id])))
+  (sort-by #(nth % 3) (d/q '[:find ?p ?name ?type ?order
+                             :keys [:db/id :name :type :order]
+                             :in $ ?fn
+                             :where [?fn :function/parameters ?p]
+                                    [?p :parameter/name ?name]
+                                    [?p :parameter/type ?type]
+                                    [?p :parameter/order ?order]] @@vms-conn function-id)))
 
 (defn variable-units [group-variable-uuid]
-  (first @(rf/subscribe [:vms/query '[:find  [?units]
-                                      :in    $ ?gv-uuid
-                                      :where [?gv :bp/uuid ?gv-uuid]
-                                             [?v :variable/group-variables ?gv]
-                                             [?v :variable/native-units ?units]]
-                         group-variable-uuid])))
+  (first (d/q '[:find  [?units]
+                :in    $ ?gv-uuid
+                :where [?gv :bp/uuid ?gv-uuid]
+                       [?v :variable/group-variables ?gv]
+                       [?v :variable/native-units ?units]] @@vms-conn group-variable-uuid)))
 
 ;; Cannot use pull due to the use of UUID's to join CPP ns/class/fns
 (defn group-variable->fn [group-variable-uuid]
-  @(rf/subscribe [:vms/query '[:find  [?fn ?fn-name]
-                               :in    $ ?gv-uuid
-                               :where [?gv :bp/uuid ?gv-uuid]
-                                      [?gv :group-variable/cpp-function ?fn-uuid]
-                                      [?fn :bp/uuid ?fn-uuid]
-                                      [?fn :function/name ?fn-name]]
-                 group-variable-uuid]))
+  (d/q '[:find  [?fn ?fn-name]
+         :in    $ ?gv-uuid
+         :where [?gv :bp/uuid ?gv-uuid]
+                [?gv :group-variable/cpp-function ?fn-uuid]
+                [?fn :bp/uuid ?fn-uuid]
+                [?fn :function/name ?fn-name]] @@vms-conn group-variable-uuid))
 
 ;; Cannot use pull due to the use of UUID's to join CPP ns/class/fns/param
 (defn parameter->group-variable [parameter-id]
-  @(rf/subscribe [:vms/query '[:find  [?gv-uuid ...]
-                               :in    $ ?p
-                               :where [?p :bp/uuid ?p-uuid]
-                                      [?gv :group-variable/cpp-parameter ?p-uuid]
-                                      [?gv :bp/uuid ?gv-uuid]]
-                  parameter-id]))
+  (d/q '[:find  [?gv-uuid ...]
+         :in    $ ?p
+         :where [?p :bp/uuid ?p-uuid]
+                [?gv :group-variable/cpp-parameter ?p-uuid]
+                [?gv :bp/uuid ?gv-uuid]] @@vms-conn parameter-id))
 
 (defn- apply-single-cpp-fn [module-fns module gv-id value units]
   (let [[fn-id fn-name] (group-variable->fn gv-id)
@@ -64,7 +61,7 @@
         unit-enum       (units/get-unit units)
         f               ((symbol fn-name) module-fns)
         params          (fn-params fn-id)]
-    (println "Input:" fn-name value unit-enum)
+    (println "-- SOLVER INPUT:" fn-name value unit-enum)
     (cond
       (nil? value)
       (js/console.error "Cannot process Contain Module with nil value for:" @(rf/subscribe [:vms/pull '[{:variable/_group-variables [:variable/name]}] gv-id]))
@@ -135,8 +132,6 @@
         (let [[gv-id value] (ffirst (vals repeats))
               units         (or (variable-units gv-id) "")]
           (println "-- SINGLE VAR" gv-id value units)
-          (rf/dispatch [:worksheet/add-result-table-header ws-uuid gv-id units])
-          (rf/dispatch [:worksheet/add-result-table-cell ws-uuid gv-id value])
           (apply-single-cpp-fn (ns-publics 'behave.lib.contain) module gv-id value units))
 
         ; Multiple Groups w/ Single Variable
@@ -144,8 +139,6 @@
         (doseq [[_ repeat-group] repeats]
           (let [[gv-id value] (first repeat-group)
                 units         (or (variable-units gv-id) "")]
-            (rf/dispatch [:worksheet/add-result-table-header ws-uuid gv-id units])
-            (rf/dispatch [:worksheet/add-result-table-cell ws-uuid gv-id value])
             (apply-single-cpp-fn (ns-publics 'behave.lib.contain) module gv-id value units)))
 
         ; Multiple Groups w/ Multiple Variables
@@ -156,13 +149,14 @@
 
     ; Run
     (contain/doContainRun module)
+    (println "-- RUNNING SIMULATION")
 
     ; Get Outputs
     (doseq [group-variable-uuid outputs]
-      (let [units  (variable-units group-variable-uuid) 
+      (let [units  (variable-units group-variable-uuid)
             result (apply-output-cpp-fn (ns-publics 'behave.lib.contain) module group-variable-uuid)]
-        (rf/dispatch [:worksheet/add-result-table-header ws-uuid group-variable-uuid units])
-        (rf/dispatch [:worksheet/add-result-table-cell ws-uuid group-variable-uuid result])))))
+        (println "-- OUTPUT VAR" group-variable-uuid result units)
+        (assoc-in results [:contain group-variable-uuid 0] result)))))
 
 (defn mortality-solver [ws-uuid results]
   (assoc results :mortality []))

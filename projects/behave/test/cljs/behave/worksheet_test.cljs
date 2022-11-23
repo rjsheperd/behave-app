@@ -1,33 +1,11 @@
 (ns behave.worksheet-test
   (:require [cljs.test   :refer [is deftest testing] :refer-macros [use-fixtures]]
-            [clojure.set :as set]
             [datascript.core :as d]
             [re-frame.core :as rf]
             [re-frisk.core :as re-frisk]
             [behave.store :refer [load-store! conn]]
             [behave.events]
             [behave.subs]))
-
-;; Constants
-
-(def fs->bp6 {; Inputs
-              :fs/ReportSize                         "vContainReportSize"
-              :fs/LineConstructionOffset             "vContainAttackDist"
-              :fs/LengthToWidthRatio                 "vContainReportRatio"
-              :fs/SurfaceFireRateOfSpread            "vContainReportSpread"
-              :fs/SuppressionTactic                  "vContainAttackTactic"
-              :fs/ResourceArrivalTime                "vContainResourceArrival"
-              :fs/ResourceDuration                   "vContainResourceDuration"
-              :fs/ResourceProductionRate             "vContainResourceProd"
-              :fs/ResourceName                       "vContainResourceName"
-
-            ; Outputs
-              :fs/FirelineConstructed                "vContainLine"
-              :fs/FireAreaAtResourceArrivalTime      "vContainAttackSize"
-              :fs/FirePerimeterAtResourceArrivalTime "vContainAttackPerimeter"
-              :fs/ContainedArea                      "vContainSize"
-              :fs/TimeFromReport                     "vContainTime"
-              :fs/ContainStatus                      "vContainStatus"})
 
 ;; Fixtures
 
@@ -241,10 +219,10 @@
                                         [?c :result-cell/header ?h]
                                         [?c :result-cell/value ?v]] @@conn ws-uuid variable)))))))
 
-
 (comment
 
   (def ws-uuid "63759501-c1be-4287-a9e0-74540fa8002c")
+
   (def variable "abc")
 
   (rf/subscribe [:worksheet/results-table-headers ws-uuid])
@@ -255,41 +233,12 @@
 
   (rf/subscribe [:worksheet/results-table-column ws-uuid variable])
 
-  (def table (first (d/q '[:find  [?t ...]
-                           :in    $ ?ws-uuid
-                           :where [?e :worksheet/uuid ?ws-uuid]
-                                  [?e :worksheet/result-table ?t]] @@conn ws-uuid)))
-
-  table
-
-  (def row (first (d/q '[:find  [?r ...]
-                         :in    $ ?t ?row-id
-                         :where [?t :result-table/rows ?r]
-                                [?r :result-row/id ?row-id]] @@conn table 0)))
-
-  row
-
-  (def header (first (d/q '[:find  [?h ...]
-                            :in    $ ?t ?group-var-uuid
-                            :where [?t :result-table/headers ?h]
-                                   [?h :result-header/group-variable-uuid ?group-var-uuid]]
-
-                          @@conn table variable)))
-
-  header
-
-  (def value "50")
-
-  (d/transact @conn [{:db/id row
-                      :result-row/cells [{:result-cell/header header
-                                          :result-cell/value  value}]}])
-
   (d/q '[:find  [?c ...]
          :in    $ ?ws-uuid
          :where [?e :worksheet/uuid ?ws-uuid]
-         [?e :worksheet/result-table ?t]
-         [?t :result-table/rows ?r]
-         [?r :result-row/cells ?c]] @@conn ws-uuid)
+                [?e :worksheet/result-table ?t]
+                [?t :result-table/rows ?r]
+                [?r :result-row/cells ?c]] @@conn ws-uuid)
 
   (d/q '[:find  [?v ...]
          :in    $ ?ws-uuid ?v-uuid
