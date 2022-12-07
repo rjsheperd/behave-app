@@ -77,8 +77,13 @@
 
 (defn transit->clj [s]
   #?(:clj
-     (let [in (ByteArrayInputStream. (.getBytes s))]
-       (transit/read (transit/reader in :json)))
+     (cond
+       (string? s)
+       (let [in (ByteArrayInputStream. (.getBytes s))]
+         (transit/read (transit/reader in :json)))
+
+       :else ; Treat as an input stream
+       (transit/read (transit/reader s :json)))
 
      :cljs
      (transit/read (transit/reader :json) s)))

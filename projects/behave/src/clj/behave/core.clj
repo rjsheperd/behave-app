@@ -16,6 +16,7 @@
             [behave.store             :as store]
             [behave.sync              :refer [sync-handler]]
             [behave.download-vms      :refer [export-from-vms]]
+            [behave.export-pdf        :refer [pdf-handler]]
             [behave.views             :refer [render-page]])
   (:gen-class))
 
@@ -32,6 +33,7 @@
   (let [next-handler (cond
                        (bad-uri? uri)                 (not-found "404 Not Found")
                        (str/starts-with? uri "/sync") #'sync-handler
+                       (str/starts-with? uri "/pdf")  #'pdf-handler
                        (match-route routes uri)       (render-page (match-route routes uri))
                        :else                          (not-found "404 Not Found"))]
     (next-handler request)))
@@ -58,7 +60,7 @@
 
 (defn wrap-content-type [handler]
   (fn [{:keys [headers] :as req}]
-    (handler (assoc req :content-type (get headers "Content-Type")))))
+    (handler (assoc req :content-type (get headers "content-type")))))
 
 (defn wrap-accept [handler]
   (fn [{:keys [headers] :as req}]

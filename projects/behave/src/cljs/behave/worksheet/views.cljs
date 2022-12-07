@@ -3,6 +3,7 @@
             [behave.components.navigation :refer [wizard-navigation]]
             [behave.translate             :refer [<t bp]]
             [behave.worksheet.events]
+            [behave.vega                  :refer [vega-chart]]
             [re-frame.core                :as rf]
             [reagent.core                 :as r]
             [string-utils.interface       :refer [->str]]))
@@ -108,7 +109,11 @@
   [:<>
    [:div.workflow-select
     [:div.workflow-select__header
-     [:h3 "TODO: FLESH OUT GUIDED WORKSHEET"]]]])
+     [:h3 "TODO: FLESH OUT GUIDED WORKSHEET"]
+     [vega-chart]
+     [c/button {:label "Print to PDF"
+                :variant "primary"
+                :on-click #(rf/dispatch [:worksheet/export-pdf "vega-canvas"])}]]]])
 
 (defn import-worksheet-page [params]
   (let [file (r/track #(or @(rf/subscribe [:state [:worksheet :file]])

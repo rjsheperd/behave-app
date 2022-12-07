@@ -1,9 +1,12 @@
 (ns behave.worksheet.events
   (:require [re-frame.core   :as rf]
             [behave.importer :refer [import-worksheet]]
+            [behave.exporter :refer [export-pdf!]]
             [behave.solver   :refer [solve-worksheet]]))
 
 (rf/reg-fx :ws/import-worksheet import-worksheet)
+
+(rf/reg-fx :ws/export-pdf export-pdf!)
 
 (rf/reg-event-fx
   :ws/worksheet-selected
@@ -18,3 +21,8 @@
     (assoc-in db
               [:state :worksheet :results]
               (solve-worksheet (:worksheet state)))))
+
+(rf/reg-event-fx
+  :worksheet/export-pdf
+  (fn [_ [_ elem-id]]
+    {:ws/export-pdf elem-id}))
