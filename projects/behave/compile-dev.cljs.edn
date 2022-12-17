@@ -1,9 +1,9 @@
 ^{:extra-main-files {:testing {:main behave.test-runner}}
   :watch-dirs       ["src/cljs" "test/cljs"]}
 {:main          "behave.client"
- :output-dir    "resources/public/js/out"
- :output-to     "resources/public/js/out/app.js"
- :asset-path    "/js/out/"
+ :output-dir    "resources/public/cljs"
+ :output-to     "resources/public/cljs/app.js"
+ :asset-path    "/cljs/"
  :source-map    true
  :optimizations :none
  :pretty-print  true}

@@ -1,7 +1,7 @@
 {:main            "behave.client"
- :output-dir      "target/public/cljs"
- :output-to       "target/public/cljs/app.js"
- :source-map      "target/public/cljs/app.js.map"
+ :output-dir      "resources/public/cljs"
+ :output-to       "resources/public/cljs/app.js"
+ :source-map      "resources/public/cljs/app.js.map"
  :fingerprint     true
  :optimizations   :advanced
  :pretty-print    false
