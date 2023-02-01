@@ -67,7 +67,7 @@
 
 (defn export-from-vms [auth-token & [url]]
   (log-str "Beginning download from VMS...")
-  (http/GET (or "https://behave.sig-gis.com/clj/export-all" url)
+  (http/GET (or "https://behave.sig-gis.com/sync" url)
             {:params {:auth-token auth-token}
              :format :transit
              :headers {"Content-Type" "application/transit+json"}

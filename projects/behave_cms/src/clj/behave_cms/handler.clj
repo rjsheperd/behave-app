@@ -60,7 +60,7 @@
 (defn routing-handler [{:keys [uri session params] :as request}]
   (let [next-handler (cond
                        (bad-uri? uri)                  (constantly (data-response "Forbidden" {:status 403}))
-                       (str/starts-with? uri "/sync")  #'sync-handler
+                       (str/starts-with? uri "/sync")  (token-resp params sync-handler)
                        (match-route api-routes uri)    (authenticated-api uri session api-handler)
                        (str/starts-with? uri "/clj/")  (token-resp params clj-handler)
                        (str/starts-with? uri "/file/") #'file-handler
