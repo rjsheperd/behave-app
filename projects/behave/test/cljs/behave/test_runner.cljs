@@ -1,10 +1,14 @@
 (ns behave.test-runner
   (:require [clojure.string :as str]
             [cljs-test-display.core]
-            [figwheel.main.testing :refer [run-tests]]))
+            [figwheel.main.testing :refer [run-tests]]
+            [behave.contain-test]
+            [behave.worksheet-test]))
 
 (defn run-the-tests []
-  (run-tests (cljs-test-display.core/init! "app-testing")))
+  (run-tests (cljs-test-display.core/init! "app-testing")
+             'behave.contain-test
+             'behave.worksheet-test))
 
 (defn add-script [js-path]
   (let [script-el (.createElement js/document "script")]

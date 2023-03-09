@@ -1,5 +1,6 @@
 (ns behave.events
   (:require [re-frame.core :as rf]
+            [re-posh.core  :as rp]
             [behave.worksheet.events]
             [behave.wizard.events]))
 
@@ -65,6 +66,11 @@
 
 
 ;;; Datascript
+
+(rp/reg-event-fx
+ :transact
+ (fn [_ [_ datoms]]
+   {:transact datoms}))
 
 ;;; Navigation
 

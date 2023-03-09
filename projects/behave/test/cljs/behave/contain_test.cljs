@@ -32,7 +32,7 @@
                       (first))
           module (contain/init)]
 
-                                        ; Arrange
+      ;; Arrange
       (-> module
           (contain/setAttackDistance (get row "attackDistance") (get-unit "ch"))
           (contain/setLwRatio (get row "lwRatio"))
@@ -46,10 +46,10 @@
                                (get-unit "ch/h")
                                (get row "resourceDescription")))
 
-                                        ; Act
+      ;; Act
       (contain/doContainRun module)
 
-                                        ; Assert
+      ;; Assert
       (is (within-millionth? (get row "fireLineLength")           (contain/getFinalFireLineLength module (get-unit "ch"))))
       (is (within-millionth? (get row "perimeterAtInitialAttack") (contain/getPerimeterAtInitialAttack module (get-unit "ch"))))
       (is (within-millionth? (get row "perimeterAtContainment")   (contain/getPerimeterAtContainment module (get-unit "ch"))))
