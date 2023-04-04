@@ -30,8 +30,7 @@
                  "projects/behave/src/clj"
                  "projects/behave/src/cljs"
                  "projects/behave/test/cljs"
-                 "projects/behave/resources"
-                 ]
+                 "projects/behave/resources"]
 
    :extra-deps {;; Clojure Deps
                 bidi/bidi                       {:mvn/version "2.1.6"}

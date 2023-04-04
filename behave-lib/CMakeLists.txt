@@ -1,5 +1,30 @@
 cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
 
+# C++14 Standard
+set(CMAKE_CXX_STANDARD 14)
+
+# Optional Tests
+OPTION(TEST_BEHAVE "Enable Testing" OFF)
+OPTION(TEST_CONTAIN "Enable Testing Contain" OFF)
+OPTION(TEST_SURFACE "Enable Testing Surface" OFF)
+OPTION(TEST_DEBUG "Enable Debug mode for tests" OFF)
+
+IF(TEST_BEHAVE)
+    ADD_DEFINITIONS(-DTEST_BEHAVE)
+ENDIF()
+
+IF(TEST_CONTAIN)
+    ADD_DEFINITIONS(-DTEST_CONTAIN)
+ENDIF()
+
+IF(TEST_SURFACE)
+    ADD_DEFINITIONS(-DTEST_SURFACE)
+ENDIF()
+
+IF(NOT TEST_DEBUG)
+    ADD_COMPILE_DEFINITIONS(NDEBUG)
+ENDIF()
+
 # Optional JS
 OPTION(BEHAVE_JS "Enable compiling to .js (WARNING: Emits a large file)" OFF)
 OPTION(BEHAVE_WASM "Enable compiling to .wasm" ON)
@@ -43,11 +68,21 @@ include_directories(${CMAKE_SOURCE_DIR}/include/cpp/sig-adapters)
 include_directories(${CMAKE_SOURCE_DIR}/include/cpp/emscripten)
 
 SET(SOURCE
+    behave-mirror/src/behave/behaveRun.cpp
     behave-mirror/src/behave/behaveUnits.cpp
     behave-mirror/src/behave/canopy_coefficient_table.cpp
+    behave-mirror/src/behave/Contain.cpp
+    behave-mirror/src/behave/ContainAdapter.cpp
+    behave-mirror/src/behave/ContainForce.cpp
+    behave-mirror/src/behave/ContainForceAdapter.cpp
+    behave-mirror/src/behave/ContainResource.cpp
+    behave-mirror/src/behave/ContainSim.cpp
     behave-mirror/src/behave/crown.cpp
     behave-mirror/src/behave/crownInputs.cpp
     behave-mirror/src/behave/fireSize.cpp
+    behave-mirror/src/behave/fuelModels.cpp
+    behave-mirror/src/behave/ignite.cpp
+    behave-mirror/src/behave/igniteInputs.cpp
     behave-mirror/src/behave/mortality.cpp
     behave-mirror/src/behave/mortality_equation_table.cpp
     behave-mirror/src/behave/mortality_inputs.cpp
@@ -57,6 +92,8 @@ SET(SOURCE
     behave-mirror/src/behave/randthread.cpp
     behave-mirror/src/behave/safety.cpp
     behave-mirror/src/behave/species_master_table.cpp
+    behave-mirror/src/behave/spot.cpp
+    behave-mirror/src/behave/spotInputs.cpp
     behave-mirror/src/behave/surface.cpp
     behave-mirror/src/behave/surfaceFireReactionIntensity.cpp
     behave-mirror/src/behave/surfaceFuelbedIntermediates.cpp
@@ -85,11 +122,21 @@ SET(SOURCE
     include/cpp/sig-adapters/SIGSurface.cpp)
 
 SET(HEADERS
+    behave-mirror/src/behave/behaveRun.h
     behave-mirror/src/behave/behaveUnits.h
     behave-mirror/src/behave/canopy_coefficient_table.h
+    behave-mirror/src/behave/Contain.h
+    behave-mirror/src/behave/ContainAdapter.h
+    behave-mirror/src/behave/ContainForce.h
+    behave-mirror/src/behave/ContainForceAdapter.h
+    behave-mirror/src/behave/ContainResource.h
+    behave-mirror/src/behave/ContainSim.h
     behave-mirror/src/behave/crown.h
     behave-mirror/src/behave/crownInputs.h
     behave-mirror/src/behave/fireSize.h
+    behave-mirror/src/behave/fuelModels.h
+    behave-mirror/src/behave/ignite.h
+    behave-mirror/src/behave/igniteInputs.h
     behave-mirror/src/behave/mortality.h
     behave-mirror/src/behave/mortality_equation_table.h
     behave-mirror/src/behave/mortality_inputs.h
@@ -99,6 +146,8 @@ SET(HEADERS
     behave-mirror/src/behave/randthread.h
     behave-mirror/src/behave/safety.h
     behave-mirror/src/behave/species_master_table.h
+    behave-mirror/src/behave/spot.h
+    behave-mirror/src/behave/spotInputs.h
     behave-mirror/src/behave/surface.h
     behave-mirror/src/behave/surfaceFireReactionIntensity.h
     behave-mirror/src/behave/surfaceFuelbedIntermediates.h
@@ -133,6 +182,40 @@ source_group("Behave Core Source Files" FILES ${SOURCE})
 source_group("Behave Core Header Files" FILES ${HEADERS})
 
 add_library(behave STATIC ${SOURCE} ${HEADERS})
+
+# Behave Test Outputs
+
+IF(TEST_BEHAVE)
+        SET(BOOST_TEST_SOURCE
+            behave-mirror/src/testBehave/testBehave.cpp)
+        ADD_EXECUTABLE(testBehave 
+            ${SOURCE}
+            ${BOOST_TEST_SOURCE}
+            ${HEADERS})
+        TARGET_LINK_LIBRARIES(testBehave)
+ENDIF()
+
+IF(TEST_CONTAIN)
+        SET(BOOST_TEST_SOURCE
+            test/cpp/testContain.cpp)
+        ADD_EXECUTABLE(testContain
+            ${SOURCE}
+            ${BOOST_TEST_SOURCE}
+            ${HEADERS})
+        TARGET_LINK_LIBRARIES(testContain)
+ENDIF()
+
+IF(TEST_SURFACE)
+        SET(BOOST_TEST_SOURCE
+            test/cpp/testSurface.cpp)
+        ADD_EXECUTABLE(testSurface
+            ${SOURCE}
+            ${BOOST_TEST_SOURCE}
+            ${HEADERS})
+        TARGET_LINK_LIBRARIES(testSurface)
+ENDIF()
+
+# Behave JS/WASM Outpupts
 
 IF(BEHAVE_JS)
     add_custom_command(

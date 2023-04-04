@@ -99,7 +99,12 @@ int main(int argc, char * argv[])
   int result = parseCSVFile(csvFilename, csvHeaders, csvStringRows, csvDoubleRows);
 
   if (result == 0) {
-    printCSVData(csvHeaders, csvStringRows, csvDoubleRows);
+#ifndef NDEBUG
+      printCSVData(csvHeaders, csvStringRows, csvDoubleRows);
+#endif
+  } else {
+    std::cerr << "ERROR: Unable to read CSV file: " << csvFilename << std::endl;
+    return -1;
   }
 
   std::cout << "Performing tests with: " << csvStringRows.size() << " samples.\n";
@@ -138,12 +143,12 @@ int main(int argc, char * argv[])
   std::cout << "Total tests passed: " << testInfo.numPassed << "\n";
   std::cout << "Total tests failed: " << testInfo.numFailed << "\n\n";
 
-  //#ifndef NDEBUG
-  //    // Make Visual Studio wait while in debug mode
-  //    std::cout << "Press Enter to continue . . .";
-  //    std::cin.get();
-  //#endif
-  //    return 0;
+  #ifndef NDEBUG
+      // Make Visual Studio wait while in debug mode
+      std::cout << "Press Enter to continue . . .";
+      std::cin.get();
+  #endif
+      return 0;
 }
 
 /* Helper Methods */

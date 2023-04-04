@@ -150,7 +150,12 @@ int main(int argc, char * argv[])
   int result = parseCSVFile(csvFilename, csvHeaders, csvStringRows, csvDoubleRows);
 
   if (result == 0) {
-    printCSVData(csvHeaders, csvStringRows, csvDoubleRows);
+#ifndef NDEBUG
+      printCSVData(csvHeaders, csvStringRows, csvDoubleRows);
+#endif
+  } else {
+    std::cerr << "ERROR: Unable to read CSV file: " << csvFilename << std::endl;
+    return -1;
   }
 
   std::cout << "Performing tests with: " << csvStringRows.size() << " samples.\n";
@@ -193,12 +198,12 @@ int main(int argc, char * argv[])
   std::cout << "Total tests passed: " << testInfo.numPassed << "\n";
   std::cout << "Total tests failed: " << testInfo.numFailed << "\n\n";
 
-  //#ifndef NDEBUG
-  //    // Make Visual Studio wait while in debug mode
-  //    std::cout << "Press Enter to continue . . .";
-  //    std::cin.get();
-  //#endif
-  //    return 0;
+  #ifndef NDEBUG
+      // Make Visual Studio wait while in debug mode
+      std::cout << "Press Enter to continue . . .";
+      std::cin.get();
+  #endif
+      return 0;
 }
 
 /* Helper Methods */
@@ -265,8 +270,6 @@ void reportTestResult(int row, struct TestInfo& testInfo, const string testName,
 
 void testSurfaceModule(int row, struct TestInfo& testInfo, SurfaceTestInputs& inputs, SurfaceTestOutputs& expected, BehaveRun& behaveRun)
 {
-  std::cout << "Testing Surface module\n";
-
   string testName = "";
 
   double observedSpreadRate = 0;
@@ -301,8 +304,6 @@ void testSurfaceModule(int row, struct TestInfo& testInfo, SurfaceTestInputs& in
   testName = "Test fire spread rate";
   observedSpreadRate = behaveRun.surface.getSpreadRate(SpeedUnits::ChainsPerHour);
   reportTestResult(row, testInfo, testName, observedSpreadRate, expected.spreadRate, error_tolerance);
-
-  std::cout << "Finished testing Surface module\n\n";
 }
 
 void printCSVData(std::vector<std::string> csvHeaders,
@@ -340,7 +341,7 @@ int parseCSVFile(std::string filename,
   std::ifstream input{filename};
 
   if (!input.is_open()) {
-    std::cerr << "Couldn't read file: " << filename << "\n";
+    std::cerr << "Couldn't read file: " << filename << std::endl;
     return 1; 
   }
 
