@@ -16,6 +16,7 @@
                  "components/dom_utils/src"
                  "components/ds_schema_utils/src"
                  "components/file_utils/src"
+                 "components/hatchet/src"
                  "components/markdown2hiccup/src"
                  "components/map_utils/src"
                  "components/number_utils/src"
@@ -36,6 +37,7 @@
                 clojure-msgpack/clojure-msgpack {:mvn/version "1.2.1"}
                 com.cognitect/transit-clj       {:mvn/version "1.0.324"}
                 hiccup/hiccup                   {:mvn/version "2.0.0-alpha2"}
+                instaparse/instaparse           {:mvn/version "1.4.12"}
                 io.replikativ/datahike          {:mvn/version "0.5.1506"}
                 me.raynes/fs                    {:mvn/version "1.4.6"}
                 net.coobird/thumbnailator       {:mvn/version "0.4.19"}
