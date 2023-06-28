@@ -65,7 +65,7 @@
 
   (def datoms-to-add (mapv #(vec (apply list :db/add (take 3 %))) datoms))
 
-  (def config {:store {:backend :file :path "~/.behave_cms/db-06-15"}})
+  (def config {:store {:backend :file :path "~/.behave_cms/db-06-28"}})
   #_(d/create-database (update-in config [:store :path] #(-> % fs/expand-home (.getPath))))
   (def conn (d/connect (update-in config [:store :path] #(-> % fs/expand-home (.getPath)))))
   conn
@@ -147,6 +147,7 @@
   (def int-keys (map first (filter (fn [[k v]] (int? v)) (first db-vars))))
   (def double-keys (map first (filter (fn [[k v]] (double? v)) (first db-vars))))
 
+  int-keys
   double-keys
 
   (defn int->double [m]
@@ -173,6 +174,8 @@
                        (merge (get remapped-db-vars k)
                               {:db/id v})) cont-vars))
 
+  (spit "units.edn" (pr-str units-tx))
+
   ;; Retract old longs
 
   (def old-longs [:variable/maximum
@@ -187,8 +190,6 @@
                           :where [?e :db/ident ?ident]]
                         @conn old-longs))
   (first old-long-ids)
-
-  (d/transact conn units-tx)
 
   (d/transact conn (mapv (fn [id] [:db/retractEntity id]) old-long-ids))
 
