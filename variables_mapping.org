@@ -132,15 +132,38 @@
 *** Fire Behavior
 **** Surface Fire
 
+     | IA Variable                | cpp code block                                                                                                                                | Note |
+     |----------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------+------|
+     | Distance of Maximum Spread | [[https://github.com/firelab/behave/blob/master/src/behave/surface.h#L67][double getSpreadDistance(LengthUnits::LengthUnitsEnum lengthUnits, double elapsedTime, TimeUnits::TimeUnitsEnum timeUnits)]]                    |      |
+     | Heat per Unit Area         | [[https://github.com/firelab/behave/blob/master/src/behave/surface.cpp#L196-L199][double Surface::getHeatPerUnitArea(HeatPerUnitAreaUnits::HeatPerUnitAreaUnitsEnum heatPerUnitAreaUnits)]]                                       |      |
+     | Reaction Intensity         | [[https://github.com/firelab/behave/blob/master/src/behave/surface.cpp#L206-L209][double Surface::getReactionIntensity(HeatSourceAndReactionIntensityUnits::HeatSourceAndReactionIntensityUnitsEnum reactiontionIntensityUnits)]] |      |
+
+***** Heading
+
+     | IA Variable                | cpp code block                                                                                                                                           | Note |
+     |----------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------+------|
+     | Heading Rate of Spread     | [[https://github.com/firelab/behave/blob/master/src/behave/surface.cpp#L155-L158][double Surface::getSpreadRate(SpeedUnits::SpeedUnitsEnum spreadRateUnits)]]                                                                                |      |
+     | Heading Flame Length       | [[https://github.com/firelab/behave/blob/master/src/behave/surface.cpp#L171-L174][double Surface::getFlameLength(LengthUnits::LengthUnitsEnum flameLengthUnits)]]                                                                            |      |
+     | Heading Spread Distance    | [[https://github.com/firelab/behave/blob/master/src/behave/surface.h#L68][double Surface::getSpreadDistanceInDirectionOfInterest(LengthUnits::LengthUnitsEnum lengthUnits, double elapsedTime, TimeUnits::TimeUnitsEnum timeUnits)]] |      |
+     | Heading Fireline Intensity | [[https://github.com/firelab/behave/blob/master/src/behave/surface.cpp#L191-L194][double Surface::getFirelineIntensity(FirelineIntensityUnits::FirelineIntensityUnitsEnum firelineIntensityUnits)]]                                          |      |
+
+***** Flanking
+
+     | IA Variable                 | cpp code block                                                                                                          | Note |
+     |-----------------------------+-------------------------------------------------------------------------------------------------------------------------+------|
+     | Flanking Rate of Spread     | [[https://github.com/firelab/behave/blob/master/src/behave/surface.h#L63][double Surface::getFlankingSpreadRate(SpeedUnits::SpeedUnitsEnum spreadRateUnits)]]                                       |      |
+     | Flanking Flame Length       | [[https://github.com/firelab/behave/blob/master/src/behave/surface.h#L71][double Surface::getFlankingFlameLength(LengthUnits::LengthUnitsEnum flameLengthUnits)]]                                   |      |
+     | Flanking Spread Distance    | [[https://github.com/firelab/behave/blob/master/src/behave/surface.h#L67][double Surface::getFlankingSpreadDistance(LengthUnits::LengthUnitsEnum lengthUnits)]]                                     |      |
+     | Flanking Fireline Intensity | [[https://github.com/firelab/behave/blob/master/src/behave/surface.h#L77][double Surface::getFlankingFirelineIntensity(FirelineIntensityUnits::FirelineIntensityUnitsEnum firelineIntensityUnits)]] |      |
+
+***** Backing
+
      | IA Variable                | cpp code block                                                                                                                                  | Note |
      |----------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------+------|
-     | Rate of Sparead            | [[https://github.com/firelab/behave/blob/master/src/behave/surface.cpp#L155-L158][double Surface::getSpreadRate(SpeedUnits::SpeedUnitsEnum spreadRateUnits)]]                                                                       |      |
-     | Flame Length               | [[https://github.com/firelab/behave/blob/master/src/behave/surface.cpp#L171-L174][double Surface::getFlameLength(LengthUnits::LengthUnitsEnum flameLengthUnits)]]                                                                   |      |
-     | Spread Distance            | [[https://github.com/firelab/behave/blob/master/src/behave/surface.h#L68][double getSpreadDistanceInDirectionOfInterest(LengthUnits::LengthUnitsEnum lengthUnits, double elapsedTime, TimeUnits::TimeUnitsEnum timeUnits)]] |      |
-     | Distance of Maximum Spread | [[https://github.com/firelab/behave/blob/master/src/behave/surface.h#L67][double getSpreadDistance(LengthUnits::LengthUnitsEnum lengthUnits, double elapsedTime, TimeUnits::TimeUnitsEnum timeUnits)]]                      |      |
-     | Fireline Intensity         | [[https://github.com/firelab/behave/blob/master/src/behave/surface.cpp#L191-L194][double Surface::getFirelineIntensity(FirelineIntensityUnits::FirelineIntensityUnitsEnum firelineIntensityUnits)]]                                 |      |
-     | Heat per Unit Area         | [[https://github.com/firelab/behave/blob/master/src/behave/surface.cpp#L196-L199][double Surface::getHeatPerUnitArea(HeatPerUnitAreaUnits::HeatPerUnitAreaUnitsEnum heatPerUnitAreaUnits)]]                                         |      |
-     | Reaction Intensity         | [[https://github.com/firelab/behave/blob/master/src/behave/surface.cpp#L206-L209][double Surface::getReactionIntensity(HeatSourceAndReactionIntensityUnits::HeatSourceAndReactionIntensityUnitsEnum reactiontionIntensityUnits)]]   |      |
+     | Backing Rate of Spread     | [[https://github.com/firelab/behave/blob/master/src/behave/surface.h#L62][double Surface::getBackingSpreadRate(SpeedUnits::SpeedUnitsEnum spreadRateUnits)]]                                                                |      |
+     | Backing Flame Length       | [[https://github.com/firelab/behave/blob/master/src/behave/surface.h#L70][double Surface::getBackingFlameLength(LengthUnits::LengthUnitsEnum flameLengthUnits)]]                                                            |      |
+     | Backing Spread Distance    | [[https://github.com/firelab/behave/blob/master/src/behave/surface.h#L66][double Surface::getBackingSpreadDistance(LengthUnits::LengthUnitsEnum lengthUnits, double elapsedTime, TimeUnits::TimeUnitsEnum timeUnits)]] |      |
+     | Backing Fireline Intensity | [[https://github.com/firelab/behave/blob/master/src/behave/surface.h#L76][double Surface::getBackingFirelineIntensity(FirelineIntensityUnits::FirelineIntensityUnitsEnum firelineIntensityUnits)]]                        |   |
 
 *** Intermediates
 **** Fuel Moisture
@@ -297,11 +320,10 @@
 *** Directions of Surface Spread & Wind
 **** Surface Spread Directions
 
-     | IA Variable                   | cpp code block | Note                                                                                                            |
-     |-------------------------------+----------------+-----------------------------------------------------------------------------------------------------------------|
-     | Heading Only                  |                | #make-setter [[https://sig-gis.atlassian.net/browse/BHP1-338][BHP1-338]]                                                                                           |
-     | Heading, Flanking and Backing |                | no longer needed, instead flanking and backing will be optional output variables whenever we do a heading fire. |
-     | User-Specified Directions     |                | #make-setter  [[https://sig-gis.atlassian.net/browse/BHP1-338][BHP1-338]]                                                                                          |
+     | IA Variable                                      | cpp code block                         | Note                                                         |
+     |--------------------------------------------------+----------------------------------------+--------------------------------------------------------------|
+     | Direction of Interest (Heading / User Specified) | SIGSurface::setSurfaceRunInDirectionOf |                                                              |
+     | User-Specified Direction                         | SIGSurface::setDirectionOfInterest     | NOTE: Updated one, added another getter accordingly (MR 100) |
 
 **** Surface Fire Wind & Spread
 ***** Wind Direction
@@ -423,10 +445,10 @@
 
 **** Wind and slope
 
-     | IA Variable                               | cpp code block | Note                               |
-     |-------------------------------------------+----------------+------------------------------------|
-     | are aligned wind is +- 30 from upslope    |                | #make-getter #make-setter [[https://sig-gis.atlassian.net/browse/BHP1-311][BHP1-311]] |
-     | are NOT aligned wind is > 30 from uplsope |                | #make-getter #make-setter [[https://sig-gis.atlassian.net/browse/BHP1-311][BHP1-311]] |
+     | IA Variable            | cpp code block                          | Note                                                                            |
+     |------------------------+-----------------------------------------+---------------------------------------------------------------------------------|
+     | Wind Upslope Alignment | SIGSurface::setWindUpslopeAlignmentMode | #cond When Wind is upslope only, don't allow user to set wind direction. |
+     |                        |                                         |                                                                                 |
 
 * Mortality
 ** Outputs

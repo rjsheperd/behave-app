@@ -1,0 +1,285 @@
+* Helpers
+#+BEGIN_SRC elisp
+  (defun get-current-org-subheading ()
+    (interactive)
+    (when (eq major-mode 'org-mode)
+      (let ((element (org-element-at-point)))
+        (when (eq (car element) 'headline)
+          (insert (org-element-property :raw-value element))))))
+
+  (defun get-current-org-subheading ()
+    (interactive)
+    (when (eq major-mode 'org-mode)
+      (let* ((element (org-element-at-point))
+             (limit (save-excursion (org-table-end))))
+        (while (and (not (eq (car element) 'headline)) (search-forward "|") (< (point) limit))
+          (setq element (org-element-at-point)))
+        (when (eq (car element) 'headline)
+          (insert (org-element-property :raw-value element)))))))
+
+  (defun get-current-org-element ()
+    (interactive)
+    (org-element-at-point))
+#+END_SRC
+
+* Crown
+| I/O    | Submodule                   | Group                            | SG-1                                 | IA Variable                          | CPP Class     | CPP Function                                              | CPP Param                             |
+|--------+-----------------------------+----------------------------------+--------------------------------------+--------------------------------------+---------------+-----------------------------------------------------------+---------------------------------------|
+| Output | Fire Type                   | Fire Type                        | Fire Type (required)                 | Fire Type (required)                 | SIGCrown      | getFireType                                               |                                       |
+| Output | Fire Type                   | Transition to Crown Fire         | Transition Ratio                     | Transition Ratio                     | SIGCrown      | calculateCrownFireTransitionRatio                         |                                       |
+| Output | Fire Type                   | Transition to Crown Fire         | Critical Surface Flame Length        | Critical Surface Flame Length        | SIGCrown      | calculateCrownCriticalSurfaceFlameLength                  |                                       |
+| Output | Fire Type                   | Transition to Crown Fire         | Critical Surface Rate of Spread      | Critical Surface Rate of Spread      | SIGCrown      | calculateCrownCriticalFireSpreadRate                      |                                       |
+| Output | Fire Type                   | Transition to Crown Fire         | Critical Surface Fireline Intensity  | Critical Surface Fireline Intensity  | SIGCrown      | calculateCrownCriticalSurfaceFireIntensity                |                                       |
+| Output | Fire Type                   | Active or Independent Crown Fire | Active Ratio                         | Active Ratio                         | SIGCrown      | calculateCrownFireActiveRatio                             |                                       |
+| Output | Fire Type                   | Active or Independent Crown Fire | Critical Crown Rate of Spread        | Critical Crown Rate of Spread        | SIGCrown      | calculateCrownCriticalFireSpreadRate                      |                                       |
+| Output | Fire Type                   | Fire Behavior                    | Rate of Spread                       | Rate of Spread                       | SIGCrown      | getCrownFireSpreadRate                                    |                                       |
+| Output | Fire Type                   | Fire Behavior                    | Flame Length                         | Flame Length                         | SIGCrown      | getCrownFlameLength                                       |                                       |
+| Output | Size                        | Spread Distance                  |                                      | Spread Distance                      | SIGCrown      | getCrownFireSpreadDistance                                |                                       |
+| Output | Size                        | Fire Area                        |                                      | Fire Area                            | SIGCrown      | AreaUnits                                                 |                                       |
+| Output | Size                        | Fire Perimeter                   |                                      | Fire Perimeter                       | SIGCrown      | LengthUnits                                               |                                       |
+| Output | Size                        | Length-to-Width Ratio            |                                      | Length-to-Width Ratio                | SIGCrown      | getCrownFireLengthToWidthRatio                            |                                       |
+| Output | Spotting, Active Crown Fire | Maximum Spotting Distance        |                                      | Maximum Spotting Distance            | SIGCrown      | getMaxMountainousTerrainSpottingDistanceFromTorchingTrees |                                       |
+| Output | Spotting, Active Crown Fire | Flame Height above Canopy        |                                      | Flame Height above Canopy            | SIGCrown      | getFlameHeightForTorchingTrees                            |                                       |
+| Input  | Calculation Options         | Calculate Crown Fire Using:      |                                      | Calculate Crown Fire Using:          | void SIGCrown | setCrownFireCalculationMethod                             | CrownFireCalculationMethod            |
+| Input  | Fuel Moisture               | Foliar Moisture                  |                                      | Foliar Moisture                      | SIGCrown      | setMoistureFoliar                                         | moistureFoliar                        |
+| Input  | Canopy Fuel                 | Canopy Height                    |                                      | Canopy Height                        | SIGCrown      | setCanopyHeight                                           | canopyHeight                          |
+| Input  | Canopy Fuel                 | Canopy Base Height               |                                      | Canopy Base Height                   | SIGCrown      | setCanopyBaseHeight                                       | canopyBaseHeight                      |
+| Input  | Canopy Fuel                 | Canopy Bulk Density              |                                      | Canopy Bulk Density                  | SIGCrown      | setCanopyBulkDensity                                      | canopyBulkDensity                     |
+| Input  | Weather                     | 20-ft Wind Speed                 |                                      | 20-ft Wind Speed                     | SIGCrown      | setWindSpeed                                              | double windSpeed                      |
+| Input  | Weather                     | Wind Adjustment Factor           |                                      | Wind Adjustment Factor               | SIGCrown      | setWindAdjustmentFactorCalculationMethod                  | windAdjustmentFactorCalculationMethod |
+| Input  | Spotting                    | Canopy Fuel                      | Canopy Height                        | Canopy Height                        | SIGSpot       | setTreeHeight                                             | treeHeight                            |
+| Input  | Spotting                    | Weather                          | 20-ft Wind Speed                     | 20-ft Wind Speed                     | SIGSpot       | setWindSpeedAtTwentyFeet                                  | windSpeedAtTwentyFeet                 |
+| Input  | Spotting                    | Topography                       | Ridge-to-Valley Elevation Difference | Ridge-to-Valley Elevation Difference | SIGSpot       | setRidgeToValleyElevation                                 | ridgeToValleyElevation                |
+| Input  | Spotting                    | Topography                       | Ridge-to-Valley Horizontal Distance  | Ridge-to-Valley Horizontal Distance  | SIGSpot       | setRidgeToValleyDistance                                  | ridgeToValleyDistance                 |
+| Input  | Spotting                    | Topography                       | Spotting Source Location             | Spotting Source Location             | SIGSpot       | setLocation                                               | location                              |
+| Input  | Spotting                    | Fire Behavior                    | Active Crown Flame Length            | Active Crown Flame Length            | SIGSpot       | setFlameLength                                            | double flameLength                    |
+
+* Surface
+** Outputs
+*** Fire Behavior
+**** Surface Fire
+
+| Group | IA Variable                | CPP Class | CPP Function | CPP Param |
+|-------+----------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------+------|
+|       | Rate of Sparead            | double Surface| getSpreadRate |SpeedUnits::SpeedUnitsEnum spreadRateUnits)]                                                                       |      |
+|       | Flame Length               | double Surface| getFlameLength |LengthUnits::LengthUnitsEnum flameLengthUnits)]                                                                   |      |
+|       | Spread Distance            | double getSpreadDistanceInDirectionOfInterest(LengthUnits| LengthUnitsEnum lengthUnits, double elapsedTime, TimeUnits::TimeUnitsEnum timeUnits)] |      |
+|       | Distance of Maximum Spread | double getSpreadDistance |LengthUnits| LengthUnitsEnum lengthUnits, double elapsedTime, TimeUnits::TimeUnitsEnum timeUnits)]                      |      |
+|       | Fireline Intensity         | double Surface::getFirelineIntensity |FirelineIntensityUnits| FirelineIntensityUnitsEnum firelineIntensityUnits)]                                 |      |
+|       | Heat per Unit Area         | double Surface::getHeatPerUnitArea |HeatPerUnitAreaUnits| HeatPerUnitAreaUnitsEnum heatPerUnitAreaUnits)]                                         |      |
+|       | Reaction Intensity         | double Surface::getReactionIntensity |HeatSourceAndReactionIntensityUnits| HeatSourceAndReactionIntensityUnitsEnum reactiontionIntensityUnits)]   |      |
+
+*** Intermediates
+**** Fuel Moisture
+
+| Group | IA Variable                      | CPP Class | CPP Function | CPP Param |
+|-------+----------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------+------|
+|       | Characteristic Dead              | double Surface::getCharacteristicMoistureByLifeState |FuelLifeState| FuelLifeStateEnum lifeState, MoistureUnits::MoistureUnitsEnum moistureUnits)] |      |
+|       | Characteristic Live              | double Surface::getCharacteristicMoistureByLifeState |FuelLifeState| FuelLifeStateEnum lifeState, MoistureUnits::MoistureUnitsEnum moistureUnits)] |      |
+|       | Live Fuel Moisture of Extinction | double Surface::getLiveFuelMoistureOfExtinction |MoistureUnits| MoistureUnitsEnum moistureUnits)]                                                  |      |
+
+**** Fuel Characteristics
+
+| Group | IA Variable            | CPP Class | CPP Function | CPP Param |
+|-------+------------------------+-------------------------------------------------------------------------------------------------+------|
+|       | Characteristic SA/V    | double getCharacteristicSAVR |SurfaceAreaToVolumeUnits| SurfaceAreaToVolumeUnitsEnum savrUnits)] |      |
+|       | Bulk Density           | double getBulkDensity |DensityUnits| DensityUnitsEnum densityUnits)]                             |      |
+|       | Packing Ratio          | double SurfaceFuelbedIntermediates::getPackingRatio |)]                                          |      |
+|       | Relative Packing Ratio | double SurfaceFuelbedIntermediates| getRelativePackingRatio |)]                                  |      |
+
+**** Heat Source
+
+| Group | IA Variable                  | CPP Class | CPP Function | CPP Param |
+|-------+------------------------------+---------------------------------------------------------------------------------------------------------------------+------|
+|       | Heat Source                  | double getHeatSource(HeatSourceAndReactionIntensityUnits| HeatSourceAndReactionIntensityUnitsEnum heatSourceUnits)] |      |
+|       | Dead Fuel Reaction Intensity | double Surface::getSurfaceFireReactionIntensityForLifeState |FuelLifeState| FuelLifeStateEnum lifeState)]            |      |
+|       | Live Fuel Reaction Intensity | double Surface::getSurfaceFireReactionIntensityForLifeState |FuelLifeState| FuelLifeStateEnum lifeState)]            |      |
+|       | Wind Factor                  | double SurfaceFire::getWindAdjustmentFactor |)]                                                                      |      |
+|       | Slope Factor                 | double SurfaceFire| getSlopeFactor |)]                                                                               |      |
+
+**** Heat Sink
+
+| Group | IA Variable          | CPP Class | CPP Function | CPP Param |
+|-------+----------------------+------------------------------------------------------------------------------+------|
+|       | Heat Sink            | double Surface| getHeatSink |HeatSinkUnits::HeatSinkUnitsEnum heatSinkUnits)] |      |
+|       | Flame Residence Time | double Surface| getResidenceTime |TimeUnits::TimeUnitsEnum timeUnits)]        |      |
+
+*** Size
+**** Surface - Fire Size
+
+| IA Variable    | CPP Class | CPP Function | CPP Param |
+|----------------+--------------------------------------------------------------------------------------------------------------------------------------|
+| Fire Area      | double Surface| getFireArea |AreaUnits::AreaUnitsEnum areaUnits, double elapsedTime, TimeUnits::TimeUnitsEnum timeUnits)]             |
+| Fire Perimeter | double Surface| getFirePerimeter |LengthUnits::LengthUnitsEnum lengthUnits , double elapsedTime, TimeUnits::TimeUnitsEnum timeUnits)] |
+
+**** Surface (Dependency to fire type conditionals for display) (Supplimental)
+
+| Group | IA Variable                | CPP Class | CPP Function | CPP Param |
+|-------+----------------------------+----------------------------------------------------------------------------------------------------------------------------------------------+------|
+|       | Fire Length-to-Width Ratio | double SurfaceFire| getFireLengthToWidthRatio |)]                                                                                             |      |
+|       | Heading Spread Distance    | double Surface| getSpreadDistance |LengthUnits::LengthUnitsEnum lengthUnits, double elapsedTime, TimeUnits::TimeUnitsEnum timeUnits)]         |      |
+|       | Flanking Spread Distance   | double Surface| getFlankingSpreadDistance |LengthUnits::LengthUnitsEnum lengthUnits, double elapsedTime, TimeUnits::TimeUnitsEnum timeUnits)] |      |
+|       | Backing Spread Distance    | double Surface| getBackingSpreadDistance |LengthUnits::LengthUnitsEnum lengthUnits, double elapsedTime, TimeUnits::TimeUnitsEnum timeUnits)]  |      |
+
+*** Diagram (Supplimental)
+
+| Group | IA Variable        | CPP Class | CPP Function | CPP Param |
+|-------+--------------------+----------------+------|
+|       | Fire Shape Diagram |                |      |
+
+*** Special Case Fuel Models
+**** Western Aspen
+***** Fuel Load
+
+| SM | Group | SG-1 | SG-2 | SG-3 | IA Variable                             | CPP Class      | CPP Function               | CPP Param                                     |   |
+|---+-------+------+------+------+-----------------------------------------+----------------+----------------------------+-----------------------------------------------+---|
+|   |       |      |      |      | Create output for fuel characteristics? |                |                            |                                               |   |
+|   |       |      |      |      | 1-h Fuel Load                           | double Surface | getAspenLoadDeadOneHour    | LoadingUnits::LoadingUnitsEnum loadingUnits)] |   |
+|   |       |      |      |      | Live Woody Fuel Load                    | double Surface | getAspenLoadDeadOneHour    | LoadingUnits::LoadingUnitsEnum loadingUnits)] |   |
+|   |       |      |      |      | Live Herbaceous Fuel Load               | double Surface | getAspenLoadLiveHerbaceous | LoadingUnits::LoadingUnitsEnum loadingUnits)] |   |
+
+***** Surface Area-to-Volume Ratio (SA/V)
+
+| SM | Group | IA Variable     | CPP Class      | CPP Function            | CPP Param                                                          |
+|----+-------+-----------------+----------------+-------------------------+--------------------------------------------------------------------|
+|    |       | 1-h SA/V        | double Surface | getAspenSavrDeadOneHour | SurfaceAreaToVolumeUnits::SurfaceAreaToVolumeUnitsEnum savrUnits)] |
+|    |       | Live Woody SA/V | double Surface | getAspenSavrLiveWoody   | SurfaceAreaToVolumeUnits::SurfaceAreaToVolumeUnitsEnum savrUnits)] |
+
+**** Chaparral
+***** Fuel Load
+
+| SM | Group | SG-1 | SG-2 | SG-3 | IA Variable                             | CPP Class      | CPP Function                  | CPP Param |
+|---+-------+------+------+------+-----------------------------------------+----------------+-------------------------------+-----------|
+|   |       |      |      |      | Create output for fuel characteristics? |                |                               |           |
+|   |       |      |      |      | Total Dead Fuel Load                    | double Surface | getChaparralTotalDeadFuelLoad |           |
+|   |       |      |      |      | Total Live Fuel Load                    | double Surface | getChaparralTotalLiveFuelLoad |           |
+
+****** Total Fuel Load
+
+| Group | IA Variable                             | CPP Class | CPP Function                  | CPP Param |
+|-------+-----------------------------------------+-----------+-------------------------------+-----------+
+|       | Specified on the worksheet              | Surface   | setChaparralFuelLoadInputMode |           |
+|       | Calculated from fuel bed depth and type | Surface   | setChaparralFuelLoadInputMode |           |
+
+***** Dead Fuel Load
+
+| Group | IA Variable                     | CPP Class | CPP Function | CPP Param |
+|-------+---------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------+------|
+|       | Less than: 0.25 Inches          | double Surface::getChaparralLoad |FuelLifeState| FuelLifeStateEnum lifeState, int sizeClass, LoadingUnits::LoadingUnitsEnum loadingUnits)] |      |
+|       | From 0.25 Inches to 0.50 inches | double Surface::getChaparralLoad |FuelLifeState| FuelLifeStateEnum lifeState, int sizeClass, LoadingUnits::LoadingUnitsEnum loadingUnits)] |      |
+|       | From 0.50 Inches to 1.0 inches  | double Surface::getChaparralLoad |FuelLifeState| FuelLifeStateEnum lifeState, int sizeClass, LoadingUnits::LoadingUnitsEnum loadingUnits)] |      |
+|       | From 1.0 Inches to 3.0 inches   | double Surface::getChaparralLoad |FuelLifeState| FuelLifeStateEnum lifeState, int sizeClass, LoadingUnits::LoadingUnitsEnum loadingUnits)] |      |
+
+***** Live Fuel Load
+
+| Group | IA Variable                      | CPP Class | CPP Function | CPP Param |
+|-------+----------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------+------|
+|       | Leaves                           | double Surface::getChaparralLoad |FuelLifeState| FuelLifeStateEnum lifeState, int sizeClass, LoadingUnits::LoadingUnitsEnum loadingUnits)] |      |
+|       | Stems less than 0.25 inches      | double Surface::getChaparralLoad |FuelLifeState| FuelLifeStateEnum lifeState, int sizeClass, LoadingUnits::LoadingUnitsEnum loadingUnits)] |      |
+|       | Stems 0.25 Inches to 0.50 inches | double Surface::getChaparralLoad |FuelLifeState| FuelLifeStateEnum lifeState, int sizeClass, LoadingUnits::LoadingUnitsEnum loadingUnits)] |      |
+|       | Stems 0.5 to 1.0 inches          | double Surface::getChaparralLoad |FuelLifeState| FuelLifeStateEnum lifeState, int sizeClass, LoadingUnits::LoadingUnitsEnum loadingUnits)] |      |
+|       | Stems 1.0 to 3.0 inches          | double Surface::getChaparralLoad |FuelLifeState| FuelLifeStateEnum lifeState, int sizeClass, LoadingUnits::LoadingUnitsEnum loadingUnits)] |      |
+
+**** Palmetto-Galberry
+***** Dead Fuel Load
+
+| Group | IA Variable                | CPP Class | CPP Function | CPP Param |
+|-------+----------------------------+----------------+------|
+|       | Fine: 0 to 0.25 inches     |                |      |
+|       | Medium: 0.25 to 1 inches   |                |      |
+|       | Foliage Fuel Load: On Stem |                |      |
+
+***** Live Fuel Load
+
+| Group | IA Variable                 | CPP Class | CPP Function | CPP Param |
+|-------+-----------------------------+----------------+------|
+|       | Fine: 0 to 0.25 inches      |                |      |
+|       | Medium: 0.25 to 1 inches    |                |      |
+|       | Foliage Fuel Load : On Stem |                |      |
+
+***** Fuelbed
+
+| Group | IA Variable   | CPP Class                                       | CPP Function | CPP Param                    |   |
+|-------+---------------+-------------------------------------------------+--------------+------------------------------+---|
+|       | Fuelbed Depth | double Surface::getPalmettoGallberyFuelBedDepth | LengthUnits  | LengthUnitsEnum depthUnits)] |   |
+
+*** Spot
+**** Maximum Spotting Distance
+
+| Submodule | Group                     | SG-1                     | SG-2 | SG-3 | IA Variable              | CPP Class   | CPP Function                                              | CPP Param |   |   |
+|-----------+---------------------------+--------------------------+------+------+--------------------------+-------------+-----------------------------------------------------------+-----------+---+---|
+| Spot      | Maximum Spotting Distance | Torching Trees           |      |      | Torching Trees           | double Spot | getMaxMountainousTerrainSpottingDistanceFromTorchingTrees |           |   |   |
+| Spot      | Maximum Spotting Distance | Burning Pile             |      |      | Burning Pile             | double Spot | getMaxMountainousTerrainSpottingDistanceFromBurningPile   |           |   |   |
+| Spot      | Maximum Spotting Distance | Wind-Driven Surface Fire |      |      | Wind-Driven Surface Fire | double Spot | getMaxMountainousTerrainSpottingDistanceFromSurfaceFire   |           |   |   |
+
+**** Burning Pile
+
+| Submodule | Group                                | SG-1 | SG-2 | SG-3 | IA Variable                                       | CPP Class   | CPP Function                           | CPP Param |   |
+|-----------+--------------------------------------+------+------+------+---------------------------------------------------+-------------+----------------------------------------+-----------+---|
+| Spot      | Firebrand Height from a Burning Pile |      |      |      | double Spot::getMaxFirebrandHeightFromBurningPile | LengthUnits | LengthUnitsEnum firebrandHeightUnits)] |           |   |
+
+** Inputs
+
+*** Directions of Surface Spread & Wind
+**** Surface Spread Directions
+
+     | IA Variable                                      | cpp code block                         | Note                                                         |
+     |--------------------------------------------------+----------------------------------------+--------------------------------------------------------------|
+     | Direction of Interest (Heading / User Specified) | SIGSurface::setSurfaceRunInDirectionOf |                                                              |
+     | User-Specified Direction                         | SIGSurface::setDirectionOfInterest     | NOTE: Updated one, added another getter accordingly (MR 100) |
+
+| I/O   | Submodule                           | Group                      | SG-1                                   | SG-2                                    | SG-3                  | IA Variable                             | CPP Class  | CPP Function                     | CPP Param                                                         |
+|-------+-------------------------------------+----------------------------+----------------------------------------+-----------------------------------------+-----------------------+-----------------------------------------+------------+----------------------------------+-------------------------------------------------------------------|
+| Input | Directions of Surface Spread & Wind | Surface Spread Directions  |                                        |                                         |                       | Surface Spread Directions               | SIGSurface | #ask-kenny                       |                                                                   |
+| Input | Directions of Surface Spread & Wind | Surface Fire Wind & Spread | Wind Direction                         |                                         |                       | Wind Direction                          | SIGSurface | setWindAndSpreadOrientationMode  | windAndSpreadOrientationMode                                      |
+| Input | Fuel Models                         | Standard                   | Fuel Model                             |                                         |                       | Fuel Model                              | SIGSurface | setFuelModelNumber               | int fuelModelNumber                                               |
+| Input | Fuel Models                         | Special Case               | Chaparral (Upland)                     | Total Fuel Load is...                   |                       | Chapparal Fuel Load Method              | SIGSurface | setChaparralFuelLoadInputMode    | fuelLoadInputMode                                                 |
+| Input | Fuel Models                         | Special Case               | Chaparral (Upland)                     | Dead Load Fraction (%)                  |                       | Dead Load Fraction (%)                  | SIGSurface | setChaparralFuelDeadLoadFraction | chaparralFuelDeadLoadFraction                                     |
+| Input | Fuel Models                         | Special Case               | Chaparral (Upland)                     | Calculated from fuel depth and type     | Fuel type             | Fuel type                               | SIGSurface | setChaparralFuelType             | chaparralFuelType                                                 |
+| Input | Fuel Models                         | Special Case               | Chaparral (Upland)                     | Calculated from fuel depth and type     | Fuelbed Depth (ft, m) | Fuelbed Depth (ft, m)                   | SIGSurface | setChaparralFuelBedDepth         | chaparralFuelBedDepth                                             |
+| Input | Fuel Models                         | Special Case               | Chaparral (Upland)                     | Direct Fuel Load                        | Total Fuel Load       | Total Fuel Load                         | SIGSurface | setChaparralTotalFuelLoad        | chaparralTotalFuelLoad                                            |
+| Input | Fuel Models                         | Special Case               | Palmetto-Gallberry                     | Age of Rough (years)                    |                       | Age of Rough (years)                    | SIGSurface | setAgeOfRough                    | ageOfRough                                                        |
+| Input | Fuel Models                         | Special Case               | Palmetto-Gallberry                     | Understory Height (ft, m)               |                       | Understory Height (ft, m)               | SIGSurface | setHeightOfUnderstory            | heightOfUnderstory                                                |
+| Input | Fuel Models                         | Special Case               | Palmetto-Gallberry                     | Palmetto Coverage (%)                   |                       | Palmetto Coverage (%)                   | SIGSurface | setPalmettoCoverage              | palmettoCoverage                                                  |
+| Input | Fuel Models                         | Special Case               | Palmetto-Gallberry                     | Overstory Basal Area (ft 2 /ac, m2 /ha) |                       | Overstory Basal Area (ft 2 /ac, m2 /ha) | SIGSurface | setOverstoryBasalArea            | overstoryBasalArea                                                |
+| Input | Fuel Models                         | Special Case               | Western Aspen                          | Surface Fuel & Understory Vegetation    |                       | Surface Fuel & Understory Vegetation    | SIGSurface | setAspenFuelModelNumber          | aspenFuelModelNumber                                              |
+| Input | Fuel Models                         | Special Case               | Western Aspen                          | Multiple Fuel Models                    |                       | Multiple Fuel Models                    | SIGSurface | setTwoFuelModelsMethod           | TwoFuelModelsMethod::TwoFuelModelsMethodEnum twoFuelModelsMethod) |
+| Input | Fuel Moisture                       | Moisture Input Mode        |                                        |                                         |                       | Moisture Input Mode                     | SIGSurface | setMoistureInputMode             | MoistureInputMode::MoistureInputModeEnum moistureInputMode)]      |
+| Input | Size                                | Elapsed Time               |                                        |                                         |                       | Elapsed Time                            | SIGSurface | setElapsedTime                   | double elapsedTime, TimeUnits::TimeUnitsEnum timeUnits)]          |
+| Input | Spot                                | Canopy Fuel                | Downwind Canopy Height                 |                                         |                       | Downwind Canopy Height                  | SIGSpot    | setDownwindCoverHeight           | downwindCoverHeight                                               |
+| Input | Spot                                | Canopy Fuel                | Downwind Canopy Cover                  |                                         |                       | Downwind Canopy Cover                   | SIGSpot    | setDownwindCanopyMode            | downwindCanopyMode                                                |
+| Input | Spot                                | Torching Trees             | Torching Tree Height                   |                                         |                       | Torching Tree Height                    | SIGSpot    | setTreeHeight                    | double treeHeight                                                 |
+| Input | Spot                                | Torching Trees             | Torching Tree Species                  |                                         |                       | Torching Tree Species                   | SIGSpot    | setTreeSpecies                   | treeSpecies                                                       |
+| Input | Spot                                | Torching Trees             | DBH (Diameter at Breast Height)        |                                         |                       | DBH (Diameter at Breast Height)         | SIGSpot    | setDBH                           | double DBH                                                        |
+| Input | Spot                                | Torching Trees             | Number of Torching Trees Numeric Value |                                         |                       | Number of Torching Trees Numeric Value  | SIGSpot    | setTorchingTrees                 | int torchingTrees                                                 |
+| Input | Spot                                | Topography                 | Ridge-to-Valley Elevation Difference   |                                         |                       | Ridge-to-Valley Elevation Difference    | SIGSpot    | setRidgeToValleyElevation        | ridgeToValleyElevation                                            |
+| Input | Spot                                | Topography                 | Ridge-to-Valley Horizontal Distance    |                                         |                       | Ridge-to-Valley Horizontal Distance     | SIGSpot    | setRidgeToValleyDistance         | ridgeToValleyDistance                                             |
+| Input | Spot                                | Topography                 | Spott List Source Location             |                                         |                       | Spott List Source Location              | SIGSpot    | setLocation                      | location                                                          |
+| Input | Submodule                           | Group                      | SG-1                                   | SG-2                                    | SG-3                  | IA Variable                             | CPP Class  | CPP Function                     | CPP Param                                                         |
+| Input | Wind Speed                          | Wind speed is entered as   |                                        |                                         |                       | Wind speed is entered as                | #ask-kenny |                                  |                                                                   |
+| Input | Wind Speed                          | Wind and slope are         |                                        |                                         |                       | Wind and Slope Alignment Mode           | SIGSurface | setWindUpslopeAlignmentMode      | windUpslopeAlignmentMode                                          |
+
+**** Wind and slope
+
+     | IA Variable            | cpp code block                          | Note |
+     |------------------------+-----------------------------------------+------|
+     | Wind Upslope Alignment | SIGSurface::setWindUpslopeAlignmentMode |      |
+     |                        |                                         |      |
+
+* Mortality
+| Module    | I/O    | Submodule                  | Group                      | SG-1                       | IA Variable                | CPP Class                       | CPP Function                      | CPP Param   |
+|-----------+--------+----------------------------+----------------------------+----------------------------+----------------------------+---------------------------------+-----------------------------------+-------------|
+| Mortality | Output | Scorch                     | Scorch Height              |                            | Scorch Height              | SIGMortality                    | getFlameLengthOrScorchHeightValue |             |
+| Mortality | Output | Tree Mortality             | Probability of Mortality   |                            | Probability of Mortality   | SIGMortality                    | getProbabilityOfMortality         |             |
+| Mortality | Output | Tree Mortality             | Bark Thickness             |                            | Bark Thickness             | SIGMortality                    | getBarkThickness                  |             |
+| Mortality | Output | Tree Mortality             | Tree Crown Length Scorched |                            | Tree Crown Length Scorched | SIGMortality                    | getTreeCrownLengthScorched        |             |
+| Mortality | Output | Tree Mortality             | Tree Crown Volume Scorched |                            | Tree Crown Volume Scorched | SIGMortality                    | getTreeCrownVolumeScorched        |             |
+| Mortality | Input  | Fuel/Vegetation, Overstory | Mortality Tree Species     |                            | Mortality Tree Species     | SIGMortality                    | setSpeciesCode                    | speciesCode |
+| Mortality | Input  | Fuel/Vegetation, Overstory | Canopy Height              |                            | Canopy Height              | SIGMortality                    | setTreeHeight                     | treeHeight  |
+| Mortality | Input  | Fuel/Vegetation, Overstory | Crown Ratio                |                            | Crown Ratio                | SIGMortality                    | setCrownRatio                     | crownRatio  |
+| Mortality | Input  | Fuel/Vegetation, Overstory | DBH                        | Diameter at Breast Height) |                            | DBH (Diameter at Breast Height) | SIGMortality                      | dbh         |
+| Mortality | Input  | Scorch                     | Fire                       | Surface Fire Flame Length  | Surface Fire Flame Length  | SIGMortality                    | setSurfaceFireFlameLength         | value       |
+| Mortality | Input  | Scorch                     | Fire                       | Scorch Height              | Scorch Height              | SIGMortality                    | setSurfaceFireFlameLength         | value       |
+| Mortality | Input  | Scorch                     | Fire                       | Surface Fireline Intensity | Surface Fireline Intensity | SIGMortality                    |                                   |             |
+| Mortality | Input  | Scorch                     | Weather                    | Midflame Wind Speed        | Midflame Wind Speed        | SIGMortality                    |                                   |             |
+| Mortality | Input  | Scorch                     | Weather                    | Air Temperature            | Air Temperature            | SIGMortality                    |                                   |             |
