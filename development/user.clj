@@ -2,9 +2,7 @@
 
 (comment
   (require '[behave.core :as core])
-
   (core/init!)
-
   (core/vms-sync!)
 
   (require '[behave-cms.server :as cms])
@@ -22,6 +20,8 @@
   (require '[datom-utils.interface :refer [split-datoms
                                            safe-attr?
                                            safe-deref]])
+
+  #_(export-db @ds/conn "dh-06-28.bak")
 
   (def lists (clojure.edn/read-string (slurp "lists.edn")))
   (d/q '[:find ?e
