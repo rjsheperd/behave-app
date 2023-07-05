@@ -3,7 +3,7 @@
             [datascript.core   :refer [squuid]]
             [reagent.core      :as r]
             [re-frame.core     :as rf]
-            [string-utils.interface :refer [->kebab ->str]]
+            [string-utils.interface :refer [->str ->snake]]
             [behave.schema.core :refer [all-schemas]]
             [behave-cms.routes :refer [singular]]
             [behave-cms.utils  :as u]))
@@ -41,8 +41,8 @@
                         (filter #(str/ends-with? % "/name"))
                         (first)
                         (keyword))
-        name-kebab (->kebab (get parent name-key))]
-    (str/replace (get parent h-or-t-key name-kebab) #":help$" "")))
+        name-snake (->snake (get parent name-key))]
+    (str/replace (get parent h-or-t-key name-snake) #":help$" "")))
 
 (defn- merge-parent-fields [state original entity parent-field parent-id parent]
   (let [gen-attr           #(keyword (str (->str entity) "/" %))
@@ -50,7 +50,7 @@
         translation-attr   (gen-attr "translation-key")
         help-attr          (gen-attr "help-key")
         parent-translation (parent-translation-key parent)
-        translation-key    (str parent-translation ":" (->kebab (get state name-attr)))
+        translation-key    (str parent-translation ":" (->snake (get state name-attr)))
         help-key           (str translation-key ":help")]
 
     (merge state

@@ -25,13 +25,7 @@
 ;;; Schema
 
 (def schema
-  [{:db/ident       :group-variable/uuid
-    :db/doc         "Group variable's UUID."
-    :db/valueType   :db.type/string
-    :db/unique      :db.unique/identity
-    :db/cardinality :db.cardinality/one}
-
-   {:db/ident       :group-variable/cpp-namespace
+  [{:db/ident       :group-variable/cpp-namespace
     :db/doc         "Group variable's C++ namespace."
     :db/valueType   :db.type/string
     :db/cardinality :db.cardinality/one}

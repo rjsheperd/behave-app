@@ -1,13 +1,24 @@
 (ns behave-cms.submodules.views
-  (:require [reagent.core                       :as r]
+  (:require [clojure.string                     :as str]
+            [reagent.core                       :as r]
             [re-frame.core                      :as rf]
             [data-utils.core                    :refer [parse-int]]
+            [string-utils.interface             :refer [->str]]
             [behave-cms.components.common       :refer [accordion simple-table window]]
             [behave-cms.components.entity-form  :refer [entity-form]]
             [behave-cms.components.sidebar      :refer [sidebar sidebar-width]]
             [behave-cms.components.translations :refer [all-translations]]
             [behave-cms.help.views              :refer [help-editor]]
             [behave-cms.submodules.subs]))
+
+(defn update-submodule-key [m]
+  (let [{io    :submodule/io
+         t-key :submodule/translation-key} m
+        t-vec                              (str/split t-key #":")
+        new-key                            (str/join ":" (concat (take 2 t-vec) [(->str io)] (drop 2 t-vec)))]
+    (assoc m
+           :submodule/translation-key new-key
+           :submodule/help-key (str new-key ":help"))))
 
 (defn submodule-form [module-id id num-submodules]
   [entity-form {:entity        :submodule
@@ -22,7 +33,9 @@
                                  :type      :radio
                                  :options   [{:label "Input" :value :input}
                                              {:label "Output" :value :output}]}]
-                :on-create     #(assoc % :submodule/order num-submodules)}])
+                :on-create     #(-> %
+                                    (assoc :submodule/order num-submodules)
+                                    (update-submodule-key))}])
 
 (defn manage-submodule [module-id *submodule num-submodules]
   [:div.col-6

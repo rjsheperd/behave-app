@@ -4,17 +4,21 @@
    [clojure.set            :as set]
    [clojure.string         :as str]
    [clj-yaml.core          :as yaml]
+   [clj-fuzzy.metrics :refer [dice]]
    [datahike.api           :as d]
+   [datascript.core        :refer [squuid]]
    [behave-cms.server      :as cms]
    [datom-store.main       :as ds]
    [behave.schema.core     :refer [all-schemas]]
-   [behave.schema.queries  :refer [rules q]]
-   [string-utils.interface :refer [->str ->kebab]]
+   [behave.schema.queries  :refer [rules q pull-children pull-with-attr]]
+   [string-utils.interface :refer [->str ->snake]]
+   [map-utils.interface :refer [index-by]]
    [datom-utils.interface  :refer [split-datoms
                                    safe-attr?
                                    safe-deref]]))
 
 ;;; Constants
+
 (def ^:private db-attrs             (map :db/ident all-schemas))
 (def ^:private db-translation-attrs (->> db-attrs
                                          (filter #(-> %
@@ -27,19 +31,18 @@
                                                       (str/ends-with? "help-key")))
                                          (set)))
 
-(defn- merge-parent-fields [child entity parent-field parent-id parent]
-  (let [gen-attr           #(keyword (str (->str entity) "/" %))
-        name-attr          (gen-attr "name")
-        translation-attr   (gen-attr "translation-key")
-        help-attr          (gen-attr "help-key")
-        parent-translation (parent-translation-key parent)
-        translation-key    (str parent-translation ":" (->kebab (get child name-attr)))
-        help-key           (str translation-key ":help")]
+(defn my-empty? [x]
+  (cond
+    (keyword? x)
+    false
+    
+    (string? x)
+    (empty? x)))
 
-    (merge child
-           {parent-field     parent-id}
-           (when (db-translation-attrs translation-attr) {translation-attr translation-key})
-           (when (db-help-attrs help-attr) {help-attr help-key}))))
+(defn ->key [& s]
+  (str/join ":" (concat ["behaveplus"] (map (comp ->snake str) (remove my-empty? s)))))
+
+;;; Helpers
 
 (defn- parent-translation-key
   "Gets the translation key from `:<parent>/translation-key`,
@@ -54,98 +57,180 @@
                         (filter #(str/ends-with? % "/name"))
                         (first)
                         (keyword))
-        name-kebab (->kebab (get parent name-key))]
-    (str/replace (get parent h-or-t-key name-kebab) #":help$" "")))
+        name-snake (->snake (get parent name-key))]
+    (str/replace (get parent h-or-t-key name-snake) #":help$" "")))
+
+(defn- merge-parent-fields [child entity parent-field parent-id parent]
+  (let [gen-attr           #(keyword (str (->str entity) "/" %))
+        name-attr          (gen-attr "name")
+        translation-attr   (gen-attr "translation-key")
+        help-attr          (gen-attr "help-key")
+        parent-translation (parent-translation-key parent)
+        translation-key    (str parent-translation ":" (->snake (get child name-attr)))
+        help-key           (str translation-key ":help")]
+
+    (merge child
+           {parent-field     parent-id}
+           (when (db-translation-attrs translation-attr) {translation-attr translation-key})
+           (when (db-help-attrs help-attr) {help-attr help-key}))))
+
+(defn tsv-parser [filename]
+  (with-open [rdr (io/reader filename)]
+    (let [row-splitter #(-> %
+                            (str/split #"\t")
+                            (->> (map str/trim)))
+          lines        (line-seq rdr)
+          header       (map keyword (row-splitter (first lines)))]
+      (doall (map (fn [l]
+                    (into {} (map (fn [h l] (vector h l)) header (row-splitter l))))
+                  (rest lines))))))
+
+(defn add-item [coll x]
+  (cond
+    (nil? coll)
+    x
+
+    (or (vector? coll) (list? coll) (set? coll))
+    (conj coll x)
+
+    :else
+    [coll x]))
+
+(defn remove-item [coll x]
+  (cond
+    (set? coll)
+    (disj coll x)
+
+    (vector? coll)
+    (->> coll (remove #(= x %)) (vec))
+
+    (list? coll)
+    (remove #(= x %) coll)
+
+    (= x coll)
+    nil))
+
+(def ignore-attrs
+  #{:db/cardinality
+    :db/doc
+    :db/ident
+    :db/index
+    :db/tupleAttrs
+    :db/txInstant
+    :db/unique
+    :db/valueType
+    :user/name
+    :user/super-admin?
+    :user/email
+    :user/password
+    :user/verified?})
+
+(defn datoms-to-maps [conn]
+  (->> (d/datoms conn :eavt)
+       (split-datoms)
+       (filter #(not (ignore-attrs (second %))))
+       (reduce (fn [acc [e a v tx op]]
+                 (if op
+                   (update-in acc [e a] add-item v)
+                   (update-in acc [e a] remove-item v)))
+               {})
+       (map (fn [[k v]] [k (assoc v :db/id k)]))
+       (into (sorted-map))))
+
+(defn similar-keys? [m1 m2 & [threshold]]
+  (let [k1        (set (keys m1))
+        k2        (set (keys m2))
+        threshold (or threshold (/ (max (count k1) (count k2)) 2))]
+    (> (count (set/intersection k1 k2)) threshold)))
+
+(defn zip [ks vs]
+  (apply assoc {} 
+         (interleave ks vs)))
+
+(def t-keys {1 :module/translation-key
+             3 :submodule/translation-key
+             4 :group/translation-key
+             5 :group/translation-key
+             6 :group/translation-key
+             7 :group/translation-key
+             8 :group-variable/translation-key})
+
+(defn get-id [& v]
+  (let [t-key-attr (get t-keys (count v))
+        key        (apply ->key v)]
+    (d/q '[:find ?e .
+           :in $ ?t-attr ?k
+           :where [?e ?t-attr ?k]]
+         @@ds/conn t-key-attr key)))
+
+(def exists? (comp some? get-id))
+
+(def cols [:module/name
+           :submodule/io
+           :submodule/name
+           :group/name
+           :subgroup-1/name
+           :subgroup-2/name
+           :subgroup-3/name
+           :variable/name])
+
+(def attr-keys {1 [[:module/name] :module :application/_modules]
+                3 [[:submodule/io :submodule/name] :submodule :module/_submodules]
+                4 [[:group/name] :group :submodule/_groups]
+                5 [[:group/name] :group :group/_children]
+                6 [[:group/name] :group :group/_children]
+                7 [[:group/name] :group :group/_children]})
+
+(defn update-submodule-key [m]
+  (let [{io    :submodule/io
+         t-key :submodule/translation-key} m
+        t-vec                              (str/split t-key #":")
+        new-key                            (str/join ":" (concat (take 2 t-vec) [(->str io)] (drop 2 t-vec)))]
+    (assoc m
+           :submodule/translation-key new-key
+           :submodule/help-key (str new-key ":help"))))
+
+(defn exists-or-create [& v]
+  (when-not (apply exists? v)
+    (let [num-cols                        (count v)
+          submodule?                      (= 3 num-cols)
+          parent-id                       (if submodule? (get-id (first v)) (apply get-id (butlast v)))
+          parent                          (d/pull @@ds/conn '[*] parent-id)
+          [attrs entity-type parent-attr] (get attr-keys num-cols)
+          child                           (if submodule? (zip attrs (rest v)) (assoc {} (first attrs) (last v)))]
+      (cond-> child
+        :always 
+        (merge-parent-fields
+         entity-type
+         parent-attr
+         parent-id
+         parent)
+
+        :always
+        (assoc :bp/uuid (str (squuid)))
+
+        submodule?
+        (update-submodule-key)))))
+
+(defn search [term corpus]
+  (->> corpus
+       (map #(assoc {:value %} :match (dice term %)))
+       (filter #(< 0.6 (:match %)))
+       (sort-by :match)
+       (last)))
 
 (comment
 
   (cms/init-datahike!)
 
-  (def datoms (d/datoms @@ds/conn :eavt))
+  (def datom-maps (datoms-to-maps @@ds/conn))
 
-  (def ignore-attrs 
-    #{:db/cardinality
-      :db/doc
-      :db/ident
-      :db/index
-      :db/tupleAttrs
-      :db/txInstant
-      :db/unique
-      :db/valueType
-      :user/name
-      :user/super-admin?
-      :user/email
-      :user/password
-      :user/verified?})
+  (first datom-maps)
 
-  (def datoms-split
-    (->> datoms
-         (split-datoms)
-         (filter #(not (ignore-attrs (second %))))))
-
-  (filter #(str/starts-with? (->str %) "user") (set (map second datoms-split)))
-  (seq 3)
-  (seq #(3 2 1)
-
-  (first datoms-split)
-
-  (defn add-item [coll x]
-    (cond
-      (nil? coll)
-      x
-
-      (or (vector? coll) (list? coll) (set? coll))
-      (conj coll x)
-
-      :else
-      [coll x]))
-
-  (defn remove-item [coll x]
-      (cond
-        (set? coll)
-        (disj coll x)
-
-        (vector? coll)
-        (->> coll (remove #(= x %)) (vec))
-
-        (list? coll)
-        (remove #(= x %) coll)
-
-        (= x coll)
-        nil))
-
-  (def datoms-to-maps (->> datoms-split
-                           (reduce (fn [acc [e a v tx op]]
-                                     (if op
-                                       (update-in acc [e a] add-item v)
-                                       (update-in acc [e a] remove-item v)))
-                                   {})
-                           (map (fn [[k v]] [k (assoc v :db/id k)]))
-                           (into (sorted-map))))
-
-  (remove-item 2 2)
-  (remove-item [3 2] 2)
-
-  (add-item nil 2)
-  (add-item [3] 2)
-  (add-item 3 2)
-
-  (update-in {:a {:b [3]}} [:a :b] add-item 2)
-  (update-in {:a {:b [3 2]}} [:a :b] remove-item 3)
+  (similar-keys? {:a "hello" :b "derp" :c "foo"} {:a "hello" :b "no way" :g "maybe?"})
 
   (spit "db-06-28.yml"
         (yaml/generate-string datoms-to-maps :dumper-options {:flow-style :block}))
-
-  (defn tsv-parser [filename]
-    (with-open [rdr (io/reader filename)]
-      (let [row-splitter #(-> %
-                              (str/split #"\t")
-                              (->> (map str/trim)))
-            lines        (line-seq rdr)
-            header       (map keyword (row-splitter (first lines)))]
-        (doall (map (fn [l]
-                      (into {} (map (fn [h l] (vector h l)) header (row-splitter l))))
-                    (rest lines))))))
 
   (def var-fns (tsv-parser "var_fns_table.tsv"))
 
@@ -170,7 +255,290 @@
        [?v :variable/name ?gv-name]]
      @@ds/conn "Contain")
 
+  (d/q '[:find ?e ?s
+        :where [?e :submodule/name ?s]]
+   @@ds/conn)
+
+  (def contain-output-vars
+    (q '[:find ?m-name ?io-str ?s-name ?g-name ?v-name ?c-name ?f-name
+         :in $ % ?m-name
+         :where
+         [?m :module/name ?m-name]
+
+         (submodule ?m ?s)
+         [?s :submodule/name ?s-name]
+         (io ?s ?io)
+         [(str ?io) ?io-str]
+
+         (group ?s ?g)
+         [?g :group/name ?g-name]
+
+         (variable ?g ?gv ?v)
+         [?v :variable/name ?v-name]
+
+         [?gv :group-variable/cpp-class ?c-uuid]
+         (uuid ?c ?c-uuid)
+         [?c :cpp.class/name ?c-name]
+
+         [?gv :group-variable/cpp-function ?f-uuid]
+         (uuid ?f ?f-uuid)
+         [?f :cpp.function/name ?f-name]
+
+         (not [?gv :group-variable/cpp-parameter ?p-uuid])]
+       @@ds/conn "Contain"))
+
+  (def surface-cpp-class
+    (q '[:find ?c .
+         :in $ % ?c-name
+         :where
+         (cpp-name ?c ?c-name)
+         (cpp-fn ?c ?f)]
+       @@ds/conn "SIGSurface"))
+
+  (pull-children @@ds/conn :cpp.class/function surface-cpp-class)
+
+  (pull-with-attr @@ds/conn :cpp.namespace/name)
+
+  (d/pull-many @@ds/conn '[*] )
+
+  (def output-vars *1)
+
+  (def header [["module/name"
+                "submodule/io"
+                "submodule/name"
+                "group/name"
+                "variable/name"
+                "cpp/class"
+                "cpp/function"
+                "cpp/parameter"]])
+  
+  (spit "contain.tsv" (str/join "\n" (map #(str/join "\t" %) (concat header contain-vars))))
+  (spit "contain.tsv" (str/join "\n" (map #(str/join "\t" %) contain-output-vars)) :append true)
+
+  ;; Performed some munging offline
+
+  (def all-vars-w-fns (->> (tsv-parser "var_fns_table.tsv")
+                           (map (fn [m] (update m :submodule/io keyword)))))
+
+  (def test-case (first all-vars-w-fns))
+
+  (def vars-nested (reduce (fn [acc c]
+                             (let [path (map #(get c %) cols)]
+                               (assoc-in acc path (:variable/name c))))
+                           {}
+                           all-vars-w-fns))
+
+  (spit "vars_fns.yaml" (yaml/generate-string vars-nested :dumper-options {:flow-style :block}))
+
+
+  (first all-vars-w-fns)
+
+  (def module "Crown")
+
+  (def crown-vars-w-fns (filter #(= "Crown" (:module/name %)) all-vars-w-fns))
+
+  ;;; Major Steps
+  ;; 0. Clear out previous data
+
+  ;; -- Remove all group variables
+  (def all-group-vars (d/q '[:find  [?e ...]
+                         :where [?e :group-variable/translation-key]]
+                       @@ds/conn))
+  (d/pull @@ds/conn '[*] (first all-group-vars))
+  (d/transact @ds/conn (mapv (fn [id] [:db/retractEntity id]) all-group-vars))
+
+  ;; -- Remove all groups
+  (def all-groups (d/q '[:find  [?e ...]
+                         :where [?e :group/name]]
+                       @@ds/conn))
+  (d/transact @ds/conn (mapv (fn [id] [:db/retractEntity id]) all-groups))
+
+  ;; Remove all submodules
+  (def all-submodules (d/q '[:find  [?e ...]
+                             :where [?e :submodule/name]]
+                           @@ds/conn))
+  all-submodules
+  (d/transact @ds/conn (mapv (fn [id] [:db/retractEntity id]) all-submodules))
+
+  ;; 1. Ensure the Submodules are in place
+  (defn create-submodules []
+    (let [num-cols  3
+          curr-cols (take num-cols cols)
+          curr-data (set (map (fn [row] (mapv #(get row %) curr-cols)) all-vars-w-fns))
+          to-create (remove #(apply exists? %) (vec curr-data))]
+      (mapv #(apply exists-or-create %) to-create)))
+
+  (create-submodules)
+  (d/transact @ds/conn (create-submodules))
+
+  ;; 2. Ensure the First Groups under those submodules
+  (defn create-groups []
+    (let [num-cols  4
+          curr-cols (take num-cols cols)
+          curr-data (set (map (fn [row] (mapv #(get row %) curr-cols)) all-vars-w-fns))
+          to-create (remove #(apply exists? %) (vec curr-data))]
+      (mapv #(apply exists-or-create %) to-create)))
+
+  (d/transact @ds/conn (create-groups))
+
+  ;; 3. Ensure the 1st Subgroups
+  (defn create-subgroups-1 []
+    (let [num-cols  5
+          curr-cols (take num-cols cols)
+          curr-data (set (map (fn [row] (mapv #(get row %) curr-cols)) all-vars-w-fns))
+          to-create (remove #(apply exists? %) (vec curr-data))]
+      (mapv #(apply exists-or-create %) to-create)))
+
+  (d/transact @ds/conn (create-subgroups-1))
+
+  ;; 4. Ensure the 2nd Subgroups
+  (defn create-subgroups-2 []
+    (let [num-cols  6
+          curr-cols (take num-cols cols)
+          curr-data (set (map (fn [row] (mapv #(get row %) curr-cols)) all-vars-w-fns))
+          to-create (remove #(apply exists? %) (vec curr-data))]
+      (mapv #(apply exists-or-create %) to-create)))
+
+  (d/transact @ds/conn (create-subgroups-2))
+
+  ;; 5. Ensure the 3rd Subgroups exist
+  (defn create-subgroups-3 []
+    (let [num-cols  7
+          curr-cols (take num-cols cols)
+          curr-data (set (map (fn [row] (mapv #(get row %) curr-cols)) all-vars-w-fns))
+          to-create (remove #(apply exists? %) (vec curr-data))]
+      (mapv #(apply exists-or-create %) to-create)))
+  (d/transact @ds/conn (create-subgroups-3))
+
+  ;; 6. Resolve Variables to Groups
+  (def variables
+    (into (sorted-map) (->> (d/datoms @@ds/conn :avet :variable/name)
+                            (map (fn [d] [(-> d (nth 2) (str/lower-case)) (nth d 0)])))))
+
+  (def var-names (set (keys variables)))
+
+  (defn find-var [term]
+    (let [result (search term var-names)]
+      (when result
+        (get variables (:value result)))))
+
+  (defn create-group-variable [& v]
+    (let [group-info  (vec (butlast v))
+          search-term (str/lower-case (last v))]
+      (if-let [var-id (find-var search-term)]
+        (let [variable (d/pull @@ds/conn '[*] var-id)
+              group-id (apply get-id group-info)
+              group    (d/pull @@ds/conn '[*] group-id)
+              t-key    (apply ->key (conj group-info (:variable/name variable)))]
+
+          #_[search-term variable group-info]
+          {:bp/uuid                        (str (squuid))
+           :group/_group-variables         group-id
+           :variable/_group-variables      var-id
+           :group-variable/translation-key t-key
+           :group-variable/help-key        (str t-key ":help")})
+        [:ERROR "Unable to find term " search-term])))
+
+  (def crown-vars-w-fns (filter #(= "Crown" (:module/name %)) all-vars-w-fns))
+  (def surface-vars-w-fns (filter #(= "Surface" (:module/name %)) all-vars-w-fns))
+  (def contain-vars-w-fns (filter #(= "Contain" (:module/name %)) all-vars-w-fns))
+  (def mortality-vars-w-fns (filter #(= "Mortality" (:module/name %)) all-vars-w-fns))
+
+  (defn create-group-vars [vars-w-fns]
+    (let [num-cols    8
+          curr-cols   (take num-cols cols)
+          curr-data   (set (map (fn [row] (mapv #(get row %) curr-cols)) vars-w-fns))]
+      (map #(apply create-group-variable %) curr-data)))
+
+  (filter #(= :ERROR (first %)) (create-group-vars crown-vars-w-fns))
+  (filter #(= :ERROR (first %)) (create-group-vars surface-vars-w-fns))
+  (filter #(= :ERROR (first %)) (create-group-vars contain-vars-w-fns))
+  (filter #(= :ERROR (first %)) (create-group-vars mortality-vars-w-fns))
+
+  (ds/transact @ds/conn (create-group-vars crown-vars-w-fns))
+  (ds/transact @ds/conn (create-group-vars surface-vars-w-fns))
+
+  (search "fire perimeter" var-names)
+  (find-var "calculate using")
+
+  ;;; CPP Mapping
+
+  ;; 1. Get all Namespaces/Classes/Fns/Parameters
+
+  (def classes (index-by :cpp.class/name
+                         (d/pull-many @@ds/conn
+                                      '[:cpp.class/name :db/id :bp/uuid]
+                                      (d/q '[:find [?e ...]
+                                             :in $ ?attr
+                                             :where [?e ?attr]]
+                                           @@ds/conn :cpp.class/name))))
+
+  (def fns (index-by :cpp.function/name
+                     (d/pull-many @@ds/conn
+                                  '[:cpp.function/name :db/id :bp/uuid]
+                                  (d/q '[:find [?e ...]
+                                         :in $ ?attr
+                                         :where [?e ?attr]]
+                                       @@ds/conn :cpp.function/name))))
+
+  (def parameters (index-by :cpp.parameter/name
+                            (d/pull-many @@ds/conn
+                                         '[:cpp.parameter/name :db/id :bp/uuid]
+                                         (d/q '[:find [?e ...]
+                                                :in $ ?attr
+                                                :where [?e ?attr]]
+                                              @@ds/conn :cpp.parameter/name))))
+
+  (map
+   (fn [v]
+     (let [[{c :cpp/class f :cpp/function p :cpp/parameter}] v]
+       {:group-variable/cpp-class     (get-in classes [f 0 :bp/uuid])
+        :group-variable/cpp-function  (get-in fns [f 0 :bp/uuid])
+        :group-variable/cpp-parameter (get-in parameters [f 0 :bp/uuid])}))
+   )
+
+
+  (def missing-fns (filter #(->> % (:cpp/function) (get fns) (nil?)) surface-vars-w-fns))
+  (map :cpp/function missing-fns)
+
+  ((set (keys classes)) "SIGSurface")
+  ((set (keys classes)) "SIGCrown")
+  ((set (keys classes)) "SIGMortality")
+  ((set (keys classes)) "SIGSpot")
+
+  (first (set (keys fns)))
+  (first (set (keys parameters)))
+
+  ;; (def config {:store {:backend :file :path "~/.behave_cms/db-new-schema"}})
+  ;; (d/create-database (update-in config [:store :path] #(-> % fs/expand-home (.getPath))))
+  ;; (def conn (d/connect (update-in config [:store :path] #(-> % fs/expand-home (.getPath)))))
+  ;;
+
   (def submodules (filter (fn [[k v]])))
+
+  (def all-help-w-content
+    (q '[:find ?k ?has-content ?written
+         :where
+         [?h :help-page/key ?k]
+         [?h :help-page/content ?c]
+         [(count ?c) ?written]
+         [(< 10 ?written) ?has-content]
+         [(= true ?has-content)]]
+       @@ds/conn))
+   
+  (def all-translation-keys
+    (flatten
+     (map
+      #(q '[:find [?k ...]
+            :in $ % ?t-attr
+            :where
+            [?e ?t-attr ?k]] @@ds/conn %)
+      (set (vals t-keys)))))
+
+  (first all-translation-keys)
+
+  
+
 
   )
 

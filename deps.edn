@@ -53,6 +53,7 @@
 
                 ;; Clojure Common
                 bidi/bidi           {:mvn/version "2.1.6"}
+                clj-fuzzy/clj-fuzzy {:mvn/version "0.4.1"}
                 cljs-ajax/cljs-ajax {:mvn/version "0.8.4"}
                 sig-gis/triangulum  {:git/url "https://github.com/sig-gis/triangulum"
                                      :git/tag "2023.05.15"
