@@ -137,6 +137,7 @@
   (add-export-file-to-conn "./cms-exports/SIGCrown.edn" ds/conn)
   (add-export-file-to-conn "./cms-exports/SIGBehaveRun.edn" ds/conn)
   (add-export-file-to-conn "./cms-exports/SIGMortality.edn" ds/conn)
+  (add-export-file-to-conn "./cms-exports/SIGSpot.edn" ds/conn)
 
   ;; Verify that SIGSurface exists
   (sort (d/q '[:find [?c-name ...]

@@ -137,6 +137,9 @@
        (map (fn [[k v]] [k (assoc v :db/id k)]))
        (into (sorted-map))))
 
+(defn pull-and-index-attr [conn attr]
+  (index-by attr (pull-with-attr conn attr)))
+
 (defn similar-keys? [m1 m2 & [threshold]]
   (let [k1        (set (keys m1))
         k2        (set (keys m2))
@@ -320,22 +323,46 @@
   (def all-vars-w-fns (->> (tsv-parser "var_fns_table.tsv")
                            (map (fn [m] (update m :submodule/io keyword)))))
 
-  (def test-case (first all-vars-w-fns))
+  ;;; CPP Mapping
 
-  (def vars-nested (reduce (fn [acc c]
-                             (let [path (map #(get c %) cols)]
-                               (assoc-in acc path (:variable/name c))))
-                           {}
-                           all-vars-w-fns))
+  ;; 1. Get all Namespaces/Classes/Fns/Parameters
 
-  (spit "vars_fns.yaml" (yaml/generate-string vars-nested :dumper-options {:flow-style :block}))
+  (def namespaces (pull-and-index-attr @@ds/conn :cpp.namespace/name))
 
+  (def global-ns-uuid (:bp/uuid (first (vals namespaces))))
 
-  (first all-vars-w-fns)
+  (def classes (pull-and-index-attr @@ds/conn :cpp.class/name))
 
-  (def module "Crown")
+  (def fns (pull-and-index-attr @@ds/conn :cpp.function/name))
 
-  (def crown-vars-w-fns (filter #(= "Crown" (:module/name %)) all-vars-w-fns))
+  (def parameters (pull-and-index-attr @@ds/conn :cpp.parameter/name))
+
+  ;; 2. Filter for variables with a class
+  (def vars-wo-fns (filter #(-> % :cpp/class empty?) all-vars-w-fns))
+  (count vars-wo-fns)
+
+  (def vars-to-fn-map (remove #(-> % :cpp/class empty?) all-vars-w-fns))
+
+  (defn ->fn-map [m]
+    (let [{c :cpp/class f :cpp/function p :cpp/parameter} m]
+      (cond-> m
+
+        :always
+        (merge 
+         {:group-variable/cpp-namespace global-ns-uuid
+          :group-variable/cpp-class     (get-in classes [c :bp/uuid])
+          :group-variable/cpp-function  (get-in fns [f :bp/uuid])})
+
+        (not (empty? p))
+        (assoc :group-variable/cpp-parameter (get-in parameters [p :bp/uuid])))))
+
+  (def mapped-vars (map ->fn-map vars-to-fn-map))
+
+  (first (filter (comp not empty? :cpp/parameter) mapped-vars))
+
+  (first (filter #(and (not (empty? (:cpp/parameter %)))
+                       (nil? (:group-variable/cpp-parameter %))) mapped-vars))
+
 
   ;;; Major Steps
   ;; 0. Clear out previous data
@@ -422,33 +449,48 @@
       (when result
         (get variables (:value result)))))
 
-  (defn create-group-variable [& v]
-    (let [group-info  (vec (butlast v))
-          search-term (str/lower-case (last v))]
+  (defn create-group-variable [row]
+    (let [{t-key  :key
+           v-name :variable/name
+           path   :path} row
+          search-term    (str/lower-case v-name)]
       (if-let [var-id (find-var search-term)]
         (let [variable (d/pull @@ds/conn '[*] var-id)
-              group-id (apply get-id group-info)
-              group    (d/pull @@ds/conn '[*] group-id)
-              t-key    (apply ->key (conj group-info (:variable/name variable)))]
+              group-id (apply get-id (butlast path))
+              group    (d/pull @@ds/conn '[*] group-id)]
+          [search-term var-id group-id]
 
-          #_[search-term variable group-info]
-          {:bp/uuid                        (str (squuid))
-           :group/_group-variables         group-id
-           :variable/_group-variables      var-id
-           :group-variable/translation-key t-key
-           :group-variable/help-key        (str t-key ":help")})
-        [:ERROR "Unable to find term " search-term])))
+          #_(merge
+             (select-keys row [:group-variable/cpp-namespace
+                               :group-variable/cpp-class
+                               :group-variable/cpp-function
+                               :group-variable/cpp-parameter])
+             {:bp/uuid                        (str (squuid))
+              :group/_group-variables         group-id
+              :variable/_group-variables      var-id
+              :group-variable/translation-key t-key
+              :group-variable/help-key        (str t-key ":help")}))
+        [:ERROR "Unable to find term:" search-term " with path:" path])))
 
-  (def crown-vars-w-fns (filter #(= "Crown" (:module/name %)) all-vars-w-fns))
-  (def surface-vars-w-fns (filter #(= "Surface" (:module/name %)) all-vars-w-fns))
-  (def contain-vars-w-fns (filter #(= "Contain" (:module/name %)) all-vars-w-fns))
-  (def mortality-vars-w-fns (filter #(= "Mortality" (:module/name %)) all-vars-w-fns))
+  (def crown-vars-w-fns (filter #(= "Crown" (:module/name %)) vars-to-fn-map))
+  (def surface-vars-w-fns (filter #(= "Surface" (:module/name %)) vars-to-fn-map))
+  (def contain-vars-w-fns (filter #(= "Contain" (:module/name %)) vars-to-fn-map))
+  (def mortality-vars-w-fns (filter #(= "Mortality" (:module/name %)) vars-to-fn-map))
 
   (defn create-group-vars [vars-w-fns]
     (let [num-cols    8
           curr-cols   (take num-cols cols)
-          curr-data   (set (map (fn [row] (mapv #(get row %) curr-cols)) vars-w-fns))]
-      (map #(apply create-group-variable %) curr-data)))
+          vars-w-keys (map (fn [row]
+                             (let [path (map #(get row %) curr-cols)] 
+                               (assoc row
+                                      :path path
+                                      :key (apply ->key path))))
+                           vars-w-fns)]
+      (map create-group-variable vars-w-keys)))
+
+
+  (create-group-vars vars-to-fn-map)
+
 
   (filter #(= :ERROR (first %)) (create-group-vars crown-vars-w-fns))
   (filter #(= :ERROR (first %)) (create-group-vars surface-vars-w-fns))
@@ -459,55 +501,8 @@
   (ds/transact @ds/conn (create-group-vars surface-vars-w-fns))
 
   (search "fire perimeter" var-names)
-  (find-var "calculate using")
+  (find-var "fire perimeter")
 
-  ;;; CPP Mapping
-
-  ;; 1. Get all Namespaces/Classes/Fns/Parameters
-
-  (def classes (index-by :cpp.class/name
-                         (d/pull-many @@ds/conn
-                                      '[:cpp.class/name :db/id :bp/uuid]
-                                      (d/q '[:find [?e ...]
-                                             :in $ ?attr
-                                             :where [?e ?attr]]
-                                           @@ds/conn :cpp.class/name))))
-
-  (def fns (index-by :cpp.function/name
-                     (d/pull-many @@ds/conn
-                                  '[:cpp.function/name :db/id :bp/uuid]
-                                  (d/q '[:find [?e ...]
-                                         :in $ ?attr
-                                         :where [?e ?attr]]
-                                       @@ds/conn :cpp.function/name))))
-
-  (def parameters (index-by :cpp.parameter/name
-                            (d/pull-many @@ds/conn
-                                         '[:cpp.parameter/name :db/id :bp/uuid]
-                                         (d/q '[:find [?e ...]
-                                                :in $ ?attr
-                                                :where [?e ?attr]]
-                                              @@ds/conn :cpp.parameter/name))))
-
-  (map
-   (fn [v]
-     (let [[{c :cpp/class f :cpp/function p :cpp/parameter}] v]
-       {:group-variable/cpp-class     (get-in classes [f 0 :bp/uuid])
-        :group-variable/cpp-function  (get-in fns [f 0 :bp/uuid])
-        :group-variable/cpp-parameter (get-in parameters [f 0 :bp/uuid])}))
-   )
-
-
-  (def missing-fns (filter #(->> % (:cpp/function) (get fns) (nil?)) surface-vars-w-fns))
-  (map :cpp/function missing-fns)
-
-  ((set (keys classes)) "SIGSurface")
-  ((set (keys classes)) "SIGCrown")
-  ((set (keys classes)) "SIGMortality")
-  ((set (keys classes)) "SIGSpot")
-
-  (first (set (keys fns)))
-  (first (set (keys parameters)))
 
   ;; (def config {:store {:backend :file :path "~/.behave_cms/db-new-schema"}})
   ;; (d/create-database (update-in config [:store :path] #(-> % fs/expand-home (.getPath))))
