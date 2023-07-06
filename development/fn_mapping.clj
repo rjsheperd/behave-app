@@ -454,28 +454,22 @@
            v-name :variable/name
            path   :path} row
           search-term    (str/lower-case v-name)]
-      (if-let [var-id (find-var search-term)]
-        (let [variable (d/pull @@ds/conn '[*] var-id)
+      (if-let [variable-id (find-var v-name)]
+        (let [variable (d/pull @@ds/conn '[*] variable-id)
               group-id (apply get-id (butlast path))
               group    (d/pull @@ds/conn '[*] group-id)]
-          [search-term var-id group-id]
 
-          #_(merge
+          (merge
              (select-keys row [:group-variable/cpp-namespace
                                :group-variable/cpp-class
                                :group-variable/cpp-function
                                :group-variable/cpp-parameter])
              {:bp/uuid                        (str (squuid))
               :group/_group-variables         group-id
-              :variable/_group-variables      var-id
+              :variable/_group-variables      variable-id
               :group-variable/translation-key t-key
               :group-variable/help-key        (str t-key ":help")}))
-        [:ERROR "Unable to find term:" search-term " with path:" path])))
-
-  (def crown-vars-w-fns (filter #(= "Crown" (:module/name %)) vars-to-fn-map))
-  (def surface-vars-w-fns (filter #(= "Surface" (:module/name %)) vars-to-fn-map))
-  (def contain-vars-w-fns (filter #(= "Contain" (:module/name %)) vars-to-fn-map))
-  (def mortality-vars-w-fns (filter #(= "Mortality" (:module/name %)) vars-to-fn-map))
+        [:ERROR search-term])))
 
   (defn create-group-vars [vars-w-fns]
     (let [num-cols    8
@@ -488,21 +482,7 @@
                            vars-w-fns)]
       (map create-group-variable vars-w-keys)))
 
-
-  (create-group-vars vars-to-fn-map)
-
-
-  (filter #(= :ERROR (first %)) (create-group-vars crown-vars-w-fns))
-  (filter #(= :ERROR (first %)) (create-group-vars surface-vars-w-fns))
-  (filter #(= :ERROR (first %)) (create-group-vars contain-vars-w-fns))
-  (filter #(= :ERROR (first %)) (create-group-vars mortality-vars-w-fns))
-
-  (ds/transact @ds/conn (create-group-vars crown-vars-w-fns))
-  (ds/transact @ds/conn (create-group-vars surface-vars-w-fns))
-
-  (search "fire perimeter" var-names)
-  (find-var "fire perimeter")
-
+  (ds/transact @ds/conn (create-group-vars mapped-vars))
 
   ;; (def config {:store {:backend :file :path "~/.behave_cms/db-new-schema"}})
   ;; (d/create-database (update-in config [:store :path] #(-> % fs/expand-home (.getPath))))
@@ -531,9 +511,4 @@
       (set (vals t-keys)))))
 
   (first all-translation-keys)
-
-  
-
-
   )
-
