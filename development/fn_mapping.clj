@@ -258,10 +258,6 @@
        [?v :variable/name ?gv-name]]
      @@ds/conn "Contain")
 
-  (d/q '[:find ?e ?s
-        :where [?e :submodule/name ?s]]
-   @@ds/conn)
-
   (def contain-output-vars
     (q '[:find ?m-name ?io-str ?s-name ?g-name ?v-name ?c-name ?f-name
          :in $ % ?m-name
@@ -290,22 +286,6 @@
          (not [?gv :group-variable/cpp-parameter ?p-uuid])]
        @@ds/conn "Contain"))
 
-  (def surface-cpp-class
-    (q '[:find ?c .
-         :in $ % ?c-name
-         :where
-         (cpp-name ?c ?c-name)
-         (cpp-fn ?c ?f)]
-       @@ds/conn "SIGSurface"))
-
-  (pull-children @@ds/conn :cpp.class/function surface-cpp-class)
-
-  (pull-with-attr @@ds/conn :cpp.namespace/name)
-
-  (d/pull-many @@ds/conn '[*] )
-
-  (def output-vars *1)
-
   (def header [["module/name"
                 "submodule/io"
                 "submodule/name"
@@ -323,6 +303,17 @@
   (def all-vars-w-fns (->> (tsv-parser "var_fns_table.tsv")
                            (map (fn [m] (update m :submodule/io keyword)))))
 
+  ;;; Clear previous CPP classes/fns/params
+
+  (def cpp-attrs [:cpp.parameter/name :cpp.function/name :cpp.class/name])
+
+  (def cpp-ids (flatten (map #(d/q '[:find [?e ...]
+                                     :in $ ?attr
+                                     :where [?e ?attr]]
+                                   @@ds/conn %) cpp-attrs)))
+
+  #_(d/transact @ds/conn (mapv (fn [id] [:db/retractEntity id]) cpp-ids))
+
   ;;; CPP Mapping
 
   ;; 1. Get all Namespaces/Classes/Fns/Parameters
@@ -331,11 +322,25 @@
 
   (def global-ns-uuid (:bp/uuid (first (vals namespaces))))
 
-  (def classes (pull-and-index-attr @@ds/conn :cpp.class/name))
+  (def classes (pull-with-attr @@ds/conn
+                               :cpp.class/name
+                               '[* {:cpp.class/function [* {:cpp.function/parameter [*]}]}]))
 
-  (def fns (pull-and-index-attr @@ds/conn :cpp.function/name))
+  (defn lookup [class-name & [fn-name param-name]]
+    (if-let [class (first (filter #(= class-name (:cpp.class/name %)) classes))]
+      (cond-> class
+        (and (empty? fn-name) (empty? param-name))
+        identity
 
-  (def parameters (pull-and-index-attr @@ds/conn :cpp.parameter/name))
+        (some? fn-name)
+        (-> (get :cpp.class/function)
+            (->> (filter #(= fn-name (:cpp.function/name %))))
+            (first))
+
+        (some? param-name)
+        (-> (get :cpp.function/parameter)
+            (->> (filter #(= param-name (:cpp.parameter/name %))))
+            (first)))))
 
   ;; 2. Filter for variables with a class
   (def vars-wo-fns (filter #(-> % :cpp/class empty?) all-vars-w-fns))
@@ -344,24 +349,24 @@
   (def vars-to-fn-map (remove #(-> % :cpp/class empty?) all-vars-w-fns))
 
   (defn ->fn-map [m]
-    (let [{c :cpp/class f :cpp/function p :cpp/parameter} m]
+    (let [{c :cpp/class f :cpp/function p :cpp/parameter} m
+          cpp-class (get-in classes c)]
       (cond-> m
 
         :always
         (merge 
          {:group-variable/cpp-namespace global-ns-uuid
-          :group-variable/cpp-class     (get-in classes [c :bp/uuid])
-          :group-variable/cpp-function  (get-in fns [f :bp/uuid])})
+          :group-variable/cpp-class     (:bp/uuid (lookup c))
+          :group-variable/cpp-function  (:bp/uuid (lookup c f))})
 
         (not (empty? p))
-        (assoc :group-variable/cpp-parameter (get-in parameters [p :bp/uuid])))))
+        (assoc :group-variable/cpp-parameter (:bp/uuid (lookup c f p))))))
 
   (def mapped-vars (map ->fn-map vars-to-fn-map))
 
-  (first (filter (comp not empty? :cpp/parameter) mapped-vars))
+  (map (juxt :cpp/class :cpp/function) (filter #(and (not (empty? (:cpp/function %))) (nil? (:group-variable/cpp-function %))) mapped-vars))
 
-  (first (filter #(and (not (empty? (:cpp/parameter %)))
-                       (nil? (:group-variable/cpp-parameter %))) mapped-vars))
+  (map (juxt :cpp/class :cpp/function :cpp/parameter) (filter #(and (not (empty? (:cpp/parameter %))) (nil? (:group-variable/cpp-parameter %))) mapped-vars))
 
 
   ;;; Major Steps
@@ -384,7 +389,6 @@
   (def all-submodules (d/q '[:find  [?e ...]
                              :where [?e :submodule/name]]
                            @@ds/conn))
-  all-submodules
   (d/transact @ds/conn (mapv (fn [id] [:db/retractEntity id]) all-submodules))
 
   ;; 1. Ensure the Submodules are in place
@@ -482,6 +486,7 @@
                            vars-w-fns)]
       (map create-group-variable vars-w-keys)))
 
+  (remove :group-variable/cpp-function (create-group-vars mapped-vars))
   (ds/transact @ds/conn (create-group-vars mapped-vars))
 
   ;; (def config {:store {:backend :file :path "~/.behave_cms/db-new-schema"}})

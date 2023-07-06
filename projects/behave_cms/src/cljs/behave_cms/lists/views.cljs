@@ -43,7 +43,7 @@
     (println list)
     [:<>
      [:h3 (if @*list-option "Edit Option" "Add Option")]
-     [entity-form {:entity        :list-options
+     [entity-form {:entity        :list-option
                    :parent-field  :list/_options
                    :parent-id     (:db/id list)
                    :id            (:db/id @*list-option)
@@ -67,7 +67,7 @@
     [:h3 (if list (str "Edit " (:list/name list)) "Add List")]]
    [:div.row
     [:div.col-3
-     [entity-form {:entity :lists
+     [entity-form {:entity :list
                    :id     (when list (:db/id list))
                    :fields [{:label     "Name"
                              :required? true

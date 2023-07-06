@@ -1,0 +1,165 @@
+{:global
+ {:SIGContainAdapter
+  {:setReportSize
+   {:id "setReportSize",
+    :parameters 
+    [{:id "reportSize",
+      :type "double"}
+     {:id "areaUnits",
+      :type "AreaUnits::AreaUnitsEnum"}],
+    :type "void"},
+   :setLwRatio                    
+   {:id "setLwRatio",
+    :parameters 
+    [{:id "lwRatio",
+      :type "double"}],
+    :type "void"},
+   :setMaxFireTime                
+   {:id "setMaxFireTime",
+    :parameters 
+    [{:id "maxFireTime",
+      :type "int"}],
+    :type "void"},
+   :doContainRun                  
+   {:id "doContainRun",
+    :type "void"},
+   :setReportRate                 
+   {:id "setReportRate",
+    :parameters 
+    [{:id "reportRate",
+      :type "double"}
+     {:id "speedUnits",
+      :type "SpeedUnits::SpeedUnitsEnum"}],
+    :type "void"},
+   :getPerimeterAtInitialAttack   
+   {:id "getPerimeterAtInitialAttack",
+    :parameters 
+    [{:id "lengthUnits",
+      :type "LengthUnits::LengthUnitsEnum"}],
+    :type "double"},
+   :setTactic                     
+   {:id "setTactic",
+    :parameters 
+    [{:id "tactic",
+      :type "ContainTactic"}],
+    :type "void"},
+   :removeAllResources            
+   {:id "removeAllResources",
+    :type "void"},
+   :getFinalFireSize              
+   {:id "getFinalFireSize",
+    :parameters 
+    [{:id "areaUnits",
+      :type "AreaUnits::AreaUnitsEnum"}],
+    :type "double"},
+   :getFireSizeAtInitialAttack    
+   {:id "getFireSizeAtInitialAttack",
+    :parameters 
+    [{:id "areaUnits",
+      :type "AreaUnits::AreaUnitsEnum"}],
+    :type "double"},
+   :setAttackDistance             
+   {:id "setAttackDistance",
+    :parameters 
+    [{:id "attackDistance",
+      :type "double"}
+     {:id "lengthUnits",
+      :type "LengthUnits::LengthUnitsEnum"}],
+    :type "void"},
+   :getResourcesUsed              
+   {:id "getResourcesUsed",
+    :type "int"},
+   :getContainmentStatus          
+   {:id "getContainmentStatus",
+    :type "ContainStatus"},
+   :removeResourceWithThisDesc    
+   {:id "removeResourceWithThisDesc",
+    :parameters 
+    [{:id "desc",
+      :type "char"}],
+    :type "int"},
+   :SIGContainAdapter             
+   {:id "SIGContainAdapter",
+    :type "void"},
+   :getPerimeterAtContainment     
+   {:id "getPerimeterAtContainment",
+    :parameters 
+    [{:id "lengthUnits",
+      :type "LengthUnits::LengthUnitsEnum"}],
+    :type "double"},
+   :getFinalFireLineLength        
+   {:id "getFinalFireLineLength",
+    :parameters 
+    [{:id "lengthUnits",
+      :type "LengthUnits::LengthUnitsEnum"}],
+    :type "double"},
+   :setRetry                      
+   {:id "setRetry",
+    :parameters 
+    [{:id "retry",
+      :type "bool"}],
+    :type "void"},
+   :getFinalContainmentArea       
+   {:id "getFinalContainmentArea",
+    :parameters 
+    [{:id "areaUnits",
+      :type "AreaUnits::AreaUnitsEnum"}],
+    :type "double"},
+   :removeResourceAt              
+   {:id "removeResourceAt",
+    :parameters 
+    [{:id "index",
+      :type "int"}],
+    :type "int"},
+   :removeAllResourcesWithThisDesc
+   {:id "removeAllResourcesWithThisDesc",
+    :parameters 
+    [{:id "desc",
+      :type "char"}],
+    :type "int"},
+   :getFinalTimeSinceReport       
+   {:id "getFinalTimeSinceReport",
+    :parameters 
+    [{:id "timeUnits",
+      :type "TimeUnits::TimeUnitsEnum"}],
+    :type "double"},
+   :setFireStartTime              
+   {:id "setFireStartTime",
+    :parameters 
+    [{:id "fireStartTime",
+      :type "int"}],
+    :type "void"},
+   :setMinSteps                   
+   {:id "setMinSteps",
+    :parameters 
+    [{:id "minSteps",
+      :type "int"}],
+    :type "void"},
+   :setMaxSteps                   
+   {:id "setMaxSteps",
+    :parameters 
+    [{:id "maxSteps",
+      :type "int"}],
+    :type "void"},
+   :setMaxFireSize                
+   {:id "setMaxFireSize",
+    :parameters 
+    [{:id "maxFireSize",
+      :type "int"}],
+    :type "void"},
+   :addResource                   
+   {:id "addResource",
+    :type "void",
+    :parameters 
+    [{:id "arrival",
+      :type "double"}
+     {:id "duration",
+      :type "double"}
+     {:id "timeUnit",
+      :type "TimeUnits::TimeUnitsEnum"}
+     {:id "productionRate",
+      :type "double"}
+     {:id "productionRateUnits",
+      :type "SpeedUnits::SpeedUnitsEnum"}
+     {:id "description",
+      :type "char"}]}}}}
