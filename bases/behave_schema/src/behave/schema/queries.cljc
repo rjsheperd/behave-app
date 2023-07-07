@@ -1,7 +1,42 @@
 (ns behave.schema.queries
   (:require [clojure.string :as str]
+            [string-utils.interface :refer [->str]]
+            [behave.schema.core :refer [all-schemas]]
             #?(:cljs [datascript.core :as d]
                :clj  [datahike.api :as d])))
+
+;;; Macro
+
+(defn recursive-ref-rule [name attr]
+  `'[
+     [(~name ~(symbol "?p") ~(symbol "?c"))
+      [~(symbol "?p") ~attr ~(symbol "?c")]]
+
+     [(~name ~(symbol "?p") ~(symbol "?c"))
+      [~(symbol "?p") ~attr ~(symbol "?x")]
+      (~name ~(symbol "?x") ~(symbol "?c"))]])
+
+(comment
+
+  (concat
+   rules
+   (recursive-ref-rule (symbol "modules") :application/modules)
+   (recursive-ref-rule (symbol "submodules") :modules/submodules))
+
+  (def little-schema (take 1 (->> all-schemas
+                                (filter #(= :db.type/ref (:db/valueType %))))))
+  little-schema
+  (generate-rule "modules" :application/modules)
+
+  (quote [?p :attr ?c])
+  (generate-ref-rules all-schemas)
+  (map #(-> % :db/ident ->str (str/split #"/") second symbol))
+
+  (def vector1 '[1 2 3])
+  (def vector2 '[4 5 6])
+  (def concatenated-vector (concat vector1 vector2))
+
+  )
 
 ;;; Rules
 
