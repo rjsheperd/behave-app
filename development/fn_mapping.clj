@@ -376,7 +376,6 @@
   (def all-group-vars (d/q '[:find  [?e ...]
                          :where [?e :group-variable/translation-key]]
                        @@ds/conn))
-  (d/pull @@ds/conn '[*] (first all-group-vars))
   (d/transact @ds/conn (mapv (fn [id] [:db/retractEntity id]) all-group-vars))
 
   ;; -- Remove all groups
@@ -392,54 +391,54 @@
   (d/transact @ds/conn (mapv (fn [id] [:db/retractEntity id]) all-submodules))
 
   ;; 1. Ensure the Submodules are in place
-  (defn create-submodules []
+  (defn create-submodules [vars]
     (let [num-cols  3
           curr-cols (take num-cols cols)
-          curr-data (set (map (fn [row] (mapv #(get row %) curr-cols)) all-vars-w-fns))
+          curr-data (set (map (fn [row] (mapv #(get row %) curr-cols)) vars))
           to-create (remove #(apply exists? %) (vec curr-data))]
       (mapv #(apply exists-or-create %) to-create)))
 
-  (create-submodules)
-  (d/transact @ds/conn (create-submodules))
+  (d/transact @ds/conn (create-submodules mapped-vars))
 
   ;; 2. Ensure the First Groups under those submodules
-  (defn create-groups []
+  (defn create-groups [vars]
     (let [num-cols  4
           curr-cols (take num-cols cols)
-          curr-data (set (map (fn [row] (mapv #(get row %) curr-cols)) all-vars-w-fns))
+          curr-data (set (map (fn [row] (mapv #(get row %) curr-cols)) vars))
           to-create (remove #(apply exists? %) (vec curr-data))]
       (mapv #(apply exists-or-create %) to-create)))
 
-  (d/transact @ds/conn (create-groups))
+  (d/transact @ds/conn (create-groups mapped-vars))
 
   ;; 3. Ensure the 1st Subgroups
-  (defn create-subgroups-1 []
+  (defn create-subgroups-1 [vars]
     (let [num-cols  5
           curr-cols (take num-cols cols)
-          curr-data (set (map (fn [row] (mapv #(get row %) curr-cols)) all-vars-w-fns))
+          curr-data (set (map (fn [row] (mapv #(get row %) curr-cols)) vars))
           to-create (remove #(apply exists? %) (vec curr-data))]
       (mapv #(apply exists-or-create %) to-create)))
 
-  (d/transact @ds/conn (create-subgroups-1))
+  (d/transact @ds/conn (create-subgroups-1 mapped-vars))
 
   ;; 4. Ensure the 2nd Subgroups
-  (defn create-subgroups-2 []
+  (defn create-subgroups-2 [vars]
     (let [num-cols  6
           curr-cols (take num-cols cols)
-          curr-data (set (map (fn [row] (mapv #(get row %) curr-cols)) all-vars-w-fns))
+          curr-data (set (map (fn [row] (mapv #(get row %) curr-cols)) vars))
           to-create (remove #(apply exists? %) (vec curr-data))]
       (mapv #(apply exists-or-create %) to-create)))
 
-  (d/transact @ds/conn (create-subgroups-2))
+  (d/transact @ds/conn (create-subgroups-2 mapped-vars))
 
   ;; 5. Ensure the 3rd Subgroups exist
-  (defn create-subgroups-3 []
+  (defn create-subgroups-3 [vars]
     (let [num-cols  7
           curr-cols (take num-cols cols)
-          curr-data (set (map (fn [row] (mapv #(get row %) curr-cols)) all-vars-w-fns))
+          curr-data (set (map (fn [row] (mapv #(get row %) curr-cols)) vars))
           to-create (remove #(apply exists? %) (vec curr-data))]
       (mapv #(apply exists-or-create %) to-create)))
-  (d/transact @ds/conn (create-subgroups-3))
+
+  (d/transact @ds/conn (create-subgroups-3 mapped-vars))
 
   ;; 6. Resolve Variables to Groups
   (def variables
