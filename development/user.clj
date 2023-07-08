@@ -3,6 +3,7 @@
 (comment
   (require '[behave.core :as core])
   (core/init!)
+
   (core/vms-sync!)
 
   (require '[behave-cms.server :as cms])
