@@ -7,7 +7,8 @@
             [re-frame.core              :as rf]
             [datom-compressor.interface :as c]
             [ds-schema-utils.interface  :refer [->ds-schema]]
-            [behave.schema.core         :refer [all-schemas]]))
+            [behave.schema.core         :refer [all-schemas]]
+            [behave.translate           :refer [load-translations!]]))
 
 ;;; State
 
@@ -48,6 +49,7 @@
    (do
      (reset! vms-conn (d/conn-from-datoms datoms schema))
      (posh! @vms-conn)
+     (load-translations!)
      @vms-conn)))
 
 ;;; Effects

@@ -1,7 +1,7 @@
 (ns behave.translate
-  (:require [clojure.string :as str]
-            [ajax.core :refer [GET]]
-            [re-frame.core :refer [dispatch-sync subscribe]]))
+  (:require [datascript.core :as d]
+            [re-frame.core :refer [subscribe dispatch-sync]]
+            [behave.vms.store :refer [vms-conn]]))
 
 ;;; Configuration
 
@@ -10,11 +10,17 @@
 
 ;;; Helpers
 
-(defn- get-translations [shortcode handler]
-  (GET (str "/i18n/" shortcode ".csv") {:handler handler}))
-
-(defn- csv->map [s]
-  (into {} (map #(str/split % #",") (str/split-lines s))))
+(defn- get-translations [shortcode]
+  (->>
+   (d/q '[:find ?key ?translation
+          :in $ ?lang-shortcode
+          :where
+          [?l :language/shortcode ?lang-shortcode]
+          [?l :language/translation ?t]
+          [?t :translation/key ?key]
+          [?t :translation/translation ?translation]]
+        @@vms-conn shortcode)
+   (into {})))
 
 (defn browser-lang []
   (.. js/window -navigator -language))
@@ -39,4 +45,6 @@
 (defn load-translations! []
   (let [browser   (browser-lang)
         shortcode (if (contains? supported browser) browser default)]
-    (get-translations shortcode #(dispatch-sync [:translations/load shortcode (csv->map %1)]))))
+    (->> (get-translations shortcode)
+         (conj [:translations/load shortcode])
+         (dispatch-sync))))
