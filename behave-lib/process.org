@@ -1,0 +1,743 @@
+#+TITLE: Process
+#+AUTHOR: RJ Sheperd
+
+** JSON Test
+#+BEGIN_SRC cpp :flags -I include/cpp/ :includes '(<iostream> <string> <nlohmann/json.hpp>)
+  using json = nlohmann::json;
+
+  // Using (raw) string literals and json::parse
+  json ex1 = json::parse(R"(
+      {
+        "pi": 3.141,
+        "happy": true,
+        "arr": [1, 2, 3]
+      }
+    )");
+  std::cout << ex1["happy"] << " " << ex1["pi"] << " " << ex1["arr"][0] << std::endl;
+
+  // Using initializer lists
+  json ex2 = {
+    {"happy", true},
+    {"pi", 3.141},
+  };
+  std::cout << ex2["happy"] << " " << ex2["pi"] << std::endl;
+#+END_SRC
+
+#+RESULTS:
+| true | 3.141 | 1 |
+| true | 3.141 |   |
+
+** Dispatch on Types
+#+BEGIN_SRC cpp :includes '(<iostream> <iomanip> <string> <any> <typeinfo>)
+
+  // Forward declaration for printing class names
+  class MyClass {};
+
+  enum Color { red, blue };
+  enum Size { small, medium, large };
+
+  // Helper function to shorten strings with ellipses
+  std::string shortenString(const std::string& str, int maxLength = 20) {
+      if (str.size() <= maxLength) {
+          return str;
+      } else {
+          return str.substr(0, maxLength - 3) + "...";
+      }
+  }
+
+  // Generic print function using std::any
+  void my_print(const std::any& value) {
+      // Check if the value holds a number
+      if (value.type() == typeid(int) || value.type() == typeid(float) ||
+          value.type() == typeid(double)) {
+          std::cout << std::fixed << std::setprecision(2) << std::any_cast<double>(value);
+      }
+      // Check if the value holds a string
+      else if (value.type() == typeid(std::string)) {
+          std::cout << shortenString(std::any_cast<std::string>(value));
+      }
+      // Check if the value holds an enum or class
+      else if (value.type() == typeid(Color)) {
+          std::cout << std::any_cast<Color>(value);
+      }
+  }
+
+  int main() {
+      std::any num = 3.14159;
+      std::any str = std::string("This is a long string that needs to be shortened");
+      std::any myColor = Color::red;
+
+      my_print(num);        // Output: 3.14
+      my_print(str);        // Output: This is a long st...
+      my_print(myColor);    // Output: 0
+      return 0;
+  }
+
+#+END_SRC
+
+#+RESULTS:
+: 3.14This is a long st...0
+
+** Member Function Params Info
+
+#+BEGIN_SRC cpp :includes '(<iostream> <functional> <typeinfo> <vector>)
+// #include <iostream>
+// #include <functional>
+// #include <typeinfo>
+// #include <vector>
+
+template <typename Class, typename ReturnType, typename... Args>
+std::pair<int, std::vector<const std::type_info*>> getParameterTypes(ReturnType(Class::*func)(Args...))
+{
+    std::vector<const std::type_info*> types = {&typeid(Args)...};
+    return {sizeof...(Args), types};
+}
+
+class MyClass
+{
+public:
+    void foo(int a, double b) {}
+};
+
+int main()
+{
+    auto memberFuncPtr = &MyClass::foo;
+    auto result = getParameterTypes(memberFuncPtr);
+
+    std::cout << "Num parameters: " << result.first << std::endl;
+    std::cout << "Parameter types: ";
+    for (const auto* type : result.second)
+    {
+        std::cout << type->name() << ", ";
+    }
+    std::cout << std::endl;
+
+    return 0;
+}
+#+END_SRC
+
+#+RESULTS:
+| Num parameters: 2  |   |   |
+| Parameter types: i | d |   |
+
+** Parse params from strings
+
+#+BEGIN_SRC cpp :includes '(<iostream> <sstream> <functional>)
+  // #include <iostream>
+  // #include <sstream>
+  // #include <functional>
+
+  template <typename ReturnType, typename Func, typename... Args>
+  ReturnType callFunctionFromString(ReturnType (*func)(Args ...), const std::string& paramStr)
+  {
+      std::istringstream paramStream(paramStr);
+      std::tuple<Args...> tupleParams;
+
+      // Parse parameters from string and store in tuple
+      std::tuple<std::decay_t<Args>...> params;
+      std::apply([&paramStream](auto&&... args) { ((paramStream >> args), ...); }, params);
+
+      // Call the function with the parsed parameters
+      return std::apply(func, params);
+  }
+
+  int sum(int a, int b)
+  {
+      return a + b;
+  }
+
+  int main()
+  {
+      std::string paramStr = "4 5";
+
+      std::cout << "Params: " << paramStr << std::endl;
+
+      int result = callFunctionFromString<int, int, int>(sum, paramStr);
+      std::cout << "Result: " << result << std::endl;
+
+      return 0;
+  }
+#+END_SRC
+
+#+RESULTS:
+| Params: | 4 | 5 |
+| Result: | 9 |   |
+
+** Public Member Fns Using Reflection
+#+BEGIN_SRC cpp :includes '(<iostream> <iomanip> <string> <any> <typeinfo> <type_traits> <vector>)
+
+// #include <iostream>
+// #include <string>
+// #include <type_traits>
+// #include <vector>
+
+// Helper function to check if a member is a public member function pointer
+template <typename T, typename = void>
+struct is_public_member_function : std::false_type {};
+
+template <typename T>
+struct is_public_member_function<T, std::void_t<decltype(&T::operator())>> :
+    std::bool_constant<std::is_function_v<decltype(&T::operator())>> {};
+
+// Function template to retrieve the names of public methods for a class
+template <typename T>
+std::vector<std::string> GetPublicMethods() {
+    std::vector<std::string> methods;
+
+    // Loop through all members of the class
+    // Check if the member is a public member function
+    // Add the name of the member to the list of methods
+    // Exclude the special case of the constructor (if applicable)
+    for_each_member<T>([&methods](auto member) {
+        if constexpr (!std::is_constructor_v<decltype(member)>) {
+            if constexpr (is_public_member_function<decltype(member)>::value) {
+                methods.push_back(member.name);
+            }
+        }
+    });
+
+    return methods;
+}
+
+// Usage example
+class MyClass {
+public:
+    void publicMethod1() {}
+    void publicMethod2() {}
+private:
+    void privateMethod() {}
+};
+
+int main() {
+    std::vector<std::string> methods = GetPublicMethods<MyClass>();
+
+    for (const auto& method : methods) {
+        std::cout << method << std::endl;
+    }
+
+    return 0;
+}
+#+END_SRC
+
+#+RESULTS:
+
+** Templated Functors
+
+#+BEGIN_SRC cpp :includes '(<iostream> <string> <vector> <functional> <memory> <random>)
+  class A
+  {
+  public:
+    void setB(int b) {
+      _b = b;
+    }
+
+    int getB() {
+      return _b;
+    }
+
+  private:
+    int _b;
+  };
+
+  int main()
+  {
+    A a;
+    a.setB(100);
+    std::cout << "Got: " << a.getB() << std::endl;
+  }
+#+END_SRC
+
+#+RESULTS:
+: Got: 100
+
+#+BEGIN_SRC cpp :includes '(<iostream> <string> <vector> <functional> <memory> <random>)
+class A
+{
+public:
+  void setB(int b) {
+    _b = b;
+  }
+
+  int getB() {
+    return _b;
+  }
+
+private:
+  int _b;
+};
+
+template <typename T, typename MemberFunc>
+class Functor
+{
+public:
+  Functor(T* object_ptr, MemberFunc member_func) : _object_ptr(object_ptr), _member_func(member_func) {}
+
+  void operator()(int value) const {
+    (_object_ptr->*_member_func)(value);
+  }
+
+  int operator()() const {
+    return (_object_ptr->*_member_func)();
+  }
+
+private:
+  T* _object_ptr;
+  MemberFunc _member_func;
+};
+
+int main()
+{
+  A a;
+  Functor<A, void (A::*)(int)> setBFunctor(&a, &A::setB);
+  Functor<A, int(A::*)()> getBFunctor(&a, &A::getB);
+  
+  setBFunctor(100);
+  std::cout << "Got: " << getBFunctor() << std::endl;
+
+  return 0;
+}
+
+#+END_SRC
+
+#+RESULTS:
+: Got: 100
+
+#+BEGIN_SRC cpp :includes '(<iostream> <string> <vector> <functional> <memory> <random>)
+class A
+{
+public:
+  void setB(int b) {
+    _b = b;
+  }
+
+  int getB() {
+    return _b;
+  }
+
+private:
+  int _b;
+};
+
+template <typename Callable>
+class Functor
+{
+public:
+  Functor(Callable&& callable) : _callable(std::forward<Callable>(callable)) {}
+
+  template <typename... Args>
+  auto operator()(Args&&... args) const {
+    return std::invoke(_callable, std::forward<Args>(args)...);
+  }
+
+private:
+  Callable _callable;
+};
+
+int main()
+{
+  A a;
+  Functor<void(int)> setBFunctor(std::bind(&A::setB, std::ref(a), std::placeholders::_1));
+  Functor<int()> getBFunctor(std::bind(&A::getB, std::ref(a)));
+  
+  setBFunctor(100);
+  std::cout << "Got: " << getBFunctor() << std::endl;
+
+  return 0;
+}
+
+#+END_SRC
+
+#+BEGIN_SRC cpp :includes '(<iostream> <string> <vector> <functional> <memory> <random>)
+  class A
+  {
+  public:
+    void setB(int b) {
+      _b = b;
+    }
+
+    int getB() {
+      return _b;
+    }
+
+  private:
+    int _b;
+  };
+
+  int main()
+  {
+    A a;
+    auto setBFunctor = ([&a](int value){ a.setB(value); });
+    auto getBFunctor = ([&a](){ return a.getB(); });
+  
+    setBFunctor(100);
+    std::cout << "Got: " << getBFunctor() << std::endl;
+
+    return 0;
+  }
+
+#+END_SRC
+
+#+RESULTS:
+: Got: 100
+
+#+BEGIN_SRC cpp :includes '(<iostream> <string> <vector> <functional> <memory> <random>)
+  struct A
+  {
+    template<typename T>
+    operator T*(); // conversion to pointer to any type
+  };
+ 
+  // out-of-class definition
+  template<typename T>
+  A::operator T*() { return nullptr; }
+ 
+  // explicit specialization for char*
+  template<>
+  A::operator char*() { return nullptr; }
+ 
+  // explicit instantiation
+  template A::operator void*();
+ 
+  int main()
+  {
+    A a;
+    int* ip = a.operator int*(); // explicit call to A::operator int*()
+  }
+#+END_SRC
+
+#+RESULTS:
+
+** Lambda Getters/Setters
+
+#+BEGIN_SRC cpp :flags -I ./behave-mirror/src/behave -I ./include/cpp/sig-adapters :includes '(<iostream> <functional> <unordered_map> <iostream> <vector> <map> <fstream> <sstream> <iomanip> <cctype> <cmath> <string> <vector> <map> <type_traits> "behaveUnits.cpp")
+
+  enum Color { red, blue };
+  enum Size { small, medium, large };
+
+  union Property {
+    Color color;
+    Size  size;
+  };
+
+  class Ball {
+  public:
+    void setColor(Color color) { color_ = color; };
+    void setSize(Size size) { size_ = size; };
+
+    Color getColor() { return color_; };
+    Size getSize() { return size_; };
+
+  private:
+    Color color_;
+    Size size_;
+  };
+
+  template<typename T, typename Func>
+  class SetterCallable {
+  public:
+    SetterCallable(T& obj, Func&& func) : obj(obj), func(std::forward<Func>(func)) {}
+    SetterCallable(T& obj, Func& func) : obj(obj), func(std::forward<Func>(func)) {}
+
+    template<typename U>
+    auto operator() (Property property) const {
+      if (std::is_same<U, Color>::value) {
+        (obj.*func)(property.color);
+      } else if (std::is_same<U, Size>::value) {
+        (obj.*func)(property.size);
+      } else {
+        return;
+      }
+    }
+
+  private:
+    T& obj;
+    Func func;
+  };
+
+  typedef SetterCallable<Ball, std::function<void(Ball&, Property)>> PropertyCallable;
+
+  int main() {
+
+    Ball ball;
+    Property prop;
+    prop.color = Color::red;
+    prop.size = Size::small;
+
+
+    PropertyCallable setColor(ball, &Ball::setColor);
+    PropertyCallable setColor(ball, &Ball::setSize);
+
+    // std::cout << sameEnums << std::endl;
+  }
+
+
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC cpp :flags -I ./behave-mirror/src/behave -I ./include/cpp/sig-adapters :includes '(<iostream> <functional> <unordered_map> <iostream> <vector> <map> <fstream> <sstream> <iomanip> <cctype> <cmath> <string> <vector> <map> <type_traits> "behaveUnits.cpp")
+  template<typename Func>
+  class Callable {
+  public:
+    Callable(Func&& func) : func(std::forward<Func>(func)) {}
+    Callable(Func& func) : func(std::forward<Func>(func)) {}
+
+    template<typename... Args>
+    auto operator()(Args&&... args) const {
+      return func(std::forward<Args>(args)...);
+    }
+
+  private:
+    Func func;
+  };
+
+  template<typename T, typename Func>
+  class MemberCallable {
+  public:
+    MemberCallable(T& obj, Func&& func) : obj(obj), func(std::forward<Func>(func)) {}
+    MemberCallable(T& obj, Func& func) : obj(obj), func(std::forward<Func>(func)) {}
+
+    template<typename... Args>
+    auto operator()(Args&&... args) const {
+      return (obj.*func)(std::forward<Args>(args)...);
+    }
+
+  private:
+    T& obj;
+    Func func;
+  };
+
+  template<typename T, typename Func>
+  class SetterCallable {
+  public:
+    MemberCallable(T& obj, Func&& func) : obj(obj), func(std::forward<Func>(func)) {}
+    MemberCallable(T& obj, Func& func) : obj(obj), func(std::forward<Func>(func)) {}
+
+    template<typename... Args>
+    auto operator()(Args&&... args) const {
+      if (is_same(T, ))
+      return (obj.*func)(std::forward<Args>(args)...);
+    }
+
+  private:
+    T& obj;
+    Func func;
+  };
+
+  template <typename T>
+  using MemberSetterFn = MemberCallable<T, std::function<void(T&, double, BehaveUnits)>>;
+
+  template <typename T>
+  struct SetterBuilder {
+    typedef MemberCallable<T, std::function<void(T&, double, BehaveUnits)>>
+  };
+
+  union BehaveUnits {
+    AreaUnits::AreaUnitsEnum areaUnits;
+    BasalAreaUnits::BasalAreaUnitsEnum basalAreaUnits;
+    CoverUnits::CoverUnitsEnum coverUnits;
+    CuringLevelUnits::CuringLevelEnum curingLevelUnits;
+    DensityUnits::DensityUnitsEnum densityUnits;
+    FirelineIntensityUnits::FirelineIntensityUnitsEnum firelineIntensityUnits;
+    HeatOfCombustionUnits::HeatOfCombustionUnitsEnum heatOfCombustionUnits;
+    HeatPerUnitAreaUnits::HeatPerUnitAreaUnitsEnum heatPerUnitAreaUnits;
+    HeatSinkUnits::HeatSinkUnitsEnum heatSinkUnits;
+    HeatSourceAndReactionIntensityUnits::HeatSourceAndReactionIntensityUnitsEnum heatSourceAndReactionIntensityUnits;
+    LengthUnits::LengthUnitsEnum lengthUnits;
+    LoadingUnits::LoadingUnitsEnum loadingUnits;
+    MoistureUnits::MoistureUnitsEnum moistureUnits;
+    MortalityRateUnits::MortalityRateUnitsEnum mortalityRateUnits;
+    ProbabilityUnits::ProbabilityUnitsEnum probabilityUnits;
+    SlopeUnits::SlopeUnitsEnum slopeUnits;
+    SpeedUnits::SpeedUnitsEnum speedUnits;
+    SurfaceAreaToVolumeUnits::SurfaceAreaToVolumeUnitsEnum surfaceAreaToVolumeUnits;
+    TemperatureUnits::TemperatureUnitsEnum temperatureUnits;
+    TimeUnits::TimeUnitsEnum timeUnits;
+  };
+
+  class SIGTestClass {
+  public:
+    void setHeight(double height, LengthUnits::LengthUnitsEnum units) {
+      height_ = LengthUnits::toBaseUnits(height, units);
+    };
+
+    double getHeight(LengthUnits::LengthUnitsEnum units) {
+      return LengthUnits::fromBaseUnits(height_, units);
+    };
+
+    void setWidth(double width, LengthUnits::LengthUnitsEnum units) {
+      width_ = LengthUnits::toBaseUnits(width, units);
+    };
+
+    double getWidth(LengthUnits::LengthUnitsEnum units) {
+      return LengthUnits::fromBaseUnits(width_, units);
+    };
+
+  private:
+    double height_;
+    double width_;
+  };
+
+
+  void testMemberCallable() {
+    SIGTestClass s;
+
+    auto setter = &SIGTestClass::setHeight;
+    auto getter = &SIGTestClass::getHeight;
+
+    std::unordered_map<std::string, Callable<A, std::function<void(A&, int)>>> setters;
+
+    hashmap["setter"] = MemberCallable<SIGTestClass, std::function<void(SIGTestClass&, double, BehaveUnits)>>(s, &SIGTestClass::setHeight);
+    hashmap["getter"] = MemberCallable<SIGTestClass, std::function<double(SIGTestClass&, BehaveUnits)>>(s, &SIGTestClass::getHeight);
+
+    double value = 6.0;
+    BehaveUnits units;
+    units.lengthUnits = LengthUnits::Meters;
+    setter(6.0, units);
+
+    BehaveUnits newUnits;
+    newUnits.lengthUnits = LengthUnits::Feet;
+    std::cout << "SIGTestClass::getHeight - " << getter(newUnits) << std::endl;
+
+  }
+
+  void testMemberLambda() {
+    SIGTestClass s;
+
+    auto setter = [&s](double value, BehaveUnits behaveUnits) {
+      s.setHeight(value, behaveUnits.lengthUnits);
+    };
+
+    auto getter = [&s](BehaveUnits behaveUnits) {
+      return s.getHeight(behaveUnits.lengthUnits);
+    };
+
+    double value = 6.0;
+    BehaveUnits units;
+    units.lengthUnits = LengthUnits::Meters;
+    setter(value, units);
+
+    BehaveUnits newUnits;
+    newUnits.lengthUnits = LengthUnits::Feet;
+    std::cout << "SIGTestClass::getHeight - " << getter(newUnits) << std::endl;
+  };
+
+  void testMemberLambda_2() {
+    SIGTestClass s;
+
+    std::function<void(double, BehaveUnits)> setHeight = [&s](double value, BehaveUnits behaveUnits) {s.setHeight(value, behaveUnits.lengthUnits);};
+    std::function<void(double, BehaveUnits)> setWidth = [&s](double value, BehaveUnits behaveUnits) {s.setWidth(value, behaveUnits.lengthUnits);};
+
+    std::function<double(BehaveUnits)> getWidth = [&s](BehaveUnits behaveUnits) {return s.getWidth(behaveUnits.lengthUnits);};
+    std::function<double(BehaveUnits)> getHeight = [&s](BehaveUnits behaveUnits) {return s.getHeight(behaveUnits.lengthUnits);};
+
+    std::unordered_map<std::string, std::function<void(double, BehaveUnits)>*> setters;
+    setters["setHeight"] = &setHeight;
+    setters["setWidth"] = &setWidth;
+
+    std::unordered_map<std::string, std::function<double(BehaveUnits)>*> getters;
+    getters["getHeight"] = &getHeight;
+    getters["getWidth"] = &getWidth;
+
+    double value = 6.0;
+    BehaveUnits units;
+    units.lengthUnits = LengthUnits::Meters;
+    (*setters["setHeight"])(value, units);
+    (*setters["setWidth"])(30.0, units);
+
+    BehaveUnits newUnits;
+    newUnits.lengthUnits = LengthUnits::Feet;
+    std::cout << "SIGTestClass::getHeight - " << (*getters["getHeight"])(newUnits) << std::endl;
+    std::cout << "SIGTestClass::getWidth - " << (*getters["getWidth"])(newUnits) << std::endl;
+    std::cout << "SIGTestClass::getWidth - " << getters["getWidth"] << std::endl;
+  };
+
+  void testLambda() {
+
+    auto lambda = [](int a, float b, const std::string& c) {
+      return a + b + std::stoi(c);
+    };
+
+    Callable<decltype(lambda)> callable(lambda);
+    int result = callable(1, 2.5, "3"); // Calls the lambda function with arguments
+    std::cout << result << std::endl; // Prints: 6
+
+    // Test adding to hashmap
+    // std::unordered_map<std::string, Callable<std::function<void()>> *> hashmap;
+
+    // Lambda function that prints a message
+    auto printMessage = [](std::string_view name) {
+      std::cout << "Hello, " << name << "!" << std::endl;
+    };
+
+    std::unordered_map<std::string, Callable<decltype(printMessage)>*> hashmap;
+    Callable<decltype(printMessage)> callable_printMessage(printMessage);
+
+    callable_printMessage("RJ");
+
+    // Insert the lambda into the hashmap with std::function<void()>
+    hashmap["print"] = &callable_printMessage;
+
+    (*hashmap["print"])("RJ");
+  };
+
+  int main() {
+    // testLambda();
+    // testMemberCallable();
+    // testMemberLambda();
+    testMemberLambda_2();
+
+    return 0;
+  }
+
+#+END_SRC
+
+#+RESULTS:
+| SIGTestClass::getHeight | - |      19.685 |
+| SIGTestClass::getWidth  | - |     98.4252 |
+| SIGTestClass::getWidth  | - | 0x16af13228 |
+
+** SIGString
+
+#+BEGIN_SRC cpp :includes '(<iostream> <string> <vector>)
+      class SIGString
+      {
+      public:
+        static char* str2charptr(std::string str) {
+          char* c_str = new char[str.length() + 1];
+          std::strcpy(c_str, str.c_str());
+          return c_str;
+        };
+        static std::string charptr2str(char* c_str) {
+          std::string str(c_str);
+          return str;
+        };
+      };
+
+      int main() {
+        std::string hello("Hello World");
+        char * derp = "DERP";
+        std::cout << hello << std::endl;
+
+        std::cout << SIGString::str2charptr(hello) << std::endl;
+        std::cout << SIGString::charptr2str(derp) << std::endl;
+        std::cout << std::string(derp) << std::endl;
+
+        std::vector<bool> myVector = {true, false, true};
+
+        bool* boolPtr = myVector.data();
+        // The pointer `boolPtr` now points to the underlying data of `myVector`
+
+        std::cout << *boolPtr << std::endl;
+
+        return 0;
+    }
+      }
+#+END_SRC
+
+#+RESULTS:
+| Hello | World |
+| Hello | World |
+| DERP  |       |
+| DERP  |       |
+
