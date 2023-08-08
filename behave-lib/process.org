@@ -788,3 +788,17 @@ int main()
 | DERP  |       |
 | DERP  |       |
 
+
+
+** Boost Testing
+
+#+BEGIN_SRC cpp :flags -I /opt/homebrew/include/ :includes '(<iostream> <string> <vector> <boost/test/included/unit_test.hpp>)
+  #define BOOST_TEST_MODULE example
+
+  BOOST_AUTO_TEST_CASE( test_case )
+  {
+    BOOST_TEST( true );
+  }
+#+END_SRC
+
+#+RESULTS:
