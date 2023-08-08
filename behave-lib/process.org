@@ -1,8 +1,29 @@
 #+TITLE: Process
 #+AUTHOR: RJ Sheperd
 
-** JSON Test
-#+BEGIN_SRC cpp :flags -I include/cpp/ :includes '(<iostream> <string> <nlohmann/json.hpp>)
+** SimpleVector Example
+:PROPERTIES:
+:header-args:cpp: :flags -I ./behave-mirror/src/behave -I ./include/cpp/sig-adapters :includes '(<iostream> <vector> "SIGCollections.h" "behaveUnits.cpp")
+:END:
+#+BEGIN_SRC cpp 
+
+  std::vector<LengthUnits::LengthUnitsEnum> lengths = { LengthUnits::Meters };
+  std::cout << lengths.at(0) << std::endl;
+
+  SimpleVector<LengthUnits::LengthUnitsEnum> simpleLengths(lengths);
+
+  std::cout << simpleLengths.get(0) << std::endl;
+#+END_SRC
+
+#+RESULTS:
+| 4 |
+| 4 |
+
+** JSON2 Test
+:PROPERTIES:
+:header-args:cpp: :flags -I include/cpp/ :includes '(<iostream> <string> <nlohmann/json.hpp>)
+:END:
+#+BEGIN_SRC cpp 
   using json = nlohmann::json;
 
   // Using (raw) string literals and json::parse
@@ -26,6 +47,32 @@
 #+RESULTS:
 | true | 3.141 | 1 |
 | true | 3.141 |   |
+
+** JSON Test
+#+BEGIN_SRC cpp :flags -I include/cpp/ :includes '(<iostream> <string> <nlohmann/json.hpp>)
+  using json = nlohmann::json;
+
+  // Using (raw) string literals and json::parse
+  json ex1 = json::parse(R"(
+      {
+        "pi": 3.141,
+        "happy": true,
+        "arr": [1, 2, 3]
+      }
+    )");
+  std::cout << ex1["happy"] << " " << ex1["pi"] << " " << ex1["arr"][0] << std::endl;
+
+  // Using initializer lists
+  json ex2 = {
+    {"happy", true},
+    {"pi", 3.141},
+  };
+  std::cout << ex2["happy"] << " " << ex2["pi"] << std::endl;
+#+END_SRC
+
+#+RESULTS[1a08313acf4cc0d9c62d3fde993a83e2a36fe725]:
+: true 3.141 1
+: true 3.141
 
 ** Dispatch on Types
 #+BEGIN_SRC cpp :includes '(<iostream> <iomanip> <string> <any> <typeinfo>)
