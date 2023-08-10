@@ -789,16 +789,44 @@ int main()
 | DERP  |       |
 
 
+* DocTest
+:PROPERTIES:
+:header-args:cpp:  :flags -I include/cpp/
+:header-args:cpp+: :includes '(<iostream> <nlohmann/json.hpp>)
+:header-args:cpp+: :main no 
+:header-args:cpp+: :cmdline "-ni -nc -nv"
+:END:
 
-** Boost Testing
+#+BEGIN_SRC cpp
+  #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+  #import "doctest.h"
 
-#+BEGIN_SRC cpp :flags -I /opt/homebrew/include/ :includes '(<iostream> <string> <vector> <boost/test/included/unit_test.hpp>)
-  #define BOOST_TEST_MODULE example
+  using json = nlohmann::json;
 
-  BOOST_AUTO_TEST_CASE( test_case )
-  {
-    BOOST_TEST( true );
+  int fact(int n) {
+    return n <= 1 ? n : fact(n - 1) * n;
+  }
+
+  TEST_CASE("testing the factorial function") {
+    CHECK(fact(0) == 0); // should fail
+    CHECK(fact(1) == 1);
+    CHECK(fact(2) == 2);
+    CHECK(fact(3) == 6);
+    CHECK(fact(10) == 3628800);
+  }
+
+  TEST_CASE("[json] testing the JSON parse method") {
+    // Using (raw) string literals and json::parse
+    json ex1 = json::parse(R"(
+         {
+           "pi": 3.141,
+           "happy": true,
+           "arr": [1, 2, 3]
+         }
+       )");
+
+    CHECK(ex1["happy"] == true);
+    CHECK(ex1["pi"] == 3.141);
+    CHECK(ex1["arr"][0] == 1);
   }
 #+END_SRC
-
-#+RESULTS:
