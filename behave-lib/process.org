@@ -1,6 +1,7 @@
 #+TITLE: Process
 #+AUTHOR: RJ Sheperd
 
+* Tests
 ** SimpleVector Example
 :PROPERTIES:
 :header-args:cpp: :flags -I ./behave-mirror/src/behave -I ./include/cpp/sig-adapters :includes '(<iostream> <vector> "SIGCollections.h" "behaveUnits.cpp")
@@ -458,6 +459,7 @@ int main()
 
 #+BEGIN_SRC cpp :flags -I ./behave-mirror/src/behave -I ./include/cpp/sig-adapters :includes '(<iostream> <functional> <unordered_map> <iostream> <vector> <map> <fstream> <sstream> <iomanip> <cctype> <cmath> <string> <vector> <map> <type_traits> "behaveUnits.cpp")
 
+  
   enum Color { red, blue };
   enum Size { small, medium, large };
 
@@ -510,9 +512,8 @@ int main()
     prop.color = Color::red;
     prop.size = Size::small;
 
-
-    PropertyCallable setColor(ball, &Ball::setColor);
-    PropertyCallable setColor(ball, &Ball::setSize);
+    // PropertyCallable<Ball, > setBallColor(ball, &Ball::setColor);
+    PropertyCallable setBallSize(ball, &Ball::setSize);
 
     // std::cout << sameEnums << std::endl;
   }
@@ -632,7 +633,8 @@ int main()
     auto setter = &SIGTestClass::setHeight;
     auto getter = &SIGTestClass::getHeight;
 
-    std::unordered_map<std::string, Callable<A, std::function<void(A&, int)>>> setters;
+    // std::unordered_map<std::string, Callable<A, std::function<void(A&, int)>>> setters;
+    std::unordered_map<std::string, Callable<A, std::any>> setters;
 
     hashmap["setter"] = MemberCallable<SIGTestClass, std::function<void(SIGTestClass&, double, BehaveUnits)>>(s, &SIGTestClass::setHeight);
     hashmap["getter"] = MemberCallable<SIGTestClass, std::function<double(SIGTestClass&, BehaveUnits)>>(s, &SIGTestClass::getHeight);
@@ -740,9 +742,173 @@ int main()
 #+END_SRC
 
 #+RESULTS:
-| SIGTestClass::getHeight | - |      19.685 |
-| SIGTestClass::getWidth  | - |     98.4252 |
-| SIGTestClass::getWidth  | - | 0x16af13228 |
+
+** Templated Class
+
+#+BEGIN_SRC cpp :includes '(<iostream> <string> <vector> <unordered_map> <functional>)
+
+  // Callable
+  template<typename ReturnType, typename... Args>
+  class Callable {
+  private:
+    using FunctionType = std::function<ReturnType(Args...)>;
+    using FunctionMap = std::unordered_map<std::string, FunctionType>;
+
+    template<typename Func>
+    struct FunctionWrapper;
+
+    template<typename R, typename... A>
+    struct FunctionWrapper<R(A...)> {
+      static ReturnType call(const std::function<R(A...)>& func, Args&&... args) {
+        return func(std::forward<Args>(args)...);
+      }
+    };
+
+    std::unordered_map<std::string, FunctionType> funcs;
+
+  public:
+    template<typename Func>
+    void addFunction(const std::string& name, Func&& func) {
+      FunctionType wrapper = std::function<ReturnType(Args...)>(std::forward<Func>(func));
+      funcs[name] = wrapper;
+    }
+
+    ReturnType call(const std::string& name, Args&&... args) {
+      auto it = funcs.find(name);
+      if (it != funcs.end()) {
+        FunctionType& func = it->second;
+        return FunctionWrapper<FunctionType>::call(func, std::forward<Args>(args)...);
+      }
+      return ReturnType{}; // default value if function not found
+    }
+  };
+
+  // Ball
+  enum Color { red, blue };
+  enum Size { small, medium, large };
+
+  class Ball {
+  public:
+    void setColor(Color color) { color_ = color; };
+    void setSize(Size size) { size_ = size; };
+
+    Color getColor() { return color_; };
+    Size getSize() { return size_; };
+
+  private:
+    Color color_;
+    Size size_;
+  };
+
+  // Main
+  int main() {
+    Ball ball;
+
+    Callable<void, Color> callable;
+    callable.addFunction("SetColor", [&ball](Color color) { ball.setColor(color); });
+
+    // Callable<void, Size> callable2;
+    // callable2.addFunction("SetSize", [&ball](Size size) { ball.setSize(size); });
+
+    // Callable<Color> callable3;
+    // callable3.addFunction("GetColor", [&ball]() { return ball.getColor(); });
+
+    // Callable<Size> callable4;
+    // callable4.addFunction("GetSize", [&ball]() { return ball.getSize(); });
+
+    callable.call("SetColor", Color::red);
+    // callable2.call("SetSize", Size::medium);
+    // Color color = callable3.call("GetColor");
+    // Size size = callable4.call("GetSize");
+
+    return 0;
+  }
+#+END_SRC
+
+
+#+RESULTS:
+
+** EnumsResolver
+#+BEGIN_SRC cpp :includes '(<iostream> <string> <vector> <unordered_map> <functional>)
+
+enum LengthUnits {
+  Feet, Meters
+};
+
+enum SpeedUnits {
+  MetersPerHour, FeetPerHour
+};
+
+class ShortcodeResolver {
+public:
+  void addShortcode(const std::string& shortcode, LengthUnits value) {
+    lengthShortcodes_[shortcode] = value;
+  }
+
+  void addShortcode(const std::string& shortcode, SpeedUnits value) {
+    speedShortcodes_[shortcode] = value;
+  }
+
+  template <typename T>
+  T resolveShortcode(const std::string& shortcode) {
+    if constexpr (std::is_same_v<T, LengthUnits>) {
+      return lengthShortcodes_[shortcode];
+    } else if constexpr (std::is_same_v<T, SpeedUnits>) {
+      return speedShortcodes_[shortcode];
+    } else {
+      // Handle error or unsupported shortcode
+      throw std::runtime_error("Unsupported shortcode");
+    }
+  }
+
+private:
+  std::unordered_map<std::string, LengthUnits> lengthShortcodes_;
+  std::unordered_map<std::string, SpeedUnits> speedShortcodes_;
+};
+
+int main() {
+  ShortcodeResolver resolver;
+
+  resolver.addShortcode("ft", LengthUnits::Feet);
+  resolver.addShortcode("m", LengthUnits::Meters);
+  resolver.addShortcode("ft/hr", SpeedUnits::FeetPerHour);
+  resolver.addShortcode("m/hr", SpeedUnits::MetersPerHour);
+
+  auto lengthUnit = resolver.resolveShortcode<LengthUnits>("ft");
+  std::cout << "Length unit: " << lengthUnit << std::endl;
+
+  auto speedUnit = resolver.resolveShortcode<SpeedUnits>("m/hr");
+  std::cout << "Speed unit: " << speedUnit << std::endl;
+
+  return 0;
+}
+#+END_SRC
+
+#+RESULTS:
+| Length | unit: | 0 |
+| Speed  | unit: | 0 |
+
+** to_underlying
+#+BEGIN_SRC cpp :includes '(<iostream> <string> <vector> <type_traits>)
+
+  enum Color { red, blue };
+  enum Size { small, medium, large };
+
+  template <typename E>
+  constexpr auto to_underlying(E e) noexcept
+  {
+      return static_cast<std::underlying_type_t<E>>(e);
+  }
+
+  int main() {
+
+    std::cout << to_underlying(Color::red);
+
+  }
+#+END_SRC
+
+#+RESULTS:
+: 0
 
 ** SIGString
 
@@ -788,6 +954,498 @@ int main()
 | DERP  |       |
 | DERP  |       |
 
+* CPP Automated Testing
+:PROPERTIES:
+:header-args:cpp:  :flags -I include/cpp/ -I ./behave-mirror/src/behave 
+:header-args:cpp+: :includes '(<iostream> <fstream> <type_traits> <typeindex> <nlohmann/json.hpp> "behaveUnits.cpp")
+:header-args:cpp+: :main no 
+:header-args:cpp+: :cmdline "-ni -nc -nv"
+:END:
+
+** Units
+#+NAME unit_resolver
+#+BEGIN_SRC cpp :tangle unit_resolver.cpp
+  class UnitResolver {
+  public:
+    void addUnit(const std::string& unit, int value) {
+      units_[unit] = value;
+    }
+
+    template<typename Enum>
+    int resolveUnit(const std::string& unit) {
+      return static_cast<Enum>(units_[unit]);
+    }
+
+  private:
+    std::unordered_map<std::string, int> units_;
+  };
+
+  void addUnits(UnitResolver &unitResolver) {
+
+    unitResolver.addUnit("%", CoverUnits::Percent);
+    unitResolver.addUnit("deg", SlopeUnits::Degrees);
+    unitResolver.addUnit("fraction", CoverUnits::Fraction);
+    // unitResolver.addUnit("points"); // FIXME Contain Fire Points
+    // unitResolver.addUnit("ratio"); // FIXME
+    unitResolver.addUnit("Btu/ft/s", FirelineIntensityUnits::BtusPerFootPerSecond);
+    unitResolver.addUnit("Btu/ft/min", FirelineIntensityUnits::BtusPerFootPerMinute);
+    unitResolver.addUnit("Btu/ft2", HeatPerUnitAreaUnits::BtusPerSquareFoot);
+    unitResolver.addUnit("Btu/ft2/min", HeatSourceAndReactionIntensityUnits::BtusPerSquareFootPerMinute);
+    unitResolver.addUnit("Btu/ft2/sec", HeatSourceAndReactionIntensityUnits::BtusPerSquareFootPerSecond);
+    unitResolver.addUnit("Btu/ft3", HeatSinkUnits::BtusPerCubicFoot);
+    unitResolver.addUnit("Btu/lb", HeatOfCombustionUnits::BtusPerPound);
+    unitResolver.addUnit("ac", AreaUnits::Acres);
+    unitResolver.addUnit("ch", LengthUnits::Chains);
+    unitResolver.addUnit("ch/h", SpeedUnits::ChainsPerHour);
+    unitResolver.addUnit("ft", LengthUnits::Feet);
+    // unitResolver.addUnit("ft-lb/s/ft2"); // FIXME Power Units
+    unitResolver.addUnit("ft/min", SpeedUnits::FeetPerMinute);
+    unitResolver.addUnit("ft2", AreaUnits::SquareFeet);
+    // unitResolver.addUnit("ft2/ac"); // FIXME Basal Area Units
+    unitResolver.addUnit("ft2/ft3", SurfaceAreaToVolumeUnits::SquareFeetOverCubicFeet);
+    unitResolver.addUnit("in", LengthUnits::Inches);
+    unitResolver.addUnit("lb/ft3", DensityUnits::PoundsPerCubicFoot);
+    unitResolver.addUnit("lbs/ft3", DensityUnits::PoundsPerCubicFoot);
+    unitResolver.addUnit("mi", LengthUnits::Miles);
+    unitResolver.addUnit("mi/h", SpeedUnits::MilesPerHour);
+    // unitResolver.addUnit("ms"); // FIXME
+    unitResolver.addUnit("oF", TemperatureUnits::Fahrenheit);
+    // unitResolver.addUnit("per, ac"); // FIXME Tree Count
+    unitResolver.addUnit("ton/ac", LoadingUnits::TonsPerAcre);
+    unitResolver.addUnit("cm", LengthUnits::Centimeters);
+    unitResolver.addUnit("ha", AreaUnits::Hectares);
+    unitResolver.addUnit("kJ/kg", HeatOfCombustionUnits::KilojoulesPerKilogram);
+    unitResolver.addUnit("kJ/m2", HeatPerUnitAreaUnits::KilojoulesPerSquareMeter);
+    unitResolver.addUnit("kJ/m3", HeatSinkUnits::KilojoulesPerCubicMeter);
+    unitResolver.addUnit("kW/m", FirelineIntensityUnits::KilowattsPerMeter);
+    unitResolver.addUnit("kW/m2", HeatSourceAndReactionIntensityUnits::KilowattsPerSquareMeter);
+    unitResolver.addUnit("kg/m3", DensityUnits::KilogramsPerCubicMeter);
+    unitResolver.addUnit("km", LengthUnits::Kilometers);
+    unitResolver.addUnit("km/h", SpeedUnits::KilometersPerHour);
+    unitResolver.addUnit("m", LengthUnits::Meters);
+    unitResolver.addUnit("m/h", SpeedUnits::MetersPerHour); // FIXME
+    unitResolver.addUnit("m/min", SpeedUnits::MetersPerMinute);
+    unitResolver.addUnit("m2", AreaUnits::SquareMeters);
+    // unitResolver.addUnit("m2/ha"); // FIXME Basal Area
+    unitResolver.addUnit("m2/m3", SurfaceAreaToVolumeUnits::SquareMetersOverCubicMeters);
+    unitResolver.addUnit("mm", LengthUnits::Millimeters);
+    unitResolver.addUnit("oC", TemperatureUnits::Celsius);
+    // unitResolver.addUnit("per, ha"); // FIXME Tree Density
+    unitResolver.addUnit("tonne/ha", LoadingUnits::TonnesPerHectare);
+    unitResolver.addUnit("s", TimeUnits::Seconds);
+    unitResolver.addUnit("min", TimeUnits::Minutes);
+    unitResolver.addUnit("h", TimeUnits::Hours);
+    unitResolver.addUnit("days", TimeUnits::Days);
+    unitResolver.addUnit("years", TimeUnits::Years);
+  }
+#+END_SRC
+
+** Enum Storage
+#+BEGIN_SRC cpp
+// Define the UnitResolver class
+class UnitResolver {
+private:
+    std::unordered_map<std::string, std::unordered_map<std::string, int>> unitTypes_;
+
+public:
+    template<typename Unit>
+    void registerEnum() {
+        unitTypes_[typeid(Unit).name()] = std::unordered_map<std::string, int>() typeid(Unit);
+    }
+
+    template<typename Unit>
+    void addUnit(const std::string& shortcode, const Unit& unit) {
+        unitTypes_[typeid(Unit).name()] [shortcode] = unit;
+    }
+
+    template<typename Unit>
+    Unit getUnit(const std::string& shortcode) {
+        void* unitPtr = units_[shortcode];
+        return *static_cast<Unit*>(unitPtr);
+    }
+};
+
+int main() {
+    // Create an instance of UnitResolver
+    UnitResolver unitResolver;
+
+    // Register the enum types
+    unitResolver.registerEnum<FractionUnits>();
+    unitResolver.registerEnum<LengthUnits>();
+
+    // Add units
+    unitResolver.addUnit("%", FractionUnits::Percent);
+    unitResolver.addUnit("m", LengthUnits::Meters);
+
+    // Retrieve the units
+    FractionUnits result1 = unitResolver.getUnit<FractionUnits>("%");
+    LengthUnits result2 = unitResolver.getUnit<LengthUnits>("m");
+
+    return 0;
+}
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC cpp
+  // Get the first value of the enum
+  template<typename Enum>
+  auto getValue(std::string enumName) {
+    if (enumName == typeid(Enum).name()) {
+      return static_cast<Enum>(0);
+    }
+    // Handle error case when enumName does not match
+    // any known enums
+    throw std::runtime_error("Unknown enumName");
+  }
+
+
+  int main() {
+    std::string enumName = typeid(LengthUnits::LengthUnitsEnum).name();
+
+    std::cout << enumName << std::endl;
+
+    std::cout << getFirstValue<LengthUnits::LengthUnitsEnum>(enumName);
+
+    return 0;
+  }
+#+END_SRC
+
+#+BEGIN_SRC cpp
+
+template<typename T>
+struct remove_cvref {
+    using type = std::remove_cv_t<std::remove_reference_t<T>>;
+};
+
+template<typename T>
+using remove_cvref_t = typename remove_cvref<T>::type;
+
+template<typename T>
+const std::string& getTypeName() {
+    static const std::string name = typeid(remove_cvref_t<T>).name();
+    return name;
+}
+
+int main() {
+    int x = 42;
+    const auto& typeName = getTypeName<decltype(x)>();
+    std::cout << typeName << std::endl;
+
+    return 0;
+}
+#+END_SRC
+
+#+RESULTS:
+
+: i
+
+** Enum to Integer (and back)
+#+BEGIN_SRC cpp :tangle test.cpp
+  class UnitResolver {
+  public:
+    void addUnit(const std::string& unit, int value) {
+      units_[unit] = value;
+    }
+
+    template<typename Enum>
+    Enum resolveUnit(const std::string& unit) {
+      return static_cast<Enum>(units_[unit]);
+    }
+
+  private:
+    std::unordered_map<std::string, int> units_;
+  };
+
+  void addUnits(UnitResolver &unitResolver) {
+
+    unitResolver.addUnit("%", CoverUnits::Percent);
+    unitResolver.addUnit("deg", SlopeUnits::Degrees);
+    unitResolver.addUnit("fraction", CoverUnits::Fraction);
+    // unitResolver.addUnit("points"); // FIXME Contain Fire Points
+    // unitResolver.addUnit("ratio"); // FIXME
+    unitResolver.addUnit("Btu/ft/s", FirelineIntensityUnits::BtusPerFootPerSecond);
+    unitResolver.addUnit("Btu/ft/min", FirelineIntensityUnits::BtusPerFootPerMinute);
+    unitResolver.addUnit("Btu/ft2", HeatPerUnitAreaUnits::BtusPerSquareFoot);
+    unitResolver.addUnit("Btu/ft2/min", HeatSourceAndReactionIntensityUnits::BtusPerSquareFootPerMinute);
+    unitResolver.addUnit("Btu/ft2/sec", HeatSourceAndReactionIntensityUnits::BtusPerSquareFootPerSecond);
+    unitResolver.addUnit("Btu/ft3", HeatSinkUnits::BtusPerCubicFoot);
+    unitResolver.addUnit("Btu/lb", HeatOfCombustionUnits::BtusPerPound);
+    unitResolver.addUnit("ac", AreaUnits::Acres);
+    unitResolver.addUnit("ch", LengthUnits::Chains);
+    unitResolver.addUnit("ch/h", SpeedUnits::ChainsPerHour);
+    unitResolver.addUnit("ft", LengthUnits::Feet);
+    // unitResolver.addUnit("ft-lb/s/ft2"); // FIXME Power Units
+    unitResolver.addUnit("ft/min", SpeedUnits::FeetPerMinute);
+    unitResolver.addUnit("ft2", AreaUnits::SquareFeet);
+    // unitResolver.addUnit("ft2/ac"); // FIXME Basal Area Units
+    unitResolver.addUnit("ft2/ft3", SurfaceAreaToVolumeUnits::SquareFeetOverCubicFeet);
+    unitResolver.addUnit("in", LengthUnits::Inches);
+    unitResolver.addUnit("lb/ft3", DensityUnits::PoundsPerCubicFoot);
+    unitResolver.addUnit("lbs/ft3", DensityUnits::PoundsPerCubicFoot);
+    unitResolver.addUnit("mi", LengthUnits::Miles);
+    unitResolver.addUnit("mi/h", SpeedUnits::MilesPerHour);
+    // unitResolver.addUnit("ms"); // FIXME
+    unitResolver.addUnit("oF", TemperatureUnits::Fahrenheit);
+    // unitResolver.addUnit("per, ac"); // FIXME Tree Count
+    unitResolver.addUnit("ton/ac", LoadingUnits::TonsPerAcre);
+    unitResolver.addUnit("cm", LengthUnits::Centimeters);
+    unitResolver.addUnit("ha", AreaUnits::Hectares);
+    unitResolver.addUnit("kJ/kg", HeatOfCombustionUnits::KilojoulesPerKilogram);
+    unitResolver.addUnit("kJ/m2", HeatPerUnitAreaUnits::KilojoulesPerSquareMeter);
+    unitResolver.addUnit("kJ/m3", HeatSinkUnits::KilojoulesPerCubicMeter);
+    unitResolver.addUnit("kW/m", FirelineIntensityUnits::KilowattsPerMeter);
+    unitResolver.addUnit("kW/m2", HeatSourceAndReactionIntensityUnits::KilowattsPerSquareMeter);
+    unitResolver.addUnit("kg/m3", DensityUnits::KilogramsPerCubicMeter);
+    unitResolver.addUnit("km", LengthUnits::Kilometers);
+    unitResolver.addUnit("km/h", SpeedUnits::KilometersPerHour);
+    unitResolver.addUnit("m", LengthUnits::Meters);
+    unitResolver.addUnit("m/h", SpeedUnits::MetersPerHour); // FIXME
+    unitResolver.addUnit("m/min", SpeedUnits::MetersPerMinute);
+    unitResolver.addUnit("m2", AreaUnits::SquareMeters);
+    // unitResolver.addUnit("m2/ha"); // FIXME Basal Area
+    unitResolver.addUnit("m2/m3", SurfaceAreaToVolumeUnits::SquareMetersOverCubicMeters);
+    unitResolver.addUnit("mm", LengthUnits::Millimeters);
+    unitResolver.addUnit("oC", TemperatureUnits::Celsius);
+    // unitResolver.addUnit("per, ha"); // FIXME Tree Density
+    unitResolver.addUnit("tonne/ha", LoadingUnits::TonnesPerHectare);
+    unitResolver.addUnit("s", TimeUnits::Seconds);
+    unitResolver.addUnit("min", TimeUnits::Minutes);
+    unitResolver.addUnit("h", TimeUnits::Hours);
+    unitResolver.addUnit("days", TimeUnits::Days);
+    unitResolver.addUnit("years", TimeUnits::Years);
+  }
+
+  // Enum to Integer
+  template<typename Enum>
+  struct EnumToInt {
+    static constexpr int value = -1;
+  };
+
+  template<>
+  struct EnumToInt<LengthUnits::LengthUnitsEnum> {
+    static constexpr int value = 0;
+  };
+
+  template<>
+  struct EnumToInt<SpeedUnits::SpeedUnitsEnum> {
+    static constexpr int value = 1;
+  };
+
+  // Integer to Enum
+  template<int Value>
+  struct IntToEnum {
+    using type = void; // Default case if no matching enum value is found
+  };
+
+  template<>
+  struct IntToEnum<0> {
+    using type = LengthUnits::LengthUnitsEnum;
+  };
+
+  template<>
+  struct IntToEnum<1> {
+    using type = SpeedUnits::SpeedUnitsEnum;
+  };
+
+  template<int Value>
+  constexpr auto intToEnum() {
+    return typename IntToEnum<Value>::type{};
+  }
+
+  template <typename E>
+  constexpr auto to_underlying(E e) noexcept
+  {
+    return static_cast<std::underlying_type_t<E>>(e);
+  }
+
+  class FuncConverter {
+  private:
+    UnitResolver _unitResolver;
+  public:
+    FuncConverter(UnitResolver &unitResolver) : _unitResolver(unitResolver) {}
+
+    // Discrete Setter
+    template<typename ObjType, typename EnumType>
+    void wrapperDiscreteSetter(ObjType* obj, void (ObjType::*func)(EnumType), std::string str) {
+      // Convert the input string to the desired EnumType
+      EnumType enumValue = static_cast<EnumType>(std::stoi(str));
+
+      // Call the member function of the object with the converted EnumType
+      (obj->*func)(enumValue);
+    }
+
+    template<typename ObjType, typename EnumType>
+    std::function<void(void*, std::string)> convertDiscreteSetter(void (ObjType::*func)(EnumType)) {
+      return [=](void* obj, std::string str) {
+        wrapperDiscreteSetter(static_cast<ObjType*>(obj), func, str);
+      };
+    }
+
+    // Continous Setter
+    template<typename ObjType, typename EnumType>
+    void wrapperContinuousSetter(ObjType* obj, void (ObjType::*func)(double, EnumType), double num, std::string str) {
+      // Convert the input string to the desired EnumType
+      EnumType enumValue = _unitResolver.resolveUnit<EnumType>(str);
+
+      // Call the member function of the object with the converted EnumType
+      (obj->*func)(num, enumValue);
+    }
+
+    template<typename ObjType, typename EnumType>
+    std::function<void(void*, double, std::string)> convertContinuousSetter(void (ObjType::*func)(double, EnumType)) {
+      return [=](void* obj, double num, std::string str) {
+        wrapperContinuousSetter(static_cast<ObjType*>(obj), func, num, str);
+      };
+    }
+
+    // Calculate Wrapper
+    template<typename ObjType>
+    std::function<void(void*)> convertCalculate(void (ObjType::*func)()) {
+      return [=](void* obj, std::string str) {
+        (obj->*func)();
+      };
+    }
+
+    // Getters
+    template<typename ObjType, typename EnumType>
+    double wrapperGetter(ObjType* obj, double (ObjType::*func)(EnumType), std::string str) {
+      // Convert the input string to the desired EnumType
+      EnumType enumValue = _unitResolver.resolveUnit<EnumType>(str);
+
+      // Call the member function of the object with the converted EnumType
+      return (obj->*func)(enumValue);
+    }
+
+    template<typename ObjType, typename EnumType>
+    std::function<double(void*, std::string)> convertGetter(double (ObjType::*func)(EnumType)) {
+      return [=](void* obj, std::string str) {
+        return wrapperGetter(static_cast<ObjType*>(obj), func, str);
+      };
+    }
+  };
+
+  class SIGTestClass {
+  public:
+    void setHeight(double height, LengthUnits::LengthUnitsEnum units) {
+      height_ = LengthUnits::toBaseUnits(height, units);
+    };
+
+    double getHeight(LengthUnits::LengthUnitsEnum units) {
+      return LengthUnits::fromBaseUnits(height_, units);
+    };
+
+    void setSpeed(double speed, SpeedUnits::SpeedUnitsEnum units) {
+      speed_ = SpeedUnits::toBaseUnits(speed, units);
+    };
+
+    double getSpeed(SpeedUnits::SpeedUnitsEnum units) {
+      return SpeedUnits::fromBaseUnits(speed_, units);
+    };
+
+    void setUnits(LengthUnits::LengthUnitsEnum units) {
+      units_ = units;
+    }
+
+    LengthUnits::LengthUnitsEnum getUnits() {
+      return units_;
+    }
+
+  private:
+    double height_;
+    double speed_;
+    LengthUnits::LengthUnitsEnum units_;
+  };
+
+  int main() {
+    static const int l_units = EnumToInt<LengthUnits::LengthUnitsEnum>::value;
+
+    static const int s_units = EnumToInt<SpeedUnits::SpeedUnitsEnum>::value;
+
+    using length_units = decltype(intToEnum<l_units>()); // LengthUnits
+    using speed_units = decltype(intToEnum<s_units>()); // SpeedUnits
+
+    std::unordered_map<std::string, std::function<void(void*, std::string)>> discrete_setters;
+    std::unordered_map<std::string, std::function<void(void*, double, std::string)>> cont_setters;
+    std::unordered_map<std::string, std::function<double(void*, std::string)>> getters;
+
+    UnitResolver unitResolver;
+    addUnits(unitResolver);
+
+    FuncConverter fnConverter(unitResolver);
+
+    std::cout << unitResolver.resolveUnit<length_units>("m") << std::endl;
+    std::cout << unitResolver.resolveUnit<speed_units>("mi/h") << std::endl;
+
+    SIGTestClass sut;
+
+    // sut.setSpeed(30.0, SpeedUnits::MilesPerHour);
+    cont_setters["setHeight"] = fnConverter.convertContinuousSetter(&SIGTestClass::setHeight);
+    cont_setters["setHeight"](&sut, 10.0, "mi");
+
+    cont_setters["setSpeed"] = fnConverter.convertContinuousSetter(&SIGTestClass::setSpeed);
+    cont_setters["setSpeed"](&sut, 30.0, "mi/h");
+
+    discrete_setters["setUnits"] = fnConverter.convertDiscreteSetter(&SIGTestClass::setUnits);
+    discrete_setters["setUnits"](&sut, "3");
+
+    getters["getSpeed"] = fnConverter.convertGetter(&SIGTestClass::getSpeed);
+    std::cout << getters["getSpeed"](&sut, "ft/min") << std::endl;
+    std::cout << sut.getSpeed(SpeedUnits::FeetPerMinute) << std::endl;
+
+    getters["getHeight"] = fnConverter.convertGetter(&SIGTestClass::getHeight);
+    std::cout << getters["getHeight"](&sut, "ft") << std::endl;
+    std::cout << sut.getHeight(LengthUnits::Feet) << std::endl;
+
+    std::cout << sut.getUnits() << std::endl;
+
+    return 0;
+  }
+#+END_SRC
+
+#+RESULTS:
+|     4 |
+|     5 |
+|  2640 |
+|  2640 |
+| 52800 |
+| 52800 |
+|     3 |
+
+#+BEGIN_SRC cpp
+  int main() {
+    std::cout << static_cast<std::underlying_type_t<LengthUnits::LengthUnitsEnum>>(std::stoi("0"));
+  }
+#+END_SRC
+
+#+RESULTS:
+: 0
+
+** JSON
+#+BEGIN_SRC cpp
+
+  using json = nlohmann::json;
+
+  int main() {
+
+    // Read JSON file
+    std::ifstream file("data.json");
+    if (!file) {
+      std::cerr << "Failed to open file!" << std::endl;
+      return 1;
+    }
+
+    json jsonData;
+    file >> jsonData;
+    file.close();
+
+    std::cout << jsonData["hello"] << std::endl;
+
+  }
+#+END_SRC
+
+#+RESULTS:
+: world
 
 * DocTest
 :PROPERTIES:
