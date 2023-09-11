@@ -1,6 +1,5 @@
 (ns behave-cms.group-variables.subs
-  (:require [clojure.string     :as str]
-            [datascript.core    :as d]
+  (:require [datascript.core    :as d]
             [behave-cms.store   :refer [conn]]
             [behave-cms.queries :refer [rules]]
             [re-posh.core       :as rp]

@@ -47,7 +47,7 @@
          (str/replace #"\$\s(.*)\s\$" #(render-latex (second %))))
      text) state])
 
-(def custom-transform-vector
+(def ^:private custom-transform-vector
   [set-line-state
    empty-line
    inhibit
@@ -83,7 +83,9 @@
    clear-line-state
    latex])
 
-(defn md->html [text]
+(defn md->html
+  "Convert Markdown to HTML"
+  [text]
   (md/md->html text
                :replacement-transformers
                custom-transform-vector))

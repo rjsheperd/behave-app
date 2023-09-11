@@ -7,7 +7,10 @@
 
 ;;; Styles
 
-(def sidebar-width "200px")
+(def
+  ^{:doc "Sidebar width"}
+  sidebar-width "200px")
+
 (def ^:private $colors {:gray       "rgb(215, 215, 215)"
                         :blue       "rgb(0, 122, 255)"
                         :light-blue "rgba(0, 122, 255, 0.5)"})

@@ -71,7 +71,12 @@
           (catch ExceptionInfo e (js/console.log "Error in process-fn:" (ex-cause e))))
         (js/console.log "HTTP Error:" response)))))
 
-(defmulti call-remote! (fn [method _ _ _] method))
+(defmulti call-remote!
+  "Call remote API/service with:
+  - method [`keyword`]: One of `:get`, `:post`, `:post-text`, `:post-blob` or `:delete`.
+  - url    [`string`]: URL.
+  - data   [`any`]: Data to post/put. Could be `string`, or other formats."
+  (fn [method _ _ _] method))
 
 (defmethod call-remote! :get [_ url data auth-token]
   (go

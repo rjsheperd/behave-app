@@ -1,11 +1,10 @@
 (ns behave-cms.components.entity-form
+  {:clj-kondo/config '{:linters {:shadowed-var {:exclude [type]}}}}
   (:require [clojure.string :as str]
-            [datascript.core   :refer [squuid]]
             [reagent.core      :as r]
             [re-frame.core     :as rf]
             [string-utils.interface :refer [->kebab ->str]]
             [behave.schema.core :refer [all-schemas]]
-            [behave-cms.routes :refer [singular]]
             [behave-cms.utils  :as u]))
 
 ;;; Constants
@@ -62,7 +61,7 @@
 
 ;;; Sub-components
 
-(defmulti field-input (fn [{type :type}] type))
+(defmulti ^:private field-input (fn [{type :type}] type))
 
 (defmethod field-input :checkbox [{:keys [label options on-change state]}]
   (let [group-label label]
@@ -160,7 +159,7 @@
                                              {:label \"Output\" :value :output}]}]
                 :on-create     #(assoc % :submodule/order num-submodules)})
   ```"
-  [{:keys [entity parent-field parent-id fields id on-create] :as opts}]
+  [{:keys [entity parent-field parent-id fields id on-create]}]
   (let [original     @(rf/subscribe [:entity id])
         parent       @(rf/subscribe [:entity parent-id])
         update-state (fn [field] (fn [value] (rf/dispatch [:state/set-state [:editors entity field] value])))

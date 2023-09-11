@@ -1,7 +1,6 @@
 (ns behave-cms.languages.subs
   (:require [clojure.string :as str]
-            [re-frame.core :as rf]
-            [re-posh.core :as rp]))
+            [re-frame.core :as rf]))
 
 ;;; Languages
 

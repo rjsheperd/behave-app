@@ -1,9 +1,8 @@
-(ns behave-cms.queries
-  (:require [clojure.string :as str]
-            #?(:cljs [datascript.core :as d]
-               :clj  [datahike.api :as d])))
+(ns behave-cms.queries)
 
-(def rules
+(def
+  ^{:doc "Common Datalog Rules."}
+  rules
   '[[(module ?a ?m) [?e :application/modules ?m]]
     [(submodule ?m ?s) [?m :module/submodules ?s]]
     [(group ?s ?g) [?m :submodule/groups ?s]]

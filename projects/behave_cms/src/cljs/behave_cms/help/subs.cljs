@@ -1,15 +1,7 @@
 (ns behave-cms.help.subs
-  (:require [clojure.string             :as str]
-            [clojure.set                :refer [rename-keys]]
-            [clojure.walk               :refer [postwalk]]
-            [applied-science.js-interop :as j]
-            [reagent.core               :as r]
-            [re-frame.core              :as rf]
-            [re-posh.core               :as rp]
-            [herb.core                  :refer [<class]]
-            [markdown2hiccup.interface  :refer [md->hiccup]]
-            [data-utils.interface       :refer [parse-int]]
-            [behave-cms.utils           :as u]))
+  (:require [re-frame.core             :as rf]
+            [re-posh.core              :as rp]
+            [markdown2hiccup.interface :refer [md->hiccup]]))
 
 ;;; Database
 
@@ -50,8 +42,8 @@
 
 (rf/reg-sub
  :help-editor/state
- (fn [db [_ & keys]]
-   (get-in (editor db) keys)))
+ (fn [db [_ & ks]]
+   (get-in (editor db) ks)))
 
 (rf/reg-sub
  :help-editor/content-as-hiccup

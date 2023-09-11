@@ -1,4 +1,5 @@
 (ns behave-cms.components.translations
+  {:clj-kondo/config '{:linters {:shadowed-var {:exclude [key]}}}}
   (:require [reagent.core :as r]
             [re-frame.core :as rf]
             [data-utils.interface :refer [parse-int]]
@@ -8,7 +9,7 @@
   (let [rf-event (if (nil? (:db/id data)) :api/create-entity :api/update-entity)]
     (rf/dispatch [rf-event data])))
 
-(defn translation-editor [language-id translation-key translation-id state]
+(defn- translation-editor [language-id translation-key translation-id state]
   [:input.form-control {:type      "text"
                         :on-change #(reset! state (u/input-value %))
                         :on-blur   #(upsert-translation!
@@ -19,12 +20,14 @@
                                       (when translation-id {:db/id translation-id})))
                         :value     @state}])
 
-(defn app-translations [translation-prefix]
+(defn app-translations
+  "Editor for an application's translations."
+  [translation-prefix]
   (r/with-let [languages       (rf/subscribe [:languages])
                *language       (r/atom nil)
                new-key         (r/atom "")
                new-translation (r/atom "")
-               update-field    (fn [field] #(rf/dispatch [:state/set-state [:editors :translation field] %]))
+               ;; update-field    (fn [field] #(rf/dispatch [:state/set-state [:editors :translation field] %]))
                translations    (rf/subscribe [:all-translations translation-prefix])
                on-submit       #(do
                                   (rf/dispatch [:api/create-entity
@@ -95,7 +98,9 @@
               id
               translation]]]))]]]))
 
-(defn all-translations [translation-key]
+(defn all-translations
+  "Table of all the translations for an application."
+  [translation-key]
   (let [languages          (rf/subscribe [:languages])
         translations       (rf/subscribe [:translations translation-key])
         translation-lookup (group-by

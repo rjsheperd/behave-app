@@ -73,11 +73,11 @@
 
 (rf/reg-event-fx
   :auth/invite-user
-  (fn [{db :db} [_ name email]]
+  (fn [{db :db} [_ user-name email]]
     {:db          (assoc-in db [:state :loading?] true)
      :api/request {:method     :post
                    :uri        (path-for api-routes :api/invite-user)
-                   :data       {:name name :email email}
+                   :data       {:name user-name :email email}
                    :on-success :auth/invite-success
                    :on-error   :auth/invite-error}}))
 

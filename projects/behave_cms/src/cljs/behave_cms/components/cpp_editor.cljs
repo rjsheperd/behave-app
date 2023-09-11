@@ -1,4 +1,5 @@
 (ns behave-cms.components.cpp-editor
+  {:clj-kondo/config '{:linters {:shadowed-var {:exclude [uuid]}}}}
   (:require [reagent.core :as r]
             [re-frame.core :as rf]
             [behave-cms.utils :as u]))

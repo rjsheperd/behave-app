@@ -1,40 +1,45 @@
 (ns behave-cms.routes
-  (:require [bidi.bidi :as bidi]
-            [clojure.walk :as walk]))
+  (:require [clojure.walk :as walk]))
 
-(def admin-routes  #{:users :invite-user})
+(def
+  ^{:doc "Admin-only Routes."}
+  admin-routes #{:users :invite-user})
 
-(def public-routes #{:login
-                     :dashboard
-                     :verify-email
-                     :reset-password
-                     :api/login
-                     :api/verify-email
-                     :api/reset-password})
+(def
+  ^{:doc "Public Routes."}
+  public-routes #{:login
+                  :dashboard
+                  :verify-email
+                  :reset-password
+                  :api/login
+                  :api/verify-email
+                  :api/reset-password})
 
-(def singular       {:applications      :application
-                     :classes           :class
-                     :enum-members      :enum-member
-                     :enums             :enum
-                     :functions         :function
-                     :groups            :group
-                     :lists             :list
-                     :group-variables   :group-variable
-                     :help-pages        :help-page
-                     :languages         :language
-                     :modules           :module
-                     :namespaces        :namespace
-                     :parameters        :parameter
-                     :permissions       :permission
-                     :roles             :role
-                     :subgroups         :subgroup
-                     :submodules        :submodule
-                     :translations      :translation
-                     :tools             :tool
-                     :subtools          :subtool
-                     :subtool-variables :subtool-variable
-                     :users             :user
-                     :variables         :variable})
+(def
+  ^{:doc "Mappings between plural to singular entity names."}
+  singular {:applications      :application
+            :classes           :class
+            :enum-members      :enum-member
+            :enums             :enum
+            :functions         :function
+            :groups            :group
+            :lists             :list
+            :group-variables   :group-variable
+            :help-pages        :help-page
+            :languages         :language
+            :modules           :module
+            :namespaces        :namespace
+            :parameters        :parameter
+            :permissions       :permission
+            :roles             :role
+            :subgroups         :subgroup
+            :submodules        :submodule
+            :translations      :translation
+            :tools             :tool
+            :subtools          :subtool
+            :subtool-variables :subtool-variable
+            :users             :user
+            :variables         :variable})
 
 ;; From https://github.com/WorksHub/client/blob/master/common/src/wh/routes.cljc
 ;; The collection routes defined here are supposed to have trailing
@@ -62,7 +67,9 @@
     [entities-route [["" (->kw entities-route)]
                      [["/" [long :id]] get-entity]]]))
 
-(def api-routes
+(def
+  ^{:doc "Behave CMS API Routes."}
+  api-routes
   (add-trailing-slashes-to-roots
     ["/api"
      [["" :api-index]
@@ -76,7 +83,9 @@
             ;; Custom API routes
             ["variables/search" :api/search-variables]]]]]))
 
-(def app-routes
+(def
+  ^{:doc "Behave CMS Application Routes."}
+  app-routes
   (add-trailing-slashes-to-roots
     ["/"
      [;; App Routes

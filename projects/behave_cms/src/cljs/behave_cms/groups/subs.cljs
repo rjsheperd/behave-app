@@ -23,9 +23,9 @@
                  [?v :variable/name ?name]]
                [submodule-id]]))
  (fn [results]
-   (mapv (fn [[id name]]
+   (mapv (fn [[id var-name]]
            (-> @(subscribe [:entity id])
-               (assoc :variable/name name))) results)))
+               (assoc :variable/name var-name))) results)))
 
 (reg-sub
  :submodule/module-conditionals
@@ -52,18 +52,18 @@
 
 ;;; Groups w/ Subgroups
 
-(defn accumulate-subgroups [acc group & [parents]]
-  (let [id       (:db/id group)
-        children (:group/children group)
-        name     (:group/name group)
-        acc      (conj acc {:db/id      id
-                            :group/name (if (seq parents)
-                                          (str/join " / " (conj parents name))
-                                          name)})
-        parents  (if (nil? parents) [name] (conj parents name))]
+(defn- accumulate-subgroups [acc group & [parent-groups]]
+  (let [id         (:db/id group)
+        children   (:group/children group)
+        group-name (:group/name group)
+        acc        (conj acc {:db/id      id
+                              :group/name (if (seq parent-groups)
+                                            (str/join " / " (conj parent-groups group-name))
+                                            group-name)})
+        parent-groups    (if (nil? parents) [group-name] (conj parents group-name))]
     (if (seq children)
       (reduce (fn [acc cur]
-                (accumulate-subgroups acc cur parents))
+                (accumulate-subgroups acc cur parent-groups))
               acc
               (:group/children (d/pull @@conn '[{:group/children [*]}] id)))
       acc)))
@@ -87,7 +87,7 @@
 
   (fn [groups]
     (->> groups
-         (map (fn [{id :db/id name :group/name}]
-                {:label name
+         (map (fn [{id :db/id group-name :group/name}]
+                {:label group-name
                  :link  (path-for app-routes :get-group :id id)}))
          (sort-by :label))))

@@ -1,4 +1,5 @@
 (ns behave-cms.subgroups.subs
+  {:clj-kondo/config '{:linters {:shadowed-var {:exclude [list]}}}}
   (:require [clojure.string     :as str]
             [bidi.bidi          :refer [path-for]]
             [datascript.core    :as d]
@@ -102,8 +103,8 @@
 
  (fn [groups _]
    (->> groups
-        (map (fn [{id :db/id name :group/name}]
-               {:label name
+        (map (fn [{id :db/id group-name :group/name}]
+               {:label group-name
                 :link  (path-for app-routes :get-group :id id)}))
         (sort-by :label))))
 
@@ -124,9 +125,9 @@
                  [?v :variable/name ?name]]
                [group-id]]))
  (fn [results]
-   (mapv (fn [[id name]]
+   (mapv (fn [[id var-name]]
            (-> @(subscribe [:entity id])
-               (assoc :variable/name name))) results)))
+               (assoc :variable/name var-name))) results)))
 
 (reg-sub
  :group/module-conditionals
@@ -170,9 +171,9 @@
  (fn [variables]
    (->> variables
         (map (fn [variable]
-               (let [id   (:db/id variable)
-                     name (get-in variable [:variable/_group-variables 0 :variable/name])]
-                 {:label name
+               (let [id       (:db/id variable)
+                     var-name (get-in variable [:variable/_group-variables 0 :variable/name])]
+                 {:label var-name
                   :link  (path-for app-routes :get-group-variable :id id)})))
         (sort-by :label))))
 

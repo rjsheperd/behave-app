@@ -1,6 +1,5 @@
 (ns behave-cms.store
   (:require [clojure.set                :refer [union]]
-            [clojure.edn                :as edn]
             [ajax.core                  :refer [ajax-request]]
             [ajax.edn                   :refer [edn-request-format
                                                 edn-response-format]]
@@ -17,9 +16,9 @@
 
 ;;; State
 
-(defonce conn (atom nil))
-(defonce my-txs (atom #{}))
-(defonce sync-txs (atom #{}))
+(defonce ^{:doc "DataScript connection"} conn (atom nil))
+(defonce ^:private my-txs (atom #{}))
+(defonce ^:private sync-txs (atom #{}))
 
 ;;; Helpers
 
@@ -35,17 +34,7 @@
       (swap! sync-txs union (txs datoms))
       (rf/dispatch-sync [:ds/initialize (->ds-schema all-schemas) datoms]))))
 
-(defn load-store! []
-  (ajax-request {:uri             (str "/sync?auth-token="
-                                       (get-config :secret-token))
-                 :handler         load-data-handler
-                 :format          {:content-type "application/text" :write str}
-                 :response-format {:description  "ArrayBuffer"
-                                   :type         :arraybuffer
-                                   :content-type "application/msgpack"
-                                   :read         pr/-body}}))
-
-(defn sync-tx-data [{:keys [tx-data]}]
+(defn- sync-tx-data [{:keys [tx-data]}]
   (let [datoms (->> tx-data (filter new-datom?) (mapv split-datom))]
     (when-not (empty? datoms)
       (swap! my-txs union (txs datoms))
@@ -57,7 +46,7 @@
                      :format          (edn-request-format)
                      :response-format (edn-response-format)}))))
 
-(defn apply-latest-datoms [[ok body]]
+(defn- apply-latest-datoms [[ok body]]
   (when ok
     (let [datoms (->> (c/unpack body)
                       (filter new-datom?)
@@ -66,7 +55,11 @@
         (swap! sync-txs union (txs datoms))
         (d/transact @conn datoms)))))
 
-(defn sync-latest-datoms! []
+;;; Public Fns
+
+(defn sync-latest-datoms!
+  "Force a sync to retrieve the latest datoms."
+  []
   (ajax-request {:uri             "/sync"
                  :params          {:tx (:max-tx @@conn)}
                  :method          :get
@@ -77,9 +70,23 @@
                                    :content-type "application/msgpack"
                                    :read         pr/-body}}))
 
-;;; Public Fns
+(defn load-store!
+  "Loads the "
+  []
+  (ajax-request {:uri             (str "/sync?auth-token="
+                                       (get-config :secret-token))
+                 :handler         load-data-handler
+                 :format          {:content-type "application/text" :write str}
+                 :response-format {:description  "ArrayBuffer"
+                                   :type         :arraybuffer
+                                   :content-type "application/msgpack"
+                                   :read         pr/-body}}))
 
-(defn init! [{:keys [datoms schema]}]
+(defn init!
+  "Initializes the DataScript. Takes a map with:
+  - datoms: [`vector`]: Collection of Datoms to bootstrap the store with.
+  - schema: [`vector`]: Collection of schema entries to setup the store with."
+  [{:keys [datoms schema]}]
   (if @conn
     @conn
     (do

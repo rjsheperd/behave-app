@@ -1,4 +1,5 @@
 (ns behave-cms.components.conditionals
+  {:clj-kondo/config '{:linters {:shadowed-var {:exclude [type]}}}}
   (:require
    [behave-cms.components.common :refer [dropdown checkboxes simple-table]]
    [behave-cms.utils             :as u]
@@ -9,11 +10,11 @@
 
 ;;; Helpers
 
-(defn inverse-attr
+(defn- inverse-attr
   [attr]
   (keyword (str/join "/_" (str/split (->str attr) #"/"))))
 
-(defn on-submit [entity-id cond-attr]
+(defn- on-submit [entity-id cond-attr]
   (rf/dispatch [:ds/transact
                 (merge @(rf/subscribe [:state [:editors :conditional cond-attr]])
                        {(inverse-attr cond-attr) entity-id})])
@@ -21,7 +22,7 @@
 
 ;;; Components
 
-(defn radio-buttons
+(defn- radio-buttons
   "A component for radio button."
   [group-label options on-change]
   [:div.mb-3
@@ -36,7 +37,12 @@
         :on-change on-change}]
       [:label.form-check-label {:for value} label]])])
 
-(defn conditionals-table [entity-id conditionals cond-attr cond-op-attr]
+(defn conditionals-table
+  "Displays a table of conditionals table. Takes:
+  - entity-id    [`integer`]: Entity ID.
+  - cond-attr    [`keyword`]: Conditional attribute (e.g. `:submodule/conditionals`).
+  - cond-op-attr [`keyword`]: Conditional operation attribute (e.g. `:submodule/conditionals-operator`)."
+  [entity-id conditionals cond-attr cond-op-attr]
   (let [entity (rf/subscribe [:entity entity-id])]
     [:<>
      [dropdown
@@ -53,13 +59,13 @@
        :on-delete #(when (js/confirm (str "Are you sure you want to delete the conditional " (:variable/name %) "?"))
                      (rf/dispatch [:api/delete-entity %]))}]]))
 
-(defn toggle-item [x xs]
+(defn- toggle-item [x xs]
   (let [xs-set (set xs)]
     (vec (if (xs-set x)
            (remove #(= x %) xs)
            (conj xs x)))))
 
-(defn manage-module-conditionals [entity-id cond-attr]
+(defn- manage-module-conditionals [entity-id cond-attr]
   (let [cond-path   [:editors :conditional cond-attr]
         set-field   (fn [path v] (rf/dispatch [:state/set-state path v]))
         get-field   #(rf/subscribe [:state %])
@@ -76,7 +82,7 @@
       (get-field module-path)
       #(set-field module-path (toggle-item (u/input-value %) @*modules))]]))
 
-(defn manage-variable-conditionals [entity-id cond-attr]
+(defn- manage-variable-conditionals [entity-id cond-attr]
   (let [var-path    [:editors :variable-lookup]
         cond-path   [:editors :conditional cond-attr]
         get-field   #(rf/subscribe [:state %])
@@ -146,7 +152,11 @@
                     (map (fn [{value :list-option/value label :list-option/name}]
                            {:value value :label label}) @options))}]]))
 
-(defn manage-conditionals [entity-id cond-attr cond-attr-op]
+(defn manage-conditionals
+  "Displays a conditionals manager component. Takes:
+  - entity-id [`integer`]: Entity ID.
+  - cond-attr [`keyword`]: Conditional attribute (e.g. `:submodule/conditionals`)."
+  [entity-id cond-attr _cond-attr-op]
   (r/with-let [state     (r/atom "variable")
                cond-path [:editors :conditional cond-attr]
                set-type  #(do (reset! state %)

@@ -18,7 +18,9 @@
             [behave-cms.subtools.subs]))
 
 ;; Taken from https://lambdaisland.com/blog/11-02-2017-re-frame-form-1-subscriptions
-(def <sub (comp deref rf/subscribe))
+(def
+  ^{:doc "Immediately deref a subscription."}
+  <sub (comp deref rf/subscribe))
 
 ;;; Navigation
 

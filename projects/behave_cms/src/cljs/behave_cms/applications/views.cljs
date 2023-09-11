@@ -5,9 +5,9 @@
             [behave-cms.components.entity-form :refer [entity-form]]
             [behave-cms.applications.subs]))
 
-(def columns [:application/name :application/version])
+(def ^:private columns [:application/name :application/version])
 
-(defn add-version! [application]
+(defn- add-version! [application]
   (assoc application
          :application/version
          (str
@@ -17,7 +17,7 @@
            "."
            (:application/version-patch application))))
 
-(defn applications-table []
+(defn- applications-table []
   (let [applications (rf/subscribe [:applications])
         on-select    #(rf/dispatch [:state/set-state :application (:db/id %)])
         on-delete    #(when (js/confirm (str "Are you sure you want to delete the application " (:application/name %) "?"))
@@ -31,7 +31,7 @@
      {:on-select on-select
       :on-delete on-delete}]))
 
-(defn application-form [id]
+(defn- application-form [id]
   [entity-form {:entity :application
                 :id     id
                 :fields [{:label     "Name"
@@ -50,7 +50,9 @@
                           :type      :number
                           :required? true}]}])
 
-(defn list-applications-page [{id :id}]
+(defn applications-page
+  "Displays applications."
+  [_]
   (let [application (rf/subscribe [:state :application])]
     [:<>
      [sidebar "Applications" @(rf/subscribe [:sidebar/applications])]

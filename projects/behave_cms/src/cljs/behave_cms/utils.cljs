@@ -4,11 +4,15 @@
             [clojure.set        :as sets]
             [applied-science.js-interop :as j]
             [clojure.core.async :refer [alts! go <! timeout go-loop chan put!]]
-            [cljs.core.async.interop :refer-macros [<p!]])
+            [cljs.core.async.interop :refer-macros [<p!]]
+            [cljs.core.async.impl.channels])
   (:import  [goog.async Debouncer]))
 
 ;; JS Utils
-(defn debounce [f interval]
+(defn debounce
+  "Wraps `f` to only be called every `interval` milliseconds,
+  even after multiple calls."
+  [f interval]
   (let [dbnc (Debouncer. f interval)]
     ;; We use apply here to support functions of various arities
     (fn [& args] (.apply (.-fire dbnc) dbnc (to-array args)))))
@@ -21,6 +25,7 @@
   (-> event .-target .-value))
 
 (defn input-multi-select
+  "Returns the values of a multi-select dropdown in a vector."
   [event]
   (let [options (-> event .-target .-options)]
     (reduce (fn [acc option]
@@ -74,7 +79,15 @@
         (.getAsFile %)) items)
     (.-files data-tx)))
 
-(defn on-drop-image [event f]
+(defn on-drop-image
+  "Process an event to get the file information for an on-drop event.
+
+  Takes:
+  - event [`js/Event`]: JS Event object.
+  - f     [`function`]: callback function, which is passed `js/File`
+
+  FIXME: Upgrade to be able to pass in custom file types."
+  [event f]
    ; Prevent default behavior (Prevent file from being opened)
    (.preventDefault event)
    (let [files (get-files (j/get event :dataTransfer))
@@ -82,20 +95,41 @@
      (when (str/starts-with? (j/get file :type) "image/")
        (f file))))
 
-(defn file->url [file callback]
+(defn file->url
+  "Turns a file's data into a URL. Used to create a downloadable file.
+
+  Takes:
+  - event [`js/File`]: JS File object.
+  - f     [`function`]: callback function, which is passed the URL as a `string`."
+  [file callback]
   (let [reader  (js/FileReader.)
         on-load #(callback (j/get reader :result))]
     (.addEventListener reader "load" on-load)
     (.readAsDataURL reader file)))
 
-(defn file->blob [file callback]
+(defn file->blob
+  "Turns a file's data into a data blobl. Used to create a downloadable file.
+
+  Takes:
+  - event [`js/File`]: JS File object.
+  - f     [`function`]: callback function, which is passed `js/ArrayBuffer`."
+  [file callback]
   (let [reader  (js/FileReader.)
         on-load #(callback (j/get reader :result))]
     (.addEventListener reader "load" on-load)
     (.readAsArrayBuffer reader file)))
 
-(defn on-select-image [e f & [convert-to convert-callback]]
-  (let [file (first (array-seq (j/get-in e [:target :files])))]
+(defn on-select-image
+  "Process an event to get the file information for an file select event.
+
+  Takes:
+  - event            [`js/Event`]: JS Event object.
+  - f                [`function`]: Callback function, which is passed `js/File`
+  - convert-to       [`keyword`]: One of `:blob` or `:url`.
+  - convert-callback [`function`]: Callback function, which is passed file contents
+                                   as either `js/ArrayBuffer` or URL `string`."
+  [event f & [convert-to convert-callback]]
+  (let [file (first (array-seq (j/get-in event [:target :files])))]
     (f file)
     (when convert-to
       (if (= type :blob)
@@ -125,7 +159,7 @@
 
 ;;; Session
 
-(def session-key "behaveplus")
+(def ^:private session-key "behaveplus")
 
 (defn- save-session-storage! [data]
   (.setItem (.-sessionStorage js/window) session-key (pr-str data)))
@@ -142,9 +176,9 @@
 
 (defn remove-session-storage!
   "Removes the specified session storage data given keywords."
-  [& keys]
+  [& ks]
   (let [data (get-session-storage)]
-    (save-session-storage! (apply dissoc data keys))))
+    (save-session-storage! (apply dissoc data ks))))
 
 (defn clear-session-storage!
   "Clears the session storage data."
@@ -168,9 +202,9 @@
 
 (defn remove-local-storage!
   "Removes the specified pyregence local storage data given keywords."
-  [& keys]
+  [& ks]
   (let [data (get-local-storage)]
-    (save-local-storage! (apply dissoc data keys))))
+    (save-local-storage! (apply dissoc data ks))))
 
 (defn clear-local-storage!
   "Clears the pyregence local storage data."
@@ -231,7 +265,12 @@
           (catch ExceptionInfo e (js/console.log "Error in process-fn:" (ex-cause e))))
         (js/console.log "HTTP Error:" response)))))
 
-(defmulti call-remote! (fn [method _ _] method))
+(defmulti call-remote!
+  "Call remote API/service with:
+  - method [`keyword`]: One of `:get`, `:post`, `:post-text`, `:post-blob` or `:delete`.
+  - url    [`string`]: URL.
+  - data   [`any`]: Data to post/put. Could be `string`, or other formats."
+  (fn [method _ _] method))
 
 (defmethod call-remote! :get [_ url data]
   (go
@@ -387,10 +426,6 @@
     (call-remote! method
                   (str "/clj/" clj-fn-name)
                   data)))
-
-;;; Process Returned Results
-
-(def sql-primitive (comp val first first))
 
 ;;; Time processing
 

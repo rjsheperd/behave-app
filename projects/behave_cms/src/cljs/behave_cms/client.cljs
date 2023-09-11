@@ -1,4 +1,5 @@
 (ns ^:figwheel-hooks behave-cms.client
+  {:clj-kondo/config '{:linters {:unused-private-var {:exclude [behave-cms.client/mount-root!]}}}}
   (:require [bidi.bidi                          :refer [match-route]]
             [reagent.core                       :as r]
             [reagent.dom                        :refer [render]]
@@ -10,60 +11,60 @@
             [behave-cms.routes                  :refer [app-routes]]
             [behave-cms.components.menu         :refer [menu]]
             [behave-cms.pages.dashboard         :as dashboard]
-            [behave-cms.applications.views      :refer [list-applications-page]]
+            [behave-cms.applications.views      :refer [applications-page]]
             [behave-cms.authentication.views    :refer [invite-user-page
                                                         login-page
                                                         reset-password-page
                                                         verify-email-page]]
             [behave-cms.groups.views            :refer [list-groups-page]]
             [behave-cms.group-variables.views   :refer [group-variable-page]]
-            [behave-cms.languages.views         :refer [list-languages-page]]
+            [behave-cms.languages.views         :refer [languages-page]]
             [behave-cms.lists.views             :refer [list-lists-page]]
             [behave-cms.modules.views           :refer [list-modules-page]]
             [behave-cms.tools.views             :refer [tools-page]]
             [behave-cms.subtools.views          :refer [subtools-page]]
             [behave-cms.subtool-variables.views :refer [subtool-variable-page]]
             [behave-cms.subgroups.views         :refer [list-subgroups-page]]
-            [behave-cms.submodules.views        :refer [list-submodules-page]]
-            [behave-cms.variables.views         :refer [list-variables-page]]))
+            [behave-cms.submodules.views        :refer [submodules-page]]
+            [behave-cms.variables.views         :refer [variables-page]]))
 
 (declare render-page!)
 
-(defonce original-params (atom {}))
-(defonce history         (atom []))
-(defonce *current-path   (atom nil))
+(defonce ^:private original-params (atom {}))
+(defonce ^:private history         (atom []))
+(defonce ^:private *current-path   (atom nil))
 
-(def menu-pages
+(def ^:private menu-pages
   [{:page "Applications"   :path "/applications"}
    {:page "Variables"      :path "/variables"}
    {:page "Lists"          :path "/lists"}
    {:page "Languages"      :path "/languages"}
    {:page "Invite User"    :path "/invite-user"}])
 
-(def app-pages {:applications         list-applications-page
-                :dashboard            dashboard/root-component
-                :get-application      list-modules-page
-                :get-group            list-subgroups-page
-                :get-group-variable   group-variable-page
-                :get-module           list-submodules-page
-                :get-submodule        list-groups-page
-                :get-tool             tools-page
-                :get-subtool          subtools-page
-                :get-subtool-variable subtool-variable-page
-                :languages            list-languages-page
-                :lists                list-lists-page
-                :variables            list-variables-page})
+(def ^:private app-pages {:applications         applications-page
+                          :dashboard            dashboard/root-component
+                          :get-application      list-modules-page
+                          :get-group            list-subgroups-page
+                          :get-group-variable   group-variable-page
+                          :get-module           submodules-page
+                          :get-submodule        list-groups-page
+                          :get-tool             tools-page
+                          :get-subtool          subtools-page
+                          :get-subtool-variable subtool-variable-page
+                          :languages            languages-page
+                          :lists                list-lists-page
+                          :variables            variables-page})
 
-(def system-pages {:login          login-page
+(def ^:private system-pages {:login          login-page
                    :verify-email   verify-email-page
                    :invite-user    invite-user-page
                    :reset-password reset-password-page})
 
-(def system-page-handlers (set (keys system-pages)))
+(def ^:private system-page-handlers (set (keys system-pages)))
 
-(def handler->root-component (merge app-pages system-pages))
+(def ^:private handler->root-component (merge app-pages system-pages))
 
-(defn not-found
+(defn- not-found
   "The root component for the 404 page."
   [_]
   [:div {:style {:margin-top "100px"}}
@@ -74,8 +75,7 @@
     [:h1 {:style {:text-align "center"}}
      "404 - Page Not Found"]]])
 
-(defn page-component [params]
-  (fn [params]
+(defn- page-component [params]
     (let [current-route                  (rf/subscribe [:route])
           {:keys [handler route-params]} (match-route app-routes @current-route)
           system-route?                  (system-page-handlers handler)
@@ -83,9 +83,9 @@
           component                      (get handler->root-component handler not-found)]
       (if (not @loaded?)
         [:div "Loading..."]
-        [:div [component (merge params route-params)]]))))
+        [:div [component (merge params route-params)]])))
 
-(defn render-page! [path & [params]]
+(defn- render-page! [path & [params]]
   (rf/dispatch [:navigate path])
   (when (not= path "/login") (s/load-store!))
   (render (cond

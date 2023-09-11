@@ -1,16 +1,5 @@
 (ns behave-cms.help.events
-  (:require [clojure.string             :as str]
-            [clojure.set                :refer [rename-keys]]
-            [clojure.walk               :refer [postwalk]]
-            [applied-science.js-interop :as j]
-            [reagent.core               :as r]
-            [re-frame.core              :as rf :refer [path]]
-            [herb.core                  :refer [<class]]
-            [hickory.core               :refer [parse-fragment as-hiccup]]
-            [behave-cms.markdown.core   :refer [md->html]]
-            [data-utils.interface       :refer [parse-int]]
-            [behave-cms.utils           :as u]))
-
+  (:require [re-frame.core :as rf :refer [path]]))
 
 ;;; Editor
 

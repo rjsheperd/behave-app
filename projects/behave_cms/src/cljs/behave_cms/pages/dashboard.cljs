@@ -1,7 +1,7 @@
-(ns behave-cms.pages.dashboard
-  (:require [re-frame.core :as rf]
-            [behave-cms.components.common :refer [btn]]))
+(ns behave-cms.pages.dashboard)
 
-(defn root-component [_]
+(defn root-component
+  "Dashboard page."
+  [_]
   [:<>
    [:h1 "Firelab VMS (alpha)"]])

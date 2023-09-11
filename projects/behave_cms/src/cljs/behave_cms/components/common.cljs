@@ -1,4 +1,5 @@
 (ns behave-cms.components.common
+  {:clj-kondo/config '{:linters {:shadowed-var {:exclude [type]}}}}
   (:require [clojure.string         :as str]
             [herb.core              :refer [<class]]
             [reagent.core           :as r]
@@ -9,23 +10,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; UI Styles
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defn- $labeled-input []
-  {:display        "flex"
-   :flex           1
-   :flex-direction "column"
-   :padding-bottom ".5rem"
-   :width          "100%"})
-
-(defn- $radio [checked?]
-  (merge
-   (when checked? {:background-color ($/color-picker :border-color 0.6)})
-   {:border        "2px solid"
-    :border-color  ($/color-picker :border-color)
-    :border-radius "100%"
-    :height        "1rem"
-    :margin-right  ".4rem"
-    :width         "1rem"}))
 
 (defn- $accordion [expanded?]
   (merge
@@ -38,7 +22,11 @@
 ;; UI Components
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defn accordion [title & content]
+(defn accordion
+  "Expanding accordion component. Takes:
+  - title [`string`]
+  - `content` [vector] Hiccup elements."
+  [title & content]
   (r/with-let [expanded? (r/atom false)]
     ^{:key title}
     [:div.row.accordion {:class (<class $accordion @expanded?)}
@@ -96,7 +84,7 @@
 
 (defn checkboxes
   "Multiple check boxes."
-  [options state on-change]
+  [options _state on-change]
   [:<>
    (for [{:keys [label value]} options]
      ^{:key value}
@@ -107,7 +95,6 @@
         :value     value
         :on-change on-change}]
       [:label.form-check-label {:for value} label]])])
-;; checkbox label (= value @state) on-change]))
 
 (defn labeled-input
   "Input and label pair component. Takes as `opts`
@@ -132,6 +119,7 @@
      :on-change     call-back}]])
 
 (defn labeled-float-input
+  "Floating point number input."
   [label state call-back & [opts]]
   (apply labeled-input
          label
@@ -139,6 +127,7 @@
          (merge opts {:text "number" :call-back #(call-back (u/input-float-value %))})))
 
 (defn labeled-integer-input
+  "Integer number input."
   [label state call-back & [opts]]
   (apply labeled-input
          label
@@ -146,6 +135,7 @@
          (merge opts {:text "number" :call-back #(call-back (u/input-int-value %))})))
 
 (defn labeled-text-input
+  "Text input."
   [label state call-back & [opts]]
   (apply labeled-input
          label
@@ -153,6 +143,7 @@
          (merge opts {:type "text" :call-back #(call-back (u/input-value %))})))
 
 (defn labeled-file-input
+  "File input."
   [label state call-back & [opts]]
   (apply labeled-input
          label
@@ -219,14 +210,18 @@
                  :value button-text}]
         (when footer (footer))]]]]]))
 
-(defn btn [style label action & [{:keys [icon]}]]
+(defn btn
+  "Button component."
+  [style label action & [{:keys [icon]}]]
   [:button {:class    ["btn" (when style (str "btn-" (name style))) "mx-1"]
             :on-click action}
    (when icon
      [:span {:class ["fa-solid" (str "fa-" icon)]}])
    label])
 
-(defn btn-sm [style label action & [{:keys [icon]}]]
+(defn btn-sm
+  "Small button component."
+  [style label action & [{:keys [icon]}]]
   [:button {:class    ["btn" "btn-sm" (when style (str "btn-" (name style))) "mx-1"]
             :on-click action}
    (when icon
@@ -234,7 +229,16 @@
    (when label
      [:span {:class [(when icon "ms-2")]} label])])
 
-(defn simple-table [columns rows & [{:keys [on-select on-delete on-increase on-decrease]}]]
+(defn simple-table
+  "Simple table. Takes:
+   - columns [`vector`] Vector of keywords to pull from each row.
+   - rows [`vector`]: Vector of maps to populate the table.
+   - opts [`map`]: Options map, which takes four optional function callbacks:
+      - `on-select`: When a user clicks 'Edit'.
+      - `on-delete`: When a user clicks 'Delete'.
+      - `on-increase`: When a user clicks the Up arrow.
+      - `on-decrease`: When a user clicks the Down arrow."
+  [columns rows & [{:keys [on-select on-delete on-increase on-decrease]}]]
   [:table.table.table-hover
    [:thead
     [:tr
@@ -258,7 +262,9 @@
         (when on-decrease [btn-sm :outline-secondary nil #(on-decrease row) {:icon "arrow-up"}])
         (when on-increase [btn-sm :outline-secondary nil #(on-increase row) {:icon "arrow-down"}])]])]])
 
-(defn window [sidebar-width & children]
+(defn window
+  "Window wrapper component that enables a fixed sidebar."
+  [sidebar-width & children]
   [:div.window {:style {:position "fixed"
                         :top      "50px"
                         :left     sidebar-width

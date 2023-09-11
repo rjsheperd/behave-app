@@ -1,18 +1,15 @@
 (ns behave-cms.variables.views
   (:require [reagent.core                      :as r]
             [re-frame.core                     :as rf]
-            [behave-cms.components.common      :refer [simple-table
-                                                       labeled-text-input
-                                                       labeled-float-input
-                                                       labeled-integer-input]]
+            [behave-cms.components.common      :refer [simple-table]]
             [behave-cms.components.entity-form :refer [entity-form]]
             [behave-cms.utils                  :as u]
             [behave-cms.events]
             [behave-cms.subs]))
 
-(def columns [:variable/name :variable/bp6-label :variable/bp6-code :variable/kind])
+(def ^:private columns [:variable/name :variable/bp6-label :variable/bp6-code :variable/kind])
 
-(defn variables-table []
+(defn- variables-table []
   (let [variables (rf/subscribe [:pull-with-attr :variable/name])
         on-select #(do
                      (rf/dispatch [:state/set-state :variable (:db/id %)]))
@@ -24,7 +21,7 @@
      {:on-select on-select
       :on-delete on-delete}]))
 
-(def continuous-variable-properties
+(def ^:private continuous-variable-properties
   [{:label "Default Value  " :field-key :variable/default-value    :type :float}
    {:label "English Decimal" :field-key :variable/english-decimals :type :int}
    {:label "English Units"   :field-key :variable/english-units    :type :str}
@@ -35,18 +32,18 @@
    {:label "Native Decimals" :field-key :variable/native-decimals  :type :int}
    {:label "Native Units"    :field-key :variable/native-units     :type :str}])
 
-(defmulti properties-form (fn [kind _ _] (keyword kind)))
+(defmulti ^:private properties-form (fn [kind _ _] (keyword kind)))
 
 (defmethod properties-form
   :continuous
   [_ get-field set-field]
   [:div
-   (for [{:keys [label field-key type]} continuous-variable-properties]
+   (for [{:keys [label field-key var-type]} continuous-variable-properties]
      (let [value     (get-field field-key)
            on-change (set-field field-key)]
        [:div.mb-3 {:keys field-key}
         [:label.form-label label]
-        (condp = type
+        (condp = var-type
           :float
           [:input.form-control {:type          "number"
                                 :default-value @value
@@ -75,12 +72,12 @@
        {:on-change     #(on-change (u/input-int-value %))
         :default-value @value}
        (doall
-        (for [list @lists]
-          (let [list-name (:list/name list)
-                id        (:db/id list)]
+        (for [a-list @lists]
+          (let [list-name (:list/name a-list)
+                id        (:db/id a-list)]
             [:option {:key id :value id :selected (= id @value)} list-name])))]]]))
 
-(defn variable-form [id]
+(defn- variable-form [id]
   (let [variable  (rf/subscribe [:entity id])
         editor    (rf/subscribe [:state [:editors :variables]])
         get-field (fn [& fields]
@@ -121,7 +118,9 @@
           [:h6 "Properties"]
           [properties-form @kind get-field set-field]])]]]))
 
-(defn list-variables-page [_]
+(defn variables-page
+  "Display variables page."
+  [_]
   (let [loaded?   (rf/subscribe [:state :loaded?])
         *variable (rf/subscribe [:state :variable])]
     (if @loaded?

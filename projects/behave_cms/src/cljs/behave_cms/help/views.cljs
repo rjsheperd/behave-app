@@ -1,33 +1,29 @@
 (ns behave-cms.help.views
-  (:require [clojure.string             :as str]
-            [clojure.set                :refer [rename-keys]]
-            [clojure.walk               :refer [postwalk]]
-            [reagent.core               :as r]
-            [re-frame.core              :as rf]
-            [herb.core                  :refer [<class]]
-            [hickory.core               :refer [parse-fragment as-hiccup]]
-            [behave-cms.help.markdown   :refer [md->hiccup]]
-            [data-utils.interface       :refer [parse-int]]
+  (:require [clojure.string           :as str]
+            [reagent.core             :as r]
+            [re-frame.core            :as rf]
+            [herb.core                :refer [<class]]
+            [behave-cms.help.markdown :refer [md->hiccup]]
+            [data-utils.interface     :refer [parse-int]]
             [behave-cms.help.events]
             [behave-cms.help.subs]
-            [behave-cms.utils           :as u]))
+            [behave-cms.utils :as u]))
 
 ;;; Styling
 
-(defn $textarea []
+(defn- $textarea []
    {:font-family "var(--bs-font-monospace)"
     :width "100%"})
 
-(defn $markdown-editor []
+(defn- $markdown-editor []
   ^{:combinators {[:> :img] {:max-width "100%"
                              :height    "auto"}}}
   {})
 
 ;;; Helpers
 
-(defn on-image-uploaded-succes [help-key original save-page! file-path]
-  (let [editor-path [:editors :help-page help-key]
-        editor      (rf/subscribe [:state [:editors :help-page help-key]])
+(defn- on-image-uploaded-succes [help-key original save-page! file-path]
+  (let [editor      (rf/subscribe [:state [:editors :help-page help-key]])
         cursor      (get @editor :cursor [0 0])
         content     (get @editor :help-page/content (or original ""))
         img-md      (str "![](" file-path ")")
@@ -53,7 +49,7 @@
 
 ;;; Components
 
-(defn textarea [state {:keys [disabled? on-drop on-change update-cursor]}]
+(defn- textarea [state {:keys [disabled? on-drop on-change update-cursor]}]
   [:textarea.form-control
    {:class         (<class $textarea)
     :disabled      disabled?
@@ -67,7 +63,7 @@
     :on-mouse-up   update-cursor
     :on-change     #(on-change (u/input-value %))}])
 
-(defn editor-toolbar [help-key draft save-page!]
+(defn- editor-toolbar [help-key draft save-page!]
   [:div.mb-3
    [:label.form-label {:for "help-upload"} "Upload File"]
    [:input.form-control {:type      "file"
@@ -76,7 +72,7 @@
                          :multiple  false
                          :id        "help-upload"}]])
 
-(defn image-preview [help-key]
+(defn- image-preview [help-key]
   (let [uploading? (rf/subscribe [:help-editor/state help-key :uploading?])]
     ;images     (rf/subscribe [:state [:editors :help-page :images]])]
     [:<>
@@ -96,7 +92,7 @@
                           :background-repeat "no-repeat"
                           :resize            "both"}}]])])]))
 
-(defn language-selector [help-key on-select]
+(defn- language-selector [on-select]
   (let [languages (rf/subscribe [:languages])]
     [:div.mb-3
      [:label.form-label "Language"]
@@ -107,13 +103,13 @@
         ^{:key id}
         [:option {:value id} (str language " (" shortcode ")")])]]))
 
-(defn help-preview [draft]
+(defn- help-preview [draft]
   [:div.col-6
    [:h6.mb-3 "Preview"]
    (when (some? @draft)
      [:div {:class "help"} (md->hiccup @draft)])])
 
-(defn help-text-editor [help-key language draft dirty? save-page!]
+(defn- help-text-editor [help-key language draft dirty? save-page!]
   (let [autosave! (u/debounce #(when @dirty? (save-page!)) 3000)
         on-change #(do
                      (rf/dispatch [:help-editor/set help-key :dirty? true])
@@ -133,25 +129,28 @@
 
 ;;; Public Components
 
-(defn help-editor [help-key]
-  (let [dirty?          (rf/subscribe [:help-editor/state help-key :dirty?])
-        language        (rf/subscribe [:help-editor/state help-key :language])
-        page            (rf/subscribe [:help/page help-key @language])
-        original        (:help-page/content @page)
-        draft           (r/track #(or @(rf/subscribe [:help-editor/state help-key :help-page/content])
+(defn help-editor
+  "Displays a help editor. Takes:
+  - help-key [string]: Help key for that particular entity."
+  [help-key]
+  (let [dirty?           (rf/subscribe [:help-editor/state help-key :dirty?])
+        language         (rf/subscribe [:help-editor/state help-key :language])
+        page             (rf/subscribe [:help/page help-key @language])
+        original         (:help-page/content @page)
+        draft            (r/track #(or @(rf/subscribe [:help-editor/state help-key :help-page/content])
                                       original ""))
-        select-language #(rf/dispatch [:help-editor/set help-key :language %])
-        save-page!      #(do
+        select-language! #(rf/dispatch [:help-editor/set help-key :language %])
+        save-page!       #(do
                            (rf/dispatch [:help-editor/set help-key :dirty? false])
                            (rf/dispatch [:help-editor/save help-key @page]))
-        on-submit       (u/on-submit save-page!)]
+        on-submit        (u/on-submit save-page!)]
     [:div.row {:class (<class $markdown-editor)}
      [:div.col-6
       [:h6 "Editor"]
       [:form.my-3 {:on-submit on-submit}
        [editor-toolbar help-key draft save-page!]
        [image-preview help-key]
-       [language-selector help-key select-language]
+       [language-selector select-language!]
        [help-text-editor help-key @language draft dirty? save-page!]
        [:button.my-3.btn.btn-sm.btn-outline-primary
         {:type     "submit"

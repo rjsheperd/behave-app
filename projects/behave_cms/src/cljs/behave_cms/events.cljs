@@ -1,6 +1,6 @@
 (ns behave-cms.events
-  (:require [clojure.string     :as str]
-            [clojure.core.async :refer [go <!]]
+  {:clj-kondo/config '{:linters {:shadowed-var {:exclude [path uuid]}}}}
+  (:require [clojure.core.async :refer [go <!]]
             [ajax.core          :refer [ajax-request]]
             [ajax.edn           :refer [edn-request-format edn-response-format]]
             [bidi.bidi          :refer [path-for]]
@@ -10,7 +10,6 @@
                                         reg-event-db
                                         reg-event-fx
                                         reg-fx]]
-            [re-posh.core       :refer [reg-event-ds]]
             [behave-cms.applications.events]
             [behave-cms.authentication.events]
             [behave-cms.groups.events]
@@ -24,16 +23,16 @@
 
 ;;; Initialization
 
-(def initial-state {:router   {:history       ["/"]
-                               :curr-position 0}
-                    :state    {:editors {}
-                               :sidebar {}
-                               :loaded? false}
-                    :entities {:applications {}
-                               :functions    {}
-                               :groups       {}
-                               :modules      {}
-                               :variables    {}}})
+(def ^:private initial-state {:router   {:history       ["/"]
+                                         :curr-position 0}
+                              :state    {:editors {}
+                                         :sidebar {}
+                                         :loaded? false}
+                              :entities {:applications {}
+                                         :functions    {}
+                                         :groups       {}
+                                         :modules      {}
+                                         :variables    {}}})
 
 (reg-event-db
   :initialize
@@ -74,7 +73,7 @@
 
 ;;; Navigation
 
-(defn navigate [{:keys [history curr-position]} new-route]
+(defn- navigate [{:keys [history curr-position]} new-route]
   (let [curr-route (get history curr-position)]
     (when (not= new-route curr-route)
       (let [new-history  (-> (+ curr-position 1)
@@ -95,7 +94,7 @@
 
 (reg-event-fx
   :refresh
-  (fn [{db :db} [_ new-route]]
+  (fn [_ [_ new-route]]
     (set! (.-location js/window) new-route)))
 
 (reg-event-db
@@ -166,7 +165,7 @@
 
 ;;; AJAX/Fetch Effects
 
-(defn request [{:keys [uri method data on-success on-error fn-args]}]
+(defn- request [{:keys [uri method data on-success on-error fn-args]}]
   (let [handler (fn [[ok result]]
                   (dispatch [(if ok on-success on-error)
                              result
@@ -180,7 +179,7 @@
 
 (reg-fx :api/request request)
 
-(defn http-request [{:keys [uri method body on-success on-error fn-args]}]
+(defn- http-request [{:keys [uri method body on-success on-error fn-args]}]
   (go (let [response (<! (u/call-remote! method uri body))]
         (if (<= 200 (:status response) 299)
           (dispatch (conj [on-success response] fn-args))

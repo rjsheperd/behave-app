@@ -11,6 +11,7 @@
     label]])
 
 (defn menu
+  "Top-bar menu component."
   [pages navigate!]
   [:div.navbar {:style {:height "50px" :padding "0px" :background-color "#3f3f3f"}}
    [:ul.nav

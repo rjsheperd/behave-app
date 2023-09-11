@@ -1,11 +1,12 @@
 (ns behave-cms.users.views
+  {:clj-kondo/config '{:linters {:shadowed-var {:exclude [uuid]}}}}
   (:require [re-frame.core :as rf]
             [behave-cms.components.common :refer [simple-table]]
             [behave-cms.components.entity-form :refer [entity-form]]))
 
-(def columns [:email :name])
+(def ^:private columns [:email :name])
 
-(defn users-table []
+(defn- users-table []
   (let [users (rf/subscribe [:entities :users])
         on-select #(rf/dispatch [:state/set-state :user (:uuid %)])
         on-delete #(when (js/confirm (str "Are you sure you want to delete the user " (:user %) "?"))
@@ -16,9 +17,9 @@
      on-select
      on-delete]))
 
-(defn user-form [uuid]
+(defn- user-form [user-uuid]
   [entity-form {:entity :users
-                :uuid   uuid
+                :uuid   user-uuid
                 :fields [{:label     "Email"
                           :required? true
                           :field-key :user}
@@ -30,7 +31,10 @@
                           :type      "password"
                           :required? true}]}])
 
-(defn list-users-page [{:keys [uuid]}]
+(defn users-page
+  "Display users page. Takes a map with:
+  - uuid [string]: UUID of the User to modify."
+  [{:keys [uuid]}]
   (let [user (rf/subscribe [:state :user])]
     (when (nil? @user)
       (rf/dispatch [:state/set-state :user uuid]))
