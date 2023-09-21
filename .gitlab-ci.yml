@@ -4,7 +4,7 @@ stages:
 
 build-cms:
   stage: build
-  image: temurin-11-tools-deps-alpine
+  image: clojure:temurin-11-tools-deps-alpine
   script:
     - cd projects/behave_cms
     - clojure -M:compile-cljs
