@@ -1,6 +1,6 @@
 [submodule "bases/behave_components"]
 	path = bases/behave_components
-	url = ../../sig-gis/behave-components.git
+	url = git@gitlab.com:sig-gis/behave-components.git
 	branch = main
 [submodule "behave-lib/behave-mirror"]
 	path = behave-lib/behave-mirror
