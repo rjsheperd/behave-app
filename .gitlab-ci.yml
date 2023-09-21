@@ -8,7 +8,7 @@ stages:
 build-cms:
   stage: build
   image: clojure:temurin-11-tools-deps-alpine
-  before_script:
+  script:
     - echo "This job deploys something from the $CI_COMMIT_BRANCH branch."
     - 'command -v ssh-agent >/dev/null || ( apt-get update -y && apt-get install openssh-client -y )'
     ##
@@ -36,7 +36,6 @@ build-cms:
     # - git config --global user.email "user@example.com"
     # - git config --global user.name "User name"
 
-  script:
     - cd projects/behave_cms
     - clojure -M:compile-cljs
     - clojure -T:build org.corfield.build/uber :lib sig-gis/behave-cms :main behave-cms.server
