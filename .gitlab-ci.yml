@@ -1,0 +1,57 @@
+stages:
+  - build
+  - deploy
+
+build-cms:
+  stage: build
+  image: temurin-11-tools-deps-alpine
+  script:
+    - cd projects/behave_cms
+    - clojure -M:compile-cljs
+    - clojure -T:build org.corfield.build/uber :lib sig-gis/behave-cms :main behave-cms.server
+  artifacts:
+    paths:
+      - "projects/behave_cms/target/*.jar"
+
+# build-app:
+#   image: temurin-11-tools-deps-alpine
+#   script:
+#     - cd projects/behave
+#     - clojure -M:compile-cljs
+#     - clojure -T:build org.corfield.build/uber :lib sig-gis/behave :main behave.core
+#   artifacts:
+#     paths:
+#       - "projects/behave/target/*.jar"
+
+test-connect-cms:
+  stage: deploy
+  before_script:
+    - echo "This job deploys something from the $CI_COMMIT_BRANCH branch."
+    - 'command -v ssh-agent >/dev/null || ( apt-get update -y && apt-get install openssh-client -y )'
+    ##
+    ## Run ssh-agent (inside the build environment)
+    ##
+    - eval $(ssh-agent -s)
+
+    ##
+    ## Give the right permissions, otherwise ssh-add will refuse to add files
+    ## Add the SSH key stored in SSH_PRIVATE_KEY file type CI/CD variable to the agent store
+    ##
+    - chmod 400 "$SSH_PRIVATE_KEY"
+    - ssh-add "$SSH_PRIVATE_KEY"
+
+    ##
+    ## Create the SSH directory and give it the right permissions
+    ##
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+
+    ##
+    ## Optionally, if you will be using any Git commands, set the user name and
+    ## and email.
+    ##
+    # - git config --global user.email "user@example.com"
+    # - git config --global user.name "User name"
+
+  script:
+    - ssh sig-app@10.1.30.129 "date"
