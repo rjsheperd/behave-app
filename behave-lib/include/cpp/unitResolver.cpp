@@ -5,6 +5,11 @@
 #include <nlohmann/json.hpp>
 #include "behaveUnits.cpp"
 
+
+
+
+
+
 class UnitResolver {
 private:
   std::unordered_map<std::string, int> units_;
@@ -149,6 +154,41 @@ public:
   }
 };
 
+class FuncResolver {
+private:
+  std::unordered_map<std::string, std::function<void(void*, std::string)>> discrete_setters;
+  std::unordered_map<std::string, std::function<void(void*, double, std::string)>> cont_setters;
+  std::unordered_map<std::string, std::function<double(void*, std::string)>> getters;
+  FuncConverter fnConverter;
+  
+public:
+  FuncResolver(UnitResolver& unitResolver) : fnConverter(unitResolver) {};
+
+  void addDiscreteSetter(const std::string& name, auto fn) {
+    discrete_setters[name] = fnConverter.convertDiscreteSetter(fn);
+  }
+
+  void addContinuousSetter(const std::string& name, auto fn) {
+    cont_setters[name] = fnConverter.convertContinuousSetter(fn);
+  }
+
+  void addGetter(const std::string& name, auto fn) {
+    getters[name] = fnConverter.convertGetter(fn);
+  }
+
+  auto discSetter(const std::string& name) {
+      return discrete_setters[name];
+  }
+
+  auto contSetter(const std::string& name) {
+      return cont_setters[name];
+  }
+
+  auto getter(const std::string& name) {
+    return getters[name];
+  }
+};
+
 class SIGTestClass {
 public:
   void setHeight(double height, LengthUnits::LengthUnitsEnum units) {
@@ -182,35 +222,27 @@ private:
 };
 
 int main() {
-  std::unordered_map<std::string, std::function<void(void*, std::string)>> discrete_setters;
-  std::unordered_map<std::string, std::function<void(void*, double, std::string)>> cont_setters;
-  std::unordered_map<std::string, std::function<double(void*, std::string)>> getters;
 
   UnitResolver unitResolver;
 
-  FuncConverter fnConverter(unitResolver);
+  FuncResolver fns(unitResolver);
 
   SIGTestClass sut;
 
-  // sut.setSpeed(30.0, SpeedUnits::MilesPerHour);
-  cont_setters["setHeight"] = fnConverter.convertContinuousSetter(&SIGTestClass::setHeight);
-  cont_setters["setHeight"](&sut, 10.0, "mi");
+  fns.addContinuousSetter("setHeight", &SIGTestClass::setHeight);
+  fns.contSetter("setHeight")(&sut, 10.0, "mi");
 
-  cont_setters["setSpeed"] = fnConverter.convertContinuousSetter(&SIGTestClass::setSpeed);
-  cont_setters["setSpeed"](&sut, 30.0, "mi/h");
+  fns.addContinuousSetter("setSpeed", &SIGTestClass::setSpeed);
+  fns.contSetter("setSpeed")(&sut, 30.0, "mi/h");
 
-  discrete_setters["setUnits"] = fnConverter.convertDiscreteSetter(&SIGTestClass::setUnits);
-  discrete_setters["setUnits"](&sut, "3");
+  fns.addDiscreteSetter("setUnits", &SIGTestClass::setUnits);
+  fns.discSetter("setUnits")(&sut, "3");
 
-  getters["getSpeed"] = fnConverter.convertGetter(&SIGTestClass::getSpeed);
-  std::cout << getters["getSpeed"](&sut, "ft/min") << std::endl;
-  std::cout << sut.getSpeed(SpeedUnits::FeetPerMinute) << std::endl;
+  fns.addGetter("getSpeed", &SIGTestClass::getSpeed);
+  std::cout << fns.getter("getSpeed")(&sut, "ft/min") << std::endl;
 
-  getters["getHeight"] = fnConverter.convertGetter(&SIGTestClass::getHeight);
-  std::cout << getters["getHeight"](&sut, "ft") << std::endl;
-  std::cout << sut.getHeight(LengthUnits::Feet) << std::endl;
-
-  std::cout << sut.getUnits() << std::endl;
+  fns.addGetter("getHeight", &SIGTestClass::getHeight);
+  std::cout << fns.getter("getHeight")(&sut, "ft") << std::endl;
 
   return 0;
 }

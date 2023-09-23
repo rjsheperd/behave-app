@@ -898,17 +898,17 @@ int main() {
   constexpr auto to_underlying(E e) noexcept
   {
       return static_cast<std::underlying_type_t<E>>(e);
-  }
+  };
 
   int main() {
 
-    std::cout << to_underlying(Color::red);
+    std::cout << to_underlying(Color::blue);
 
-  }
+  };
 #+END_SRC
 
 #+RESULTS:
-: 0
+: 1
 
 ** SIGString
 
@@ -1042,30 +1042,31 @@ int main() {
 
 ** Enum Storage
 #+BEGIN_SRC cpp
-// Define the UnitResolver class
-class UnitResolver {
-private:
+  // Define the UnitResolver class
+  class UnitResolver {
+  private:
     std::unordered_map<std::string, std::unordered_map<std::string, int>> unitTypes_;
 
-public:
+  public:
     template<typename Unit>
     void registerEnum() {
-        unitTypes_[typeid(Unit).name()] = std::unordered_map<std::string, int>() typeid(Unit);
+      unitTypes_[typeid(Unit).name()] = std::unordered_map<std::string, int>();
     }
 
     template<typename Unit>
     void addUnit(const std::string& shortcode, const Unit& unit) {
-        unitTypes_[typeid(Unit).name()] [shortcode] = unit;
+      auto unitType = unitTypes_[typeid(Unit).name()];
+      unitType[shortcode] = unit;
     }
 
     template<typename Unit>
     Unit getUnit(const std::string& shortcode) {
-        void* unitPtr = units_[shortcode];
-        return *static_cast<Unit*>(unitPtr);
+      auto unitPtr = unitTypes_[shortcode];
+      return *static_cast<Unit*>(unitPtr);
     }
-};
+  };
 
-int main() {
+  int main() {
     // Create an instance of UnitResolver
     UnitResolver unitResolver;
 
@@ -1082,7 +1083,7 @@ int main() {
     LengthUnits result2 = unitResolver.getUnit<LengthUnits>("m");
 
     return 0;
-}
+  }
 #+END_SRC
 
 #+RESULTS:
@@ -1144,7 +1145,7 @@ int main() {
 #+BEGIN_SRC cpp :tangle test.cpp
   class UnitResolver {
   public:
-    void addUnit(const std::string& unit, int value) {
+    void addUnit(int value, const std::string& unit) {
       units_[unit] = value;
     }
 
@@ -1159,104 +1160,67 @@ int main() {
 
   void addUnits(UnitResolver &unitResolver) {
 
-    unitResolver.addUnit("%", CoverUnits::Percent);
-    unitResolver.addUnit("deg", SlopeUnits::Degrees);
-    unitResolver.addUnit("fraction", CoverUnits::Fraction);
-    // unitResolver.addUnit("points"); // FIXME Contain Fire Points
-    // unitResolver.addUnit("ratio"); // FIXME
-    unitResolver.addUnit("Btu/ft/s", FirelineIntensityUnits::BtusPerFootPerSecond);
-    unitResolver.addUnit("Btu/ft/min", FirelineIntensityUnits::BtusPerFootPerMinute);
-    unitResolver.addUnit("Btu/ft2", HeatPerUnitAreaUnits::BtusPerSquareFoot);
-    unitResolver.addUnit("Btu/ft2/min", HeatSourceAndReactionIntensityUnits::BtusPerSquareFootPerMinute);
-    unitResolver.addUnit("Btu/ft2/sec", HeatSourceAndReactionIntensityUnits::BtusPerSquareFootPerSecond);
-    unitResolver.addUnit("Btu/ft3", HeatSinkUnits::BtusPerCubicFoot);
-    unitResolver.addUnit("Btu/lb", HeatOfCombustionUnits::BtusPerPound);
-    unitResolver.addUnit("ac", AreaUnits::Acres);
-    unitResolver.addUnit("ch", LengthUnits::Chains);
-    unitResolver.addUnit("ch/h", SpeedUnits::ChainsPerHour);
-    unitResolver.addUnit("ft", LengthUnits::Feet);
-    // unitResolver.addUnit("ft-lb/s/ft2"); // FIXME Power Units
-    unitResolver.addUnit("ft/min", SpeedUnits::FeetPerMinute);
-    unitResolver.addUnit("ft2", AreaUnits::SquareFeet);
-    // unitResolver.addUnit("ft2/ac"); // FIXME Basal Area Units
-    unitResolver.addUnit("ft2/ft3", SurfaceAreaToVolumeUnits::SquareFeetOverCubicFeet);
-    unitResolver.addUnit("in", LengthUnits::Inches);
-    unitResolver.addUnit("lb/ft3", DensityUnits::PoundsPerCubicFoot);
-    unitResolver.addUnit("lbs/ft3", DensityUnits::PoundsPerCubicFoot);
-    unitResolver.addUnit("mi", LengthUnits::Miles);
-    unitResolver.addUnit("mi/h", SpeedUnits::MilesPerHour);
-    // unitResolver.addUnit("ms"); // FIXME
-    unitResolver.addUnit("oF", TemperatureUnits::Fahrenheit);
-    // unitResolver.addUnit("per, ac"); // FIXME Tree Count
-    unitResolver.addUnit("ton/ac", LoadingUnits::TonsPerAcre);
-    unitResolver.addUnit("cm", LengthUnits::Centimeters);
-    unitResolver.addUnit("ha", AreaUnits::Hectares);
-    unitResolver.addUnit("kJ/kg", HeatOfCombustionUnits::KilojoulesPerKilogram);
-    unitResolver.addUnit("kJ/m2", HeatPerUnitAreaUnits::KilojoulesPerSquareMeter);
-    unitResolver.addUnit("kJ/m3", HeatSinkUnits::KilojoulesPerCubicMeter);
-    unitResolver.addUnit("kW/m", FirelineIntensityUnits::KilowattsPerMeter);
-    unitResolver.addUnit("kW/m2", HeatSourceAndReactionIntensityUnits::KilowattsPerSquareMeter);
-    unitResolver.addUnit("kg/m3", DensityUnits::KilogramsPerCubicMeter);
-    unitResolver.addUnit("km", LengthUnits::Kilometers);
-    unitResolver.addUnit("km/h", SpeedUnits::KilometersPerHour);
-    unitResolver.addUnit("m", LengthUnits::Meters);
-    unitResolver.addUnit("m/h", SpeedUnits::MetersPerHour); // FIXME
-    unitResolver.addUnit("m/min", SpeedUnits::MetersPerMinute);
-    unitResolver.addUnit("m2", AreaUnits::SquareMeters);
-    // unitResolver.addUnit("m2/ha"); // FIXME Basal Area
-    unitResolver.addUnit("m2/m3", SurfaceAreaToVolumeUnits::SquareMetersOverCubicMeters);
-    unitResolver.addUnit("mm", LengthUnits::Millimeters);
-    unitResolver.addUnit("oC", TemperatureUnits::Celsius);
-    // unitResolver.addUnit("per, ha"); // FIXME Tree Density
-    unitResolver.addUnit("tonne/ha", LoadingUnits::TonnesPerHectare);
-    unitResolver.addUnit("s", TimeUnits::Seconds);
-    unitResolver.addUnit("min", TimeUnits::Minutes);
-    unitResolver.addUnit("h", TimeUnits::Hours);
-    unitResolver.addUnit("days", TimeUnits::Days);
-    unitResolver.addUnit("years", TimeUnits::Years);
-  }
+    unitResolver.addUnit(AreaUnits::Acres, "ac");
+    unitResolver.addUnit(AreaUnits::Hectares, "ha");
+    unitResolver.addUnit(AreaUnits::SquareFeet, "ft2");
+    unitResolver.addUnit(AreaUnits::SquareMeters, "m2");
 
-  // Enum to Integer
-  template<typename Enum>
-  struct EnumToInt {
-    static constexpr int value = -1;
-  };
+    unitResolver.addUnit(DensityUnits::KilogramsPerCubicMeter, "kg/m3");
+    unitResolver.addUnit(DensityUnits::PoundsPerCubicFoot, "lb/ft3");
+    unitResolver.addUnit(DensityUnits::PoundsPerCubicFoot, "lbs/ft3");
 
-  template<>
-  struct EnumToInt<LengthUnits::LengthUnitsEnum> {
-    static constexpr int value = 0;
-  };
+    unitResolver.addUnit(FirelineIntensityUnits::BtusPerFootPerMinute, "Btu/ft/min");
+    unitResolver.addUnit(FirelineIntensityUnits::BtusPerFootPerSecond, "Btu/ft/s");
+    unitResolver.addUnit(FirelineIntensityUnits::KilowattsPerMeter, "kW/m");
 
-  template<>
-  struct EnumToInt<SpeedUnits::SpeedUnitsEnum> {
-    static constexpr int value = 1;
-  };
+    unitResolver.addUnit(FractionUnits::Fraction, "fraction");
+    unitResolver.addUnit(FractionUnits::Percent, "%");
 
-  // Integer to Enum
-  template<int Value>
-  struct IntToEnum {
-    using type = void; // Default case if no matching enum value is found
-  };
+    unitResolver.addUnit(HeatOfCombustionUnits::BtusPerPound, "Btu/lb");
+    unitResolver.addUnit(HeatOfCombustionUnits::KilojoulesPerKilogram, "kJ/kg");
 
-  template<>
-  struct IntToEnum<0> {
-    using type = LengthUnits::LengthUnitsEnum;
-  };
+    unitResolver.addUnit(HeatPerUnitAreaUnits::BtusPerSquareFoot, "Btu/ft2");
+    unitResolver.addUnit(HeatPerUnitAreaUnits::KilojoulesPerSquareMeter, "kJ/m2");
 
-  template<>
-  struct IntToEnum<1> {
-    using type = SpeedUnits::SpeedUnitsEnum;
-  };
+    unitResolver.addUnit(HeatSinkUnits::BtusPerCubicFoot, "Btu/ft3");
+    unitResolver.addUnit(HeatSinkUnits::KilojoulesPerCubicMeter, "kJ/m3");
 
-  template<int Value>
-  constexpr auto intToEnum() {
-    return typename IntToEnum<Value>::type{};
-  }
+    unitResolver.addUnit(HeatSourceAndReactionIntensityUnits::BtusPerSquareFootPerMinute, "Btu/ft2/min");
+    unitResolver.addUnit(HeatSourceAndReactionIntensityUnits::BtusPerSquareFootPerSecond, "Btu/ft2/sec");
+    unitResolver.addUnit(HeatSourceAndReactionIntensityUnits::KilowattsPerSquareMeter, "kW/m2");
 
-  template <typename E>
-  constexpr auto to_underlying(E e) noexcept
-  {
-    return static_cast<std::underlying_type_t<E>>(e);
+    unitResolver.addUnit(LengthUnits::Centimeters, "cm");
+    unitResolver.addUnit(LengthUnits::Chains, "ch");
+    unitResolver.addUnit(LengthUnits::Feet, "ft");
+    unitResolver.addUnit(LengthUnits::Inches, "in");
+    unitResolver.addUnit(LengthUnits::Kilometers, "km");
+    unitResolver.addUnit(LengthUnits::Meters, "m");
+    unitResolver.addUnit(LengthUnits::Miles, "mi");
+    unitResolver.addUnit(LengthUnits::Millimeters, "mm");
+
+    unitResolver.addUnit(LoadingUnits::TonnesPerHectare, "tonne/ha");
+    unitResolver.addUnit(LoadingUnits::TonsPerAcre, "ton/ac");
+
+    unitResolver.addUnit(SlopeUnits::Degrees, "deg");
+
+    unitResolver.addUnit(SpeedUnits::ChainsPerHour, "ch/h");
+    unitResolver.addUnit(SpeedUnits::FeetPerMinute, "ft/min");
+    unitResolver.addUnit(SpeedUnits::KilometersPerHour, "km/h");
+    unitResolver.addUnit(SpeedUnits::MetersPerHour, "m/h"); // FIXME
+    unitResolver.addUnit(SpeedUnits::MetersPerMinute, "m/min");
+    unitResolver.addUnit(SpeedUnits::MilesPerHour, "mi/h");
+
+    unitResolver.addUnit(SurfaceAreaToVolumeUnits::SquareFeetOverCubicFeet, "ft2/ft3");
+    unitResolver.addUnit(SurfaceAreaToVolumeUnits::SquareMetersOverCubicMeters, "m2/m3");
+
+    unitResolver.addUnit(TemperatureUnits::Celsius, "oC");
+    unitResolver.addUnit(TemperatureUnits::Fahrenheit, "oF");
+
+    unitResolver.addUnit(TimeUnits::Days, "days");
+    unitResolver.addUnit(TimeUnits::Hours, "h");
+    unitResolver.addUnit(TimeUnits::Minutes, "min");
+    unitResolver.addUnit(TimeUnits::Seconds, "s");
+    unitResolver.addUnit(TimeUnits::Years, "years");
   }
 
   class FuncConverter {
@@ -1278,7 +1242,7 @@ int main() {
     template<typename ObjType, typename EnumType>
     std::function<void(void*, std::string)> convertDiscreteSetter(void (ObjType::*func)(EnumType)) {
       return [=](void* obj, std::string str) {
-        wrapperDiscreteSetter(static_cast<ObjType*>(obj), func, str);
+	wrapperDiscreteSetter(static_cast<ObjType*>(obj), func, str);
       };
     }
 
@@ -1295,7 +1259,7 @@ int main() {
     template<typename ObjType, typename EnumType>
     std::function<void(void*, double, std::string)> convertContinuousSetter(void (ObjType::*func)(double, EnumType)) {
       return [=](void* obj, double num, std::string str) {
-        wrapperContinuousSetter(static_cast<ObjType*>(obj), func, num, str);
+	wrapperContinuousSetter(static_cast<ObjType*>(obj), func, num, str);
       };
     }
 
@@ -1303,7 +1267,7 @@ int main() {
     template<typename ObjType>
     std::function<void(void*)> convertCalculate(void (ObjType::*func)()) {
       return [=](void* obj, std::string str) {
-        (obj->*func)();
+	(obj->*func)();
       };
     }
 
@@ -1320,7 +1284,7 @@ int main() {
     template<typename ObjType, typename EnumType>
     std::function<double(void*, std::string)> convertGetter(double (ObjType::*func)(EnumType)) {
       return [=](void* obj, std::string str) {
-        return wrapperGetter(static_cast<ObjType*>(obj), func, str);
+	return wrapperGetter(static_cast<ObjType*>(obj), func, str);
       };
     }
   };
@@ -1358,13 +1322,6 @@ int main() {
   };
 
   int main() {
-    static const int l_units = EnumToInt<LengthUnits::LengthUnitsEnum>::value;
-
-    static const int s_units = EnumToInt<SpeedUnits::SpeedUnitsEnum>::value;
-
-    using length_units = decltype(intToEnum<l_units>()); // LengthUnits
-    using speed_units = decltype(intToEnum<s_units>()); // SpeedUnits
-
     std::unordered_map<std::string, std::function<void(void*, std::string)>> discrete_setters;
     std::unordered_map<std::string, std::function<void(void*, double, std::string)>> cont_setters;
     std::unordered_map<std::string, std::function<double(void*, std::string)>> getters;
@@ -1373,9 +1330,6 @@ int main() {
     addUnits(unitResolver);
 
     FuncConverter fnConverter(unitResolver);
-
-    std::cout << unitResolver.resolveUnit<length_units>("m") << std::endl;
-    std::cout << unitResolver.resolveUnit<speed_units>("mi/h") << std::endl;
 
     SIGTestClass sut;
 
@@ -1404,8 +1358,6 @@ int main() {
 #+END_SRC
 
 #+RESULTS:
-|     4 |
-|     5 |
 |  2640 |
 |  2640 |
 | 52800 |
