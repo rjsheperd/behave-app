@@ -71,3 +71,13 @@
        (when-not (str/ends-with? s end)
          end)))
 
+(defn ->code
+  "Converts a string `s` to a Behave 6 style variable code.
+
+   Example:
+   `(->code \"Direction of Spread\") ;=> \"vDirectionOfSpread\"`"
+  [s]
+  (str "v"
+       (-> s
+           (str/replace #"[^a-zA-Z\s]" "")
+           (str/replace #"\s+(\w)" #(-> % second str/upper-case)))))

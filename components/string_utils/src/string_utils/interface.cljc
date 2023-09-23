@@ -42,3 +42,10 @@
 (def ^{:argslist '[s end]
        :doc "Appends `end` to `s` as long as `s` doesn't already end with `end`."}
   end-with c/end-with)
+
+(def ^{:argslist '[s]
+       :doc "Converts a string `s` to a Behave 6 style variable code.
+
+             Example:
+            `(->code \"Direction of Spread\") ;=> \"vDirectionOfSpread\"`"}
+  ->code c/->code)

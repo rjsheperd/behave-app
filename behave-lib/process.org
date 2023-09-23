@@ -957,7 +957,7 @@ int main() {
 * CPP Automated Testing
 :PROPERTIES:
 :header-args:cpp:  :flags -I include/cpp/ -I ./behave-mirror/src/behave 
-:header-args:cpp+: :includes '(<iostream> <fstream> <type_traits> <typeindex> <nlohmann/json.hpp> "behaveUnits.cpp")
+:header-args:cpp+: :includes '(<iostream> <functional> <variant> <fstream> <type_traits> <typeindex> <nlohmann/json.hpp> "behaveUnits.cpp")
 :header-args:cpp+: :main no 
 :header-args:cpp+: :cmdline "-ni -nc -nv"
 :END:
@@ -1141,10 +1141,127 @@ int main() {
 
 : i
 
+** Arity 
+#+BEGIN_SRC cpp :tangle include/cpp/unitResolver.cpp
+  // Helper struct to store the number of arguments as a non-type template parameter
+  template <typename Func>
+  struct Arity;
+
+  // Specialization of Arity for functions with non-void return type
+  template <typename R, typename... Args>
+  struct Arity<R(Args...)> {
+      static constexpr std::size_t value = sizeof...(Args);
+  };
+
+  // Specialization of Arity for functions with void return type
+  template <typename... Args>
+  struct Arity<void(Args...)> {
+      static constexpr std::size_t value = sizeof...(Args);
+  };
+
+  // Helper function to simplify the usage of getArity
+  template <typename Func>
+  constexpr std::size_t getArity(const Func&) {
+      return Arity<Func>::value;
+  }
+
+  int main() {
+    getArity(&SIGContainAdapter::get)
+
+  
+  }
+#+END_SRC
+
+** std::variant
+
+#+BEGIN_SRC cpp
+int main()
+{
+    std::variant<int, std::string> v = "abc";
+ 
+    std::cout << "v.index = " << v.index() << '\n';
+ 
+    v = 3; 
+ 
+    std::cout << "v.index = " << v.index() << '\n';
+}
+
+#+END_SRC
+
+#+RESULTS:
+| v.index | = | 1 |
+| v.index | = | 0 |
+
 ** Enum to Integer (and back)
-#+BEGIN_SRC cpp :tangle test.cpp
+#+BEGIN_SRC cpp :tangle include/cpp/unitResolver.cpp
   class UnitResolver {
+  private:
+    std::unordered_map<std::string, int> units_;
   public:
+    UnitResolver() {
+      addUnit(AreaUnits::Acres, "ac");
+      addUnit(AreaUnits::Hectares, "ha");
+      addUnit(AreaUnits::SquareFeet, "ft2");
+      addUnit(AreaUnits::SquareMeters, "m2");
+
+      addUnit(DensityUnits::KilogramsPerCubicMeter, "kg/m3");
+      addUnit(DensityUnits::PoundsPerCubicFoot, "lb/ft3");
+      addUnit(DensityUnits::PoundsPerCubicFoot, "lbs/ft3");
+
+      addUnit(FirelineIntensityUnits::BtusPerFootPerMinute, "Btu/ft/min");
+      addUnit(FirelineIntensityUnits::BtusPerFootPerSecond, "Btu/ft/s");
+      addUnit(FirelineIntensityUnits::KilowattsPerMeter, "kW/m");
+
+      addUnit(FractionUnits::Fraction, "fraction");
+      addUnit(FractionUnits::Percent, "%");
+
+      addUnit(HeatOfCombustionUnits::BtusPerPound, "Btu/lb");
+      addUnit(HeatOfCombustionUnits::KilojoulesPerKilogram, "kJ/kg");
+
+      addUnit(HeatPerUnitAreaUnits::BtusPerSquareFoot, "Btu/ft2");
+      addUnit(HeatPerUnitAreaUnits::KilojoulesPerSquareMeter, "kJ/m2");
+
+      addUnit(HeatSinkUnits::BtusPerCubicFoot, "Btu/ft3");
+      addUnit(HeatSinkUnits::KilojoulesPerCubicMeter, "kJ/m3");
+
+      addUnit(HeatSourceAndReactionIntensityUnits::BtusPerSquareFootPerMinute, "Btu/ft2/min");
+      addUnit(HeatSourceAndReactionIntensityUnits::BtusPerSquareFootPerSecond, "Btu/ft2/sec");
+      addUnit(HeatSourceAndReactionIntensityUnits::KilowattsPerSquareMeter, "kW/m2");
+
+      addUnit(LengthUnits::Centimeters, "cm");
+      addUnit(LengthUnits::Chains, "ch");
+      addUnit(LengthUnits::Feet, "ft");
+      addUnit(LengthUnits::Inches, "in");
+      addUnit(LengthUnits::Kilometers, "km");
+      addUnit(LengthUnits::Meters, "m");
+      addUnit(LengthUnits::Miles, "mi");
+      addUnit(LengthUnits::Millimeters, "mm");
+
+      addUnit(LoadingUnits::TonnesPerHectare, "tonne/ha");
+      addUnit(LoadingUnits::TonsPerAcre, "ton/ac");
+
+      addUnit(SlopeUnits::Degrees, "deg");
+
+      addUnit(SpeedUnits::ChainsPerHour, "ch/h");
+      addUnit(SpeedUnits::FeetPerMinute, "ft/min");
+      addUnit(SpeedUnits::KilometersPerHour, "km/h");
+      addUnit(SpeedUnits::MetersPerHour, "m/h"); // FIXME
+      addUnit(SpeedUnits::MetersPerMinute, "m/min");
+      addUnit(SpeedUnits::MilesPerHour, "mi/h");
+
+      addUnit(SurfaceAreaToVolumeUnits::SquareFeetOverCubicFeet, "ft2/ft3");
+      addUnit(SurfaceAreaToVolumeUnits::SquareMetersOverCubicMeters, "m2/m3");
+
+      addUnit(TemperatureUnits::Celsius, "oC");
+      addUnit(TemperatureUnits::Fahrenheit, "oF");
+
+      addUnit(TimeUnits::Days, "days");
+      addUnit(TimeUnits::Hours, "h");
+      addUnit(TimeUnits::Minutes, "min");
+      addUnit(TimeUnits::Seconds, "s");
+      addUnit(TimeUnits::Years, "years");
+    }
+
     void addUnit(int value, const std::string& unit) {
       units_[unit] = value;
     }
@@ -1153,75 +1270,7 @@ int main() {
     Enum resolveUnit(const std::string& unit) {
       return static_cast<Enum>(units_[unit]);
     }
-
-  private:
-    std::unordered_map<std::string, int> units_;
   };
-
-  void addUnits(UnitResolver &unitResolver) {
-
-    unitResolver.addUnit(AreaUnits::Acres, "ac");
-    unitResolver.addUnit(AreaUnits::Hectares, "ha");
-    unitResolver.addUnit(AreaUnits::SquareFeet, "ft2");
-    unitResolver.addUnit(AreaUnits::SquareMeters, "m2");
-
-    unitResolver.addUnit(DensityUnits::KilogramsPerCubicMeter, "kg/m3");
-    unitResolver.addUnit(DensityUnits::PoundsPerCubicFoot, "lb/ft3");
-    unitResolver.addUnit(DensityUnits::PoundsPerCubicFoot, "lbs/ft3");
-
-    unitResolver.addUnit(FirelineIntensityUnits::BtusPerFootPerMinute, "Btu/ft/min");
-    unitResolver.addUnit(FirelineIntensityUnits::BtusPerFootPerSecond, "Btu/ft/s");
-    unitResolver.addUnit(FirelineIntensityUnits::KilowattsPerMeter, "kW/m");
-
-    unitResolver.addUnit(FractionUnits::Fraction, "fraction");
-    unitResolver.addUnit(FractionUnits::Percent, "%");
-
-    unitResolver.addUnit(HeatOfCombustionUnits::BtusPerPound, "Btu/lb");
-    unitResolver.addUnit(HeatOfCombustionUnits::KilojoulesPerKilogram, "kJ/kg");
-
-    unitResolver.addUnit(HeatPerUnitAreaUnits::BtusPerSquareFoot, "Btu/ft2");
-    unitResolver.addUnit(HeatPerUnitAreaUnits::KilojoulesPerSquareMeter, "kJ/m2");
-
-    unitResolver.addUnit(HeatSinkUnits::BtusPerCubicFoot, "Btu/ft3");
-    unitResolver.addUnit(HeatSinkUnits::KilojoulesPerCubicMeter, "kJ/m3");
-
-    unitResolver.addUnit(HeatSourceAndReactionIntensityUnits::BtusPerSquareFootPerMinute, "Btu/ft2/min");
-    unitResolver.addUnit(HeatSourceAndReactionIntensityUnits::BtusPerSquareFootPerSecond, "Btu/ft2/sec");
-    unitResolver.addUnit(HeatSourceAndReactionIntensityUnits::KilowattsPerSquareMeter, "kW/m2");
-
-    unitResolver.addUnit(LengthUnits::Centimeters, "cm");
-    unitResolver.addUnit(LengthUnits::Chains, "ch");
-    unitResolver.addUnit(LengthUnits::Feet, "ft");
-    unitResolver.addUnit(LengthUnits::Inches, "in");
-    unitResolver.addUnit(LengthUnits::Kilometers, "km");
-    unitResolver.addUnit(LengthUnits::Meters, "m");
-    unitResolver.addUnit(LengthUnits::Miles, "mi");
-    unitResolver.addUnit(LengthUnits::Millimeters, "mm");
-
-    unitResolver.addUnit(LoadingUnits::TonnesPerHectare, "tonne/ha");
-    unitResolver.addUnit(LoadingUnits::TonsPerAcre, "ton/ac");
-
-    unitResolver.addUnit(SlopeUnits::Degrees, "deg");
-
-    unitResolver.addUnit(SpeedUnits::ChainsPerHour, "ch/h");
-    unitResolver.addUnit(SpeedUnits::FeetPerMinute, "ft/min");
-    unitResolver.addUnit(SpeedUnits::KilometersPerHour, "km/h");
-    unitResolver.addUnit(SpeedUnits::MetersPerHour, "m/h"); // FIXME
-    unitResolver.addUnit(SpeedUnits::MetersPerMinute, "m/min");
-    unitResolver.addUnit(SpeedUnits::MilesPerHour, "mi/h");
-
-    unitResolver.addUnit(SurfaceAreaToVolumeUnits::SquareFeetOverCubicFeet, "ft2/ft3");
-    unitResolver.addUnit(SurfaceAreaToVolumeUnits::SquareMetersOverCubicMeters, "m2/m3");
-
-    unitResolver.addUnit(TemperatureUnits::Celsius, "oC");
-    unitResolver.addUnit(TemperatureUnits::Fahrenheit, "oF");
-
-    unitResolver.addUnit(TimeUnits::Days, "days");
-    unitResolver.addUnit(TimeUnits::Hours, "h");
-    unitResolver.addUnit(TimeUnits::Minutes, "min");
-    unitResolver.addUnit(TimeUnits::Seconds, "s");
-    unitResolver.addUnit(TimeUnits::Years, "years");
-  }
 
   class FuncConverter {
   private:
@@ -1327,7 +1376,6 @@ int main() {
     std::unordered_map<std::string, std::function<double(void*, std::string)>> getters;
 
     UnitResolver unitResolver;
-    addUnits(unitResolver);
 
     FuncConverter fnConverter(unitResolver);
 
@@ -1396,6 +1444,8 @@ int main() {
   }
 #+END_SRC
 
+
+
 #+RESULTS:
 : world
 
@@ -1440,3 +1490,4 @@ int main() {
     CHECK(ex1["arr"][0] == 1);
   }
 #+END_SRC
+
