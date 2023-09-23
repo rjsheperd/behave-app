@@ -16,7 +16,8 @@
        [?s :submodule/groups ?x]
        (subgroup ?x ?g)]
 
-      [(variable ?g ?v) [?g :group/group-variables ?v]]
+      [(variable ?gv ?v) [?v :variable/group-variables ?gv]]
+      [(group-variable ?g ?gv) [?g :group/group-variables ?gv]]
       [(language ?code ?l) [?l :language/shortcode ?code]]
       [(translation ?k ?t) [?t :translation/key ?k]]
 
@@ -43,7 +44,7 @@
        (io ?gv ?io)
        [?g :bp/uuid ?g-uuid]]
 
-      [(conditonal ?io ?gc ?c ?g-uuid ?gv-uuid ?type ?op ?values)
+      [(conditional ?io ?gc ?c ?g-uuid ?gv-uuid ?type ?op ?values)
        [?gc :group/conditionals ?c]
        [?c :conditional/group-variable-uuid ?gv-uuid]
        [?c :conditional/operator ?op]
