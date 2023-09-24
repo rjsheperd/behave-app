@@ -957,7 +957,7 @@ int main() {
 * CPP Automated Testing
 :PROPERTIES:
 :header-args:cpp:  :flags -I include/cpp/ -I ./behave-mirror/src/behave 
-:header-args:cpp+: :includes '(<iostream> <functional> <variant> <fstream> <type_traits> <typeindex> <nlohmann/json.hpp> "behaveUnits.cpp")
+:header-args:cpp+: :includes '(<iostream> <functional> <variant> <fstream> <type_traits> <typeinfo> <typeindex> <nlohmann/json.hpp> "behaveUnits.cpp")
 :header-args:cpp+: :main no 
 :header-args:cpp+: :cmdline "-ni -nc -nv"
 :END:
@@ -1175,22 +1175,194 @@ int main() {
 ** std::variant
 
 #+BEGIN_SRC cpp
-int main()
-{
-    std::variant<int, std::string> v = "abc";
- 
-    std::cout << "v.index = " << v.index() << '\n';
- 
-    v = 3; 
- 
-    std::cout << "v.index = " << v.index() << '\n';
-}
+  using Number = std::variant<int, double>;
+
+  // Helper struct to store the number of arguments as a non-type template parameter
+  template <typename Func>
+  struct Arity;
+
+  // Specialization for non-void member function pointers
+  template <typename R, typename Class, typename... Args>
+  struct Arity<R (Class::*)(Args...)> {
+    static constexpr std::size_t value = sizeof...(Args);
+  };
+
+  // Specialization for void member function pointers
+  template <typename Class, typename... Args>
+  struct Arity<void (Class::*)(Args...)> {
+    static constexpr std::size_t value = sizeof...(Args);
+  };
+
+  // Helper function to simplify the usage of getArity
+  template <typename Func>
+  constexpr std::size_t getArity(const Func&) {
+    return Arity<Func>::value;
+  }
+
+  class MyClass {
+  public:
+    double myFunction_0() const {
+      // code here
+      return 3.14;
+    }
+    double myFunction_1(int level) const {
+      // code here
+      return 12.3 * double(level);
+    }
+  };
+
+  template<typename ObjType>
+  std::function<double(void*)> convertGetter_0(double(ObjType::*func)()) {
+    return [=](void* obj) {
+      return wrapperGetter(static_cast<ObjType*>(obj), func);
+    };
+  };
+
+  template<typename ObjType>
+  std::function<double(void*, std::string)> convertGetter_1(double (ObjType::*func)(EnumType)) {
+    return [=](void* obj, std::string str) {
+      int value = std::stoi(str);
+      return wrapperGetter(static_cast<ObjType*>(obj), func, value);
+    };
+  };
+
+  int main()
+  {
+
+    // Number v = 0.03;
+
+    // std::cout << "v.index " << v.index() << " " << std::get<double>(v) << '\n';
+
+    // v = 3; 
+
+    // std::cout << "v.index " << v.index() << " " << std::get<int>(v) << '\n';
+
+
+    auto fn_0 = convertGetter_0(&MyClass::myFunction_0);
+    auto fn_1 = convertGetter_1(&MyClass::myFunction_1);
+
+  };
 
 #+END_SRC
 
 #+RESULTS:
-| v.index | = | 1 |
-| v.index | = | 0 |
+
+** Calling Member Funcs
+
+### Update this example to allow callMemberFunction to be passed the
+class to operate on
+
+#+BEGIN_SRC cpp
+
+  //template <typename T>
+  //double callMemberFunction(const T& obj, double(T::memberFunc*)()) {
+  //    return memberFunc(obj);
+  //};
+
+  using Number = std::variant<int, double>;
+
+  class MyClass {
+  private:
+    double myNumber = 3.14;
+
+  public:
+    void setMyNumber(double newNumber) {
+      myNumber = newNumber;
+    }
+
+    double getMyNumber() const {
+      return myNumber;
+    }
+
+    double getAnotherNumber() {
+      return 30.0;
+    }
+  };
+
+  // template<typename T>
+  // std::function<int(void*, Number)> wrapSetter(void (T::*func)(int)) {
+  //   return [=](void* obj, Number n) {
+  //     Number result = std::invoke(func, static_cast<const T*>(obj), std::get<int>(n));
+  //     return result;
+  //   };
+  // }
+
+  // template<typename T>
+  // std::function<double(void*, Number)> wrapSetter(void (T::*func)(double)) {
+  //   return [=](void* obj, Number n) {
+  //     double result = std::invoke(func, static_cast<const T*>(obj), std::get<double>(n));
+
+  //     return result;
+  //   };
+  // }
+
+  template<typename T>
+  std::function<double(void*)> wrap(double (T::*func)()) {
+    return [=](void* obj) {
+      return std::invoke(func, static_cast<T*>(obj));
+    };
+  }
+
+  template<typename T>
+  std::function<double(void*)> wrap(double (T::*func)() const) {
+    return [=](void* obj) {
+      return std::invoke(func, static_cast<const T*>(obj));
+    };
+  }
+
+  template<typename T>
+  void processFunctionResult(double (T::*fn)()) {
+    T myObject;
+    // double result = (myObject.*fn)();
+    double result = std::invoke(fn, myObject);
+    std::cout << "Result: " << result << std::endl;
+  }
+
+  template<typename T>
+  void processFunctionResult(double (T::*fn)() const) {
+    T myObject;
+    // double result = (myObject.*fn)();
+    double result = std::invoke(fn, myObject);
+    std::cout << "Result: " << result << std::endl;
+  }
+
+  int main() {
+    // MyClass myObject;
+    // auto fn = &MyClass::getAnotherNumber;
+    // double result = std::invoke(fn, myObject);
+    // std::cout << "Result: " << result << std::endl;
+
+    MyClass* myObject = new MyClass();
+    void* voidObj = reinterpret_cast<void*>(myObject);
+
+    auto fn_1 = wrap(&MyClass::getMyNumber);
+    auto fn_2 = wrap(&MyClass::getAnotherNumber);
+
+    std::cout << "My#" << std::invoke(fn_1, voidObj) << std::endl
+	      << "Another#" << std::invoke(fn_2, voidObj) << std::endl;
+
+    auto set = wrapSetter(&MyClass::setMyNumber);
+
+    // processFunctionResult(&MyClass::getMyNumber);
+    // processFunctionResult(&MyClass::getAnotherNumber);
+    return 0;
+  }
+
+  //int main() {
+  //  MyClass myObject;
+
+  //  // Fix this to allow myObject to be called with fn
+  //  // auto fn = &MyClass::getMyNumber;
+  //  double (MyClass::*fn)() const = &MyClass::getMyNumber;
+  //  double result = (myObject.*fn)();
+
+  //  std::cout << "Result: " << result << std::endl;
+
+  //  return 0;
+  //};
+#+END_SRC
+
+#+RESULTS:
 
 ** Enum to Integer (and back)
 #+BEGIN_SRC cpp :tangle include/cpp/unitResolver.cpp

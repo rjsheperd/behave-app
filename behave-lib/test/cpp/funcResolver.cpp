@@ -118,7 +118,7 @@ public:
   // Calculate Wrapper
   template<typename ObjType>
   std::function<void(void*)> convertCalculate(void (ObjType::*func)()) {
-    return [=](void* obj, std::string str) {
+    return [=](void* obj) {
       (obj->*func)();
     };
   }
@@ -163,7 +163,8 @@ private:
   std::unordered_map<std::string, std::function<void(void*, std::string)>> discrete_setters;
   std::unordered_map<std::string, std::function<void(void*, double)>> cont_1_setters;
   std::unordered_map<std::string, std::function<void(void*, double, std::string)>> cont_2_setters;
-  std::unordered_map<std::string, std::function<double(void*, std::string)>> getters;
+  std::unordered_map<std::string, std::function<double(void*)>> getters_0;
+  std::unordered_map<std::string, std::function<double(void*, std::string)>> getters_1;
   FuncConverter fnConverter;
   
 public:
@@ -180,8 +181,12 @@ public:
     cont_2_setters[name] = fnConverter.convertContinuousSetter_2(fn);
   }
 
-  void addGetter(const std::string& name, auto fn) {
-    getters[name] = fnConverter.convertGetter(fn);
+  void addGetter_0(const std::string& name, auto fn) {
+    getters_0[name] = fn;
+  }
+
+  void addGetter_1(const std::string& name, auto fn) {
+    getters_1[name] = fnConverter.convertGetter(fn);
   }
 
   auto discSetter(const std::string& name) {
