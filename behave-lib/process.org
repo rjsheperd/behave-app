@@ -1245,7 +1245,81 @@ int main() {
 
 #+END_SRC
 
+** variant matching
+#+BEGIN_SRC cpp
+  namespace {
+    template <typename... Functors>
+    struct overload_set : Functors...
+    {
+      using Functors::operator()...;
+    };
+
+    template <typename... Ts>
+    overload_set(Ts...) -> overload_set<Ts...>;
+
+  }
+
+  template <typename Variant>
+  class match
+  {
+  public:
+    constexpr explicit match(const Variant& variant) : d_variant(variant) {}
+
+    template<typename... Fs>
+    constexpr auto on(Fs... fs)
+    {
+      return std::visit(overload_set<Fs...> { std::forward<Fs>(fs)... }, d_variant);
+    }
+
+  private:
+    Variant d_variant;
+  };
+
+  // Examples
+  class MyClass {
+  private:
+    double _size;
+  public:
+    void setSize(double size) { _size = size; };
+    double getSize() { return _size; };
+  };
+
+  using Getter0 = std::function<double(void*)>;
+  using Getter1 = std::function<double(void*, int)>;
+  using SetString = std::function<void(void*, std::string)>;
+  using SetDouble1 = std::function<void(void*, double)>;
+  using SetDouble2 = std::function<void(void*, double, int)>;
+
+  int main() {
+    std::variant<Getter0, Getter1, SetString, SetDouble1, SetDouble2> fns;
+
+    fns = [](void* obj, double size) {
+      std::invoke(&MyClass::setSize, static_cast<MyClass*>(obj), size);
+    };
+
+    //fns = [](void* obj) -> double {
+    //  std::invoke(&MyClass::getSize, static_cast<MyClass*>(obj));
+    //};
+
+    std::cout << fns.index() << std::endl;
+
+    MyClass* myClass = new MyClass();
+    match(fns).on(
+                  [=](Getter0 f) { std::cout << "Value: " << std::invoke(f, myClass) << std::endl; },
+                  [=](SetDouble1 f) { std::invoke(f, myClass, 30); },
+                  [](auto y) { std::cout << "The value was something else!" << std::endl; });
+
+    std::cout << "Value:" << myClass->getSize();
+
+
+  };
+#+END_SRC
+
+
+
 #+RESULTS:
+|        3 |
+| Value:30 |
 
 ** Calling Member Funcs
 
