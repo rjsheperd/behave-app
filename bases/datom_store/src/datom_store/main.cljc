@@ -1,6 +1,9 @@
 (ns datom-store.main
   (:require [#?(:clj datahike.api   :cljs datascript.core) :as d]
             [#?(:clj datahike.datom :cljs datascript.db)   :refer [datom]]
+            #?(:clj [datahike.experimental.gc :refer [gc!]])
+            #?(:clj [superv.async :refer [<?? S]])
+            [clojure.core.async :refer [<! go-loop timeout]]
             [ds-schema-utils.interface :refer [->ds-schema]]
             [datom-utils.interface     :refer [safe-attr?
                                                safe-deref
@@ -50,6 +53,19 @@
        conn)))
 
 #?(:clj
+   (defn enable-gc! [conn min]
+     (let [ms (* 1000 60 min)
+           ms-ago
+           #(let [now (java.util.Date.)]
+              (doto now
+                (.setTime (- (.getTime now) ms))
+                (.setSeconds 0)))]
+       (go-loop []
+         (<! (timeout ms))
+         (<?? S (gc! conn (ms-ago)))
+         (recur)))))
+
+#?(:clj
    (defn connect-datahike! [config schema & [setup-fn]]
      (reset! stored-unsafe-attrs (unsafe-attrs schema))
      (let [conn (if (d/database-exists? config)
@@ -58,6 +74,7 @@
        (when (fn? setup-fn) (setup-fn conn))
        (build-tx-index! conn)
        (d/listen conn :record-tx record-tx)
+       (enable-gc! @conn 1) ;; Enable GC every minute
        conn)))
 
 #?(:clj

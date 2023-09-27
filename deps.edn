@@ -37,7 +37,7 @@
                 clojure-msgpack/clojure-msgpack {:mvn/version "1.2.1"}
                 com.cognitect/transit-clj       {:mvn/version "1.0.324"}
                 hiccup/hiccup                   {:mvn/version "2.0.0-alpha2"}
-                io.replikativ/datahike          {:mvn/version "0.5.1506"}
+                io.replikativ/datahike          {:mvn/version "0.6.154"}
                 me.raynes/fs                    {:mvn/version "1.4.6"}
                 net.coobird/thumbnailator       {:mvn/version "0.4.19"}
                 org.clojure/clojure             {:mvn/version "1.11.1"}

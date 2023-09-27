@@ -6,7 +6,7 @@
  :deps      {;; Clojure
              bk/ring-gzip                       {:mvn/version "0.3.0"}
              com.draines/postal                 {:mvn/version "2.0.3"}
-             io.replikativ/datahike             {:mvn/version "0.5.1506" :exclusions [org.clojure/clojurescript]}
+             io.replikativ/datahike             {:mvn/version "0.6.1548" :exclusions [org.clojure/clojurescript]}
              me.raynes/fs                       {:mvn/version "1.4.6"}
              org.clojure/clojure                {:mvn/version "1.11.1"}
              org.mindrot/jbcrypt                {:mvn/version "0.4"}

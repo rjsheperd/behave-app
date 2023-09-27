@@ -8,7 +8,7 @@
              org.clojure/clojure           {:mvn/version "1.11.1"}
              ring/ring                     {:mvn/version "1.10.0"}
              ring/ring-defaults            {:mvn/version "0.3.3"}
-             io.replikativ/datahike        {:mvn/version "0.5.1506" :exclusions [org.clojure/clojurescript]}
+             io.replikativ/datahike        {:mvn/version "0.6.1548" :exclusions [org.clojure/clojurescript]}
              sig-gis/triangulum            {:git/url "https://github.com/sig-gis/triangulum"
                                             :sha     "acb80fc5c99cc2f3eba516fdb2317eb28629c3a4"}
 

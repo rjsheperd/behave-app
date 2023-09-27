@@ -5,7 +5,7 @@
 (defn split-datom
   "Splits a DataHike/DataScript datom into a vector of the form [e a v t op]."
   [datom]
-  [(.-e datom) (.-a datom) (.-v datom) (nth datom 3) (nth datom 4)])
+  [(nth datom 0) (nth datom 1) (nth datom 2) (nth datom 3) (nth datom 4)])
 
 (def split-datoms (partial map split-datom))
 

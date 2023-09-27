@@ -1,4 +1,4 @@
 {:paths ["src" "resources"]
  :deps {datascript/datascript  {:mvn/version "1.3.13"}
-        io.replikativ/datahike {:mvn/version "0.5.1506"}}
+        io.replikativ/datahike {:mvn/version "0.6.1548"}}
  :aliases {:test {:extra-paths ["test"]}}}
