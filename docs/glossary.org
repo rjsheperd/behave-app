@@ -1,0 +1,27 @@
+#+TITLE: Glossary
+#+AUTHOR: RJ Sheperd
+
+[[https://www.youtube.com/watch?v=c5QF2HjHLSE][Inspired by Rich Hickey's Talk "Design in Practice"]]
+
+** Behave Application Terms
+*** Compute Function
+*** Emscripten
+*** Getters/Setters
+*** Group
+*** Group Variable
+*** Input
+*** Link
+*** Module
+*** Output
+*** Result Diagrams
+*** Rules
+*** Run
+*** Run Plan
+*** Solver
+*** Subgroup
+*** Submodule
+*** Translations
+*** Variable
+*** Worksheet
+
+** Wildfire Research Terms
