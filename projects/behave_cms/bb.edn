@@ -9,6 +9,7 @@
              :task (shell (format "systemctl --user stop %s" -project))}
   build-js  (clojure "-M:compile-cljs")
   uber      (clojure "-T:build org.corfield.build/uber :lib sig-gis/behave-cms :main behave-cms.server")
+  package   (shell "jpackage --input target/ --name BehaveCMSApp --main-jar behave-cms-standalone.jar --main-class behave-cms.server --type dmg --java-options '--enable-preview'")
   pull      (shell "git pull")
   restart   (do
               (run 'stop)
