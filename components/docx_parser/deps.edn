@@ -1,0 +1,4 @@
+{:paths ["src" "resources"]
+ :deps {org.docx4j/docx4j               {:mvn/version "6.1.2"}
+        org.glassfish.jaxb/jaxb-runtime {:mvn/version "2.3.1"}}
+ :aliases {:test {:extra-paths ["test"]}}}
