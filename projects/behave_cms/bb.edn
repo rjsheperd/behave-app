@@ -1,20 +1,84 @@
-{:tasks
- {-project  "cljweb-behave-cms"
-  reload    (shell "systemctl --user daemon-reload")
-  status    {:depends [-project]
-             :task (shell (format "systemctl --user status %s" -project))}
-  start     {:depends [-project]
-             :task (shell (format "systemctl --user start %s" -project))}
-  stop      {:depends [-project]
-             :task (shell (format "systemctl --user stop %s" -project))}
-  build-js  (clojure "-M:compile-cljs")
-  uber      (clojure "-T:build org.corfield.build/uber :lib sig-gis/behave-cms :main behave-cms.server")
-  pull      (shell "git pull")
-  restart   (do
-              (run 'stop)
-              (run 'start))
-  deploy    (do
-              (run 'stop)
-              (run 'pull)
-              (run 'build-js)
-              (run 'start))}}
+{:deps {org.babashka/cli         {:mvn/version "0.4.39"}
+        org.babashka/http-client {:mvn/version "0.3.11"}
+        sig/config               {:local/root "../../components/config"}}
+
+ :tasks
+ {-project      "cljweb-behave-cms"
+  -today        (.format (java.time.LocalDateTime/now)
+                         (java.time.format.DateTimeFormatter/ofPattern "yyyy-MM-dd"))
+  -ftp-args     {:requires ([babashka.cli :as cli])
+                 :task     (cli/parse-opts *command-line-args*
+                                           {:args->opts [:url :file]
+                                            :alias      {:u :username
+                                                         :p :password}})}
+  ftp-args      {:depends [-ftp-args]
+                 :task    (println -ftp-args)}
+  -config       {:requires ([config.interface :refer [load-config get-config]])
+                 :task     (do
+                             (load-config (str (io/file "resources" "config.edn")))
+                             (get-config))}
+  reload        (shell "systemctl --user daemon-reload")
+  status        {:depends [-project]
+                 :task    (shell (format "systemctl --user status %s" -project))}
+  start         {:depends [-project]
+                 :task    (shell (format "systemctl --user start %s" -project))}
+  stop          {:depends [-project]
+                 :task    (shell (format "systemctl --user stop %s" -project))}
+  build-js      (clojure "-M:compile-cljs")
+  uber          (clojure "-T:build org.corfield.build/uber :lib sig-gis/behave-cms :main behave-cms.server")
+  config        {:depends [-config]
+                 :task    (println -config)}
+  tar-db        {:depends  [-today -config]
+                 :requires ([babashka.fs :as fs]
+                            [clojure.string :as str])
+                 :task     (let [db-file     (get-in -config [:database :config :store :path])
+                                 db-dir      (str/join fs/file-separator (map str (butlast (fs/components db-file))))
+                                 db-filename (fs/file-name db-file)
+                                 backup-file (format (get-in -config [:database :backup-file]) -today)]
+                             (shell (format "cd %s && tar czf %s --directory=%s ." db-dir backup-file db-filename)))}
+  archive-files {:depends  [-today -config]
+                 :requires ([babashka.http-client :as http]
+                            [clojure.java.io :as io])
+                 :task     (let [secret-token (get -config :secret-token)
+                                 url          (get-in -config [:mail :site-url])
+                                 archive-file (io/file "~" "file-backups" (format "file-archive-%s.zip" -today))
+                                 response     (http/get (str site-url "/clj/sync-images?auth-token=" secret-token)
+                                                        {:as :stream :headers {"Accept" "application/zip"}})]
+                             (when (= 200 (:status response))
+                               (io/copy (:body response) archive-file)))}
+  ftp-upload    {:requires ([babashka.fs :as fs]
+                            [clojure.string :as str])
+                 :depends  [-ftp-args]
+                 :task     (let [{:keys [file url username password]} -ftp-args
+                                 task                                 (format "curl -p --ssl-reqd %s/%s -u %s:%s -T %s --ftp-create-dirs"
+                                              (if (str/starts-with? "ftp://" url) url (str "ftp://" url))
+                                              (fs/file-name file)
+                                              username
+                                              password
+                                              file)]
+                             (println "Running:" task)
+                             (shell task))}
+  ftp-list      {:depends [-ftp-args]
+                 :task    (let [{:keys [url username password]} -ftp-args
+                                task                            (format "curl -l --ssl-reqd %s -u %s:%s" url username password)]
+                            (println "Running:" task)
+                            (shell task))}
+  ftp-delete    {:depends [-ftp-args]
+                 :task    (let [{:keys [file url username password]} -ftp-args
+                                task                                 (format "curl -p --ssl-reqd %s -u %s:%s -Q \"DELE %s\"" url username password file)]
+                            (println "Running:" task)
+                            (shell task))}
+  pull          (do
+                  (shell "git pull")
+                  (shell "git submodule init")
+                  (shell "git submodule update")
+                  (shell "git submodule status"))
+  restart       (do
+                  (run 'stop)
+                  (run 'start))
+  deploy        (do
+                  (run 'stop)
+                  (run 'pull)
+                  (run 'build-js)
+                  (run 'uber)
+                  (run 'start))}}
