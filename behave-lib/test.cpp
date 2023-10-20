@@ -5,6 +5,8 @@
 #include <nlohmann/json.hpp>
 #include "behaveUnits.cpp"
 
+using json = nlohmann::json;
+
 class UnitResolver {
 private:
   std::unordered_map<std::string, int> units_;
@@ -83,6 +85,12 @@ public:
   }
 };
 
+// std::to_underlying shim
+template <typename E>
+constexpr typename std::underlying_type<E>::type to_underlying(E e) noexcept {
+    return static_cast<typename std::underlying_type<E>::type>(e);
+}
+
 class FuncConverter {
 private:
   UnitResolver _unitResolver;
@@ -101,7 +109,7 @@ public:
 
   template<typename ObjType, typename EnumType>
   std::function<void(void*, std::string)> convertDiscreteSetter(void (ObjType::*func)(EnumType)) {
-    return [=](void* obj, std::string str) {
+    return [=, this](void* obj, std::string str) {
       wrapperDiscreteSetter(static_cast<ObjType*>(obj), func, str);
     };
   }
@@ -118,7 +126,7 @@ public:
 
   template<typename ObjType, typename EnumType>
   std::function<void(void*, double, std::string)> convertContinuousSetter(void (ObjType::*func)(double, EnumType)) {
-    return [=](void* obj, double num, std::string str) {
+    return [=, this](void* obj, double num, std::string str) {
       wrapperContinuousSetter(static_cast<ObjType*>(obj), func, num, str);
     };
   }
@@ -126,14 +134,14 @@ public:
   // Calculate Wrapper
   template<typename ObjType>
   std::function<void(void*)> convertCalculate(void (ObjType::*func)()) {
-    return [=](void* obj, std::string str) {
+    return [=, this](void* obj, std::string str) {
       (obj->*func)();
     };
   }
 
-  // Getters
+  // Continuous Getters
   template<typename ObjType, typename EnumType>
-  double wrapperGetter(ObjType* obj, double (ObjType::*func)(EnumType), std::string str) {
+  double wrapContinuousGetter(ObjType* obj, double (ObjType::*func)(EnumType), std::string str) {
     // Convert the input string to the desired EnumType
     EnumType enumValue = _unitResolver.resolveUnit<EnumType>(str);
 
@@ -142,11 +150,26 @@ public:
   }
 
   template<typename ObjType, typename EnumType>
-  std::function<double(void*, std::string)> convertGetter(double (ObjType::*func)(EnumType)) {
-    return [=](void* obj, std::string str) {
-      return wrapperGetter(static_cast<ObjType*>(obj), func, str);
+  std::function<double(void*, std::string)> convertContinuousGetter(double (ObjType::*func)(EnumType)) {
+    return [=, this](void* obj, std::string str) {
+      return wrapContinuousGetter(static_cast<ObjType*>(obj), func, str);
     };
   }
+
+  // Discrete Getters
+  template<typename ObjType, typename EnumType>
+  int wrapDiscreteGetter(ObjType* obj, EnumType (ObjType::*func)()) {
+    // Call the member function of the object with the converted EnumType
+    return to_underlying((obj->*func)());
+  }
+
+  template<typename ObjType, typename EnumType>
+  std::function<int(void*)> convertDiscreteGetter(EnumType (ObjType::*func)()) {
+    return [=, this](void* obj) {
+      return wrapDiscreteGetter(static_cast<ObjType*>(obj), func);
+    };
+  }
+
 };
 
 class SIGTestClass {
@@ -181,10 +204,12 @@ private:
   LengthUnits::LengthUnitsEnum units_;
 };
 
+
 int main() {
   std::unordered_map<std::string, std::function<void(void*, std::string)>> discrete_setters;
   std::unordered_map<std::string, std::function<void(void*, double, std::string)>> cont_setters;
-  std::unordered_map<std::string, std::function<double(void*, std::string)>> getters;
+  std::unordered_map<std::string, std::function<double(void*, std::string)>> cont_getters;
+  std::unordered_map<std::string, std::function<int(void*)>> disc_getters;
 
   UnitResolver unitResolver;
 
@@ -192,25 +217,68 @@ int main() {
 
   SIGTestClass sut;
 
-  // sut.setSpeed(30.0, SpeedUnits::MilesPerHour);
+  // Set Getters/Setters
   cont_setters["setHeight"] = fnConverter.convertContinuousSetter(&SIGTestClass::setHeight);
-  cont_setters["setHeight"](&sut, 10.0, "mi");
-
   cont_setters["setSpeed"] = fnConverter.convertContinuousSetter(&SIGTestClass::setSpeed);
-  cont_setters["setSpeed"](&sut, 30.0, "mi/h");
-
   discrete_setters["setUnits"] = fnConverter.convertDiscreteSetter(&SIGTestClass::setUnits);
-  discrete_setters["setUnits"](&sut, "3");
+  cont_getters["getHeight"] = fnConverter.convertContinuousGetter(&SIGTestClass::getHeight);
+  cont_getters["getSpeed"] = fnConverter.convertContinuousGetter(&SIGTestClass::getSpeed);
+  disc_getters["getUnits"] = fnConverter.convertDiscreteGetter(&SIGTestClass::getUnits);
 
-  getters["getSpeed"] = fnConverter.convertGetter(&SIGTestClass::getSpeed);
-  std::cout << getters["getSpeed"](&sut, "ft/min") << std::endl;
-  std::cout << sut.getSpeed(SpeedUnits::FeetPerMinute) << std::endl;
+  // Read JSON file
+  std::ifstream file("data.json");
+  if (!file) {
+    std::cerr << "Failed to open file!" << std::endl;
+    return 1;
+  }
 
-  getters["getHeight"] = fnConverter.convertGetter(&SIGTestClass::getHeight);
-  std::cout << getters["getHeight"](&sut, "ft") << std::endl;
-  std::cout << sut.getHeight(LengthUnits::Feet) << std::endl;
+  json jsonData;
+  file >> jsonData;
+  file.close();
 
-  std::cout << sut.getUnits() << std::endl;
+  json inputs = jsonData["SIGTestClass"]["inputs"];
+  json outputs = jsonData["SIGTestClass"]["outputs"];
+
+  // Apply Inputs
+  for (json::iterator it = inputs.begin(); it != inputs.end(); ++it) {
+
+    json input_array = it.value();
+    std::string fn_name = it.key();
+
+    if (input_array.size() == 2) {
+      double value = input_array[0];
+      std::string units = input_array[1];
+      std::cout << "ContInput: " << fn_name << " " << value << " " << units << std::endl;
+      cont_setters[fn_name](&sut, value, units);
+    } else if (input_array.size() == 1) {
+      std::string value = input_array[0];
+      std::cout << "DiscInput: " << fn_name << " " << value << std::endl;
+      discrete_setters[fn_name](&sut, value);
+    }
+  }
+
+  // Apply Outputs
+  for (json::iterator it = outputs.begin(); it != outputs.end(); ++it) {
+
+    std::string fn_name = it.key();
+    json value = it.value();
+
+    if (value.is_string()) {
+      std::string units = std::string{value};
+      std::cout << "ContOutput: " << it.key() << " " << units << std::endl;
+      std::cout << cont_getters[fn_name](&sut, units) << std::endl;
+    } else {
+      std::cout << "TODO DiscOutput: " << it.key() << std::endl;
+      std::cout << disc_getters[fn_name](&sut) << std::endl;
+    }
+  }
+
+  // sut.setSpeed(30.0, SpeedUnits::MilesPerHour);
+  //cont_setters["setHeight"](&sut, 10.0, "mi");
+  //cont_setters["setSpeed"](&sut, 30.0, "mi/h");
+  //discrete_setters["setUnits"](&sut, "3");
+
+  //std::cout << getters["getHeight"](&sut, "ft") << std::endl;
 
   return 0;
 }

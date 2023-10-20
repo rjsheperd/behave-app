@@ -1438,6 +1438,118 @@ class to operate on
 
 #+RESULTS:
 
+** Class Resolver
+#+BEGIN_SRC cpp
+  class ClassResolver {
+  private:
+    std::unordered_map<std::string, std::function<void*()>> classMap;
+
+  public:
+    // Add a class type to the resolver
+    template<typename C>
+    void addClass(const std::string& name) {
+      classMap[name] = []() -> void* { return static_cast<void*>(new C()); };
+      // classMap[name] = []() -> void* { return new C(); };
+    }
+
+    // Resolve the string to a class type
+    void* resolve(const std::string& name) {
+      auto it = classMap.find(name);
+      if (it != classMap.end()) {
+	return (it->second)();
+      }
+      return nullptr;
+    }
+  };
+
+  class A {
+  private:
+    int herp;
+
+  public:
+    void setHerp(int _herp) { herp = _herp; };
+    int getHerp() { return herp; };
+  };
+
+  class B {
+  private:
+    int derp;
+
+  public:
+    void setDerp(int _derp) { derp = _derp; };
+    int getDerp() { return derp; };
+  };
+
+  int main() {
+
+    ClassResolver classResolver;
+
+    classResolver.addClass<A>("A");
+    auto obj = classResolver.resolve("A");
+
+    &A::
+
+    // Write a lambda expression that constructs a new instance of class A
+    // auto a = []() -> void* { return static_cast<void*>(new A()); };
+
+    // Write a lambda expression that constructs a new instance of class B
+    // auto b = []() -> std::variant<A, B> { return B(); };
+  }
+
+  // template<typename... T>
+  // class ClassResolver {
+  // private:
+  //   std::unordered_map<std::string, std::function<void*()> classMap;
+
+  // public:
+  //   // Define a type alias for the variant
+  //   using Type = std::variant<T...>;
+
+  //   // Define a type alias for the function pointer type
+  //   using FunctionPtr = Type(*)(void);
+
+  //   // Add a class type to the resolver
+  //   template<typename C>
+  //   void addClass(const std::string& name) {
+  //     classMap[name] = []() -> void* { return new C(); };
+  //   }
+
+  //   // Resolve the string to a class type
+  //   void* resolve(const std::string& name) {
+  //     auto it = classMap.find(name);
+  //     if (it != classMap.end()) {
+  // 	return (it->second)();
+  //     }
+  //     return Type(nullptr);
+  //   }
+
+  // };
+
+#+END_SRC
+
+#+RESULTS:
+
+** Macros
+
+#+BEGIN_SRC cpp
+
+  #define GREETING_true_true(name) "Ciao, " #name
+  #define GREETING_true_false(name) "Hello, " #name
+  #define GREETING_false_true(name) "Fangul, " #name
+  #define GREETING_false_false(name) "Meh, " #name
+  #define GREETING_true(name, italian) GREETING_true_##italian(name)
+  #define GREETING_false(name, italian) GREETING_false_##italian(name)
+  #define GREETING(name, friendly, italian) GREETING_##friendly(name, italian)
+
+  int main() {
+    std::cout << GREETING(RJ, false, false);
+  }
+#+END_SRC
+
+#+RESULTS:
+| Meh | RJ |
+
+
 ** Enum to Integer (and back)
 #+BEGIN_SRC cpp :tangle include/cpp/unitResolver.cpp
   class UnitResolver {
@@ -1668,9 +1780,10 @@ class to operate on
 : 0
 
 ** JSON
+#+NAME: json
 #+BEGIN_SRC cpp
 
-  using json = nlohmann::json;
+  using jon = nlohmann::json;
 
   int main() {
 
@@ -1685,15 +1798,40 @@ class to operate on
     file >> jsonData;
     file.close();
 
-    std::cout << jsonData["hello"] << std::endl;
+    json inputs = jsonData["SIGTestClass"]["inputs"];
+    for (json::iterator it = inputs.begin(); it != inputs.end(); ++it) {
+      json input_array = it.value();
+      if (input_array.size() == 2) {
+	std::cout << "ContInput: " << it.key() << " " << input_array[0] << " " << input_array[1] << std::endl;
+      } else if (input_array.size() == 1) {
+	std::cout << "DiscInput: " << it.key() << " " << input_array[0] << std::endl;
+      }
+    }
 
+    json outputs = jsonData["SIGTestClass"]["outputs"];
+    for (json::iterator it = outputs.begin(); it != outputs.end(); ++it) {
+      json value = it.value();
+      if (value.is_string()) {
+        std::string units = std::string{value};
+	std::cout << "ContOutput: " << it.key() << " " << units << std::endl;
+      } else {
+	std::cout << "DiscOutput: " << it.key() << std::endl;
+      }
+    }
   }
 #+END_SRC
+
+#+RESULTS: json
+| ContInput:  | setHeight |   10.0 | mi |
+| ContInput:  | setSpeed  |   30.0 | mi |
+| DiscInput:  | setUnits  |      3 |    |
+| ContOutput: | getHeight |     ft |    |
+| ContOutput: | getSpeed  | ft/min |    |
+| DiscOutput: | getUnits  |        |    |
 
 
 
 #+RESULTS:
-: world
 
 * DocTest
 :PROPERTIES:
