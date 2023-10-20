@@ -1813,7 +1813,7 @@ class to operate on
 
 *** Tuple Write
 #+BEGIN_SRC cpp
-  //
+  // From https://stackoverflow.com/a/21675677/763738
   template<typename Tuple, std::size_t remaining>
   struct write_tuple
   {
@@ -1836,31 +1836,31 @@ class to operate on
     write_tuple<Tuple, std::tuple_size<Tuple>::value>::execute(t);
   }
 
+  // array length template
+  template <typename T, size_t n>
+  constexpr size_t array_size(const T (&)[n]) { return n; }
+
   // Convert
   template <typename T>
   T convert(const std::string& val);
 
   template <>
   int convert<int>(const std::string& val) {
-    std::cout << "CONVERT TO INT: " << val << std::endl;
     return std::stoi(val);
   }
 
   template <>
   double convert<double>(const std::string& val) {
-    std::cout << "CONVERT TO DOUBLE: " << val << std::endl;
     return std::stod(val);
   }
 
   template <>
   bool convert<bool>(const std::string& val) {
-    std::cout << "CONVERT TO BOOL: " << val << std::endl;
     return val == "true" || val == "1";
   }
 
   template <>
   std::string convert<std::string>(const std::string& val) {
-    std::cout << "CONVERT TO STRING: " << val << std::endl;
     return val;
   }
 
@@ -1869,7 +1869,6 @@ class to operate on
   {
     static std::tuple<T, Ts...> execute(std::array<std::string, N> v) {
 
-      std::cout << "REMAINING: " << remaining << std::endl;
       std::tuple head = { convert<T>(v.at(N - remaining)) };
       return std::tuple_cat(head, pack_tuple<N, remaining - 1, Ts...>::execute(v));
 
@@ -1885,31 +1884,25 @@ class to operate on
   };
 
   template<size_t N, typename ... Ts>
-  std::tuple<Ts...> pack(std::array<std::string, N> v)
+  void pack(std::tuple<Ts...> & out, std::array<std::string, N> v)
   {
-    const std::size_t n = sizeof...(Ts);
-    return pack_tuple<N, N, Ts...>::execute(v);
+    auto result = pack_tuple<N, N, Ts...>::execute(v);
+    out.swap(result);
   }
 
   int main() {
     std::array<std::string, 4> my_array = {"test", "1", "2.0", "true"};
-    std::tuple<std::string, int, double, bool> my_tuple = pack<4, std::string, int, double, bool>(my_array);
+    std::tuple<std::string, int, double, bool> my_tuple;
+    pack(my_tuple, my_array);
     write(my_tuple);
   }
 #+END_SRC
 
 #+RESULTS:
-| REMAINING: | 4  |         |      |
-| CONVERT    | TO | STRING: | test |
-| REMAINING: | 3  |         |      |
-| CONVERT    | TO | INT:    |    1 |
-| REMAINING: | 2  |         |      |
-| CONVERT    | TO | DOUBLE: |  2.0 |
-| CONVERT    | TO | BOOL:   | true |
-| test       |    |         |      |
-| 1          |    |         |      |
-| 2          |    |         |      |
-| 1          |    |         |      |
+| test |
+|    1 |
+|    2 |
+|    1 |
 
 ** Enum to Integer (and back)
 #+BEGIN_SRC cpp :tangle include/cpp/unitResolver.cpp
