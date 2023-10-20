@@ -457,7 +457,7 @@ int main()
 
 ** Lambda Getters/Setters
 
-#+BEGIN_SRC cpp :flags -I ./behave-mirror/src/behave -I ./include/cpp/sig-adapters :includes '(<iostream> <functional> <unordered_map> <iostream> <vector> <map> <fstream> <sstream> <iomanip> <cctype> <cmath> <string> <vector> <map> <type_traits> "behaveUnits.cpp")
+#+BEGIN_SRC cpp :flags -I ./behave-mirror/src/behave -I ./include/cpp/sig-adapters :includes '(<iostream> <functional> <unordered_map> <iostream> <vector> <map> <fstream> <tuple> <sstream> <iomanip> <cctype> <cmath> <string> <vector> <map> <type_traits> "behaveUnits.cpp")
 
   
   enum Color { red, blue };
@@ -523,7 +523,7 @@ int main()
 
 #+RESULTS:
 
-#+BEGIN_SRC cpp :flags -I ./behave-mirror/src/behave -I ./include/cpp/sig-adapters :includes '(<iostream> <functional> <unordered_map> <iostream> <vector> <map> <fstream> <sstream> <iomanip> <cctype> <cmath> <string> <vector> <map> <type_traits> "behaveUnits.cpp")
+#+BEGIN_SRC cpp :flags -I ./behave-mirror/src/behave -I ./include/cpp/sig-adapters :includes '(<iostream> <functional> <unordered_map> <iostream> <vector> <map> <fstream> <sstream> <cstdarg> <iomanip> <cctype> <cmath> <string> <vector> <map> <type_traits> "behaveUnits.cpp")
   template<typename Func>
   class Callable {
   public:
@@ -1549,6 +1549,367 @@ class to operate on
 #+RESULTS:
 | Meh | RJ |
 
+** Multi-input conversion
+
+*** Testing Unpack
+
+#+BEGIN_SRC cpp
+  class Business {
+  private:
+    std::string _name;
+    int _num_employees;
+    double _profit;
+    bool _online_only;
+
+  public:
+    void updateBusiness(const std::string& name, int num_employees, double profit, bool online_only) {
+      _name = name;
+      _num_employees = num_employees;
+      _profit = profit;
+      _online_only = online_only;
+    }
+  };
+
+
+  template <typename T>
+  T convert(const std::string& val);
+
+  template <>
+  int convert<int>(const std::string& val) {
+    std::cout << "CONVERT TO INT: " << val << std::endl;
+    return std::stoi(val);
+  }
+
+  template <>
+  double convert<double>(const std::string& val) {
+    std::cout << "CONVERT TO DOUBLE: " << val << std::endl;
+    if (!val.empty()) {
+      return 10;
+    } else {
+      return 0;
+    }
+  }
+
+  template <>
+  bool convert<bool>(const std::string& val) {
+    std::cout << "CONVERT TO BOOL: " << val << std::endl;
+    return val == "true" || val == "1";
+  }
+
+  template <>
+  std::string convert<std::string>(const std::string& val) {
+    std::cout << "CONVERT TO STRING: " << val << std::endl;
+    return val;
+  }
+
+  // std::tuple<> unpackAndApply() {
+  //   return {};
+  // }
+
+  template<typename... Args>
+  auto count(Args&&...)
+  {
+    return sizeof...(Args);
+  }
+
+  // template <typename... T>
+  // std::tuple<T...> unpackAndApply(initializer_list<std::string> l) {
+  //   std::cout << "# Args:" << l.size();
+
+  //   return {convert<T>(l)};
+  //   // auto head = convert<T>(param);
+  //   // std::tuple<Ts...> remainder = unpackAndApply<Ts...>(rest);
+  //   // return std::tuple_cat(make_tuple(head), remainder);
+  // }
+
+  template <typename... Args>
+  std::tuple<Args...> returnTuple(std::initializer_list<std::string> vals) {
+      std::tuple<Args...> args;
+      // Assuming convert is a function that convert string to a required type
+      auto it = std::begin(vals);
+      auto apply = [&](auto& arg) {
+	  arg = convert<decltype(arg)>(*it++);
+      };
+      std::apply([&](auto&... args) { (..., apply(args)); }, args);
+      return args;
+  }
+
+  // template <typename... T>
+  // std::tuple<T...> unpackAndApply(const std::string& param ...) {
+  //   return {convert<T>(param)...};
+  // }
+
+  template <typename... Args>
+  auto make_lambda(void (Business::*mem_fun)(Args...)) {
+    return [mem_fun](Business& b, const std::vector<std::string>& vals) {
+      std::tuple<Args...> args;
+      unpackAndApply<Args...>(vals, 0, args);
+      std::apply([&](auto&&... args) { (b.*mem_fun)(std::forward<decltype(args)>(args)...); }, args);
+    };
+  }
+
+  int main() {
+    // Business b;
+
+    // auto fn = make_lambda(&Business::updateBusiness);
+
+    std::cout << convert<double>("250.0");
+
+    // Complete the function 
+    auto my_tuple = unpackAndApply<std::string, bool, double>("Brick and Mortar Co.", "true", "250.0");
+
+    std::cout << std::get<0>(my_tuple)  << " " << std::get<1>(my_tuple);
+
+    return 0;
+  }
+#+END_SRC
+
+#+RESULTS:
+
+*** Simple Unpack
+
+#+BEGIN_SRC cpp
+
+  template <typename... T>
+  std::tuple<T...> unpackAndApply(const std::string param ...) {
+    return {convert<T>(param)...};
+  }
+
+  int main() {
+
+    std::cout << unpackAndApply<int>();
+
+    return 0;
+  }
+#+END_SRC
+
+
+*** Recursive Variadic Templates
+
+#+BEGIN_SRC cpp
+
+  // base case
+  template<typename T>
+  T add(T v) {
+    return v;
+  }
+
+  // recursive case
+  template<typename T, typename... Args>
+  T add(T first, Args... args) {
+    return first + add(args...);
+  }
+
+
+
+  //// base case
+  //template<typename T>
+  //std::tuple<T> toTuple(T v) {
+  //  return std::make_tuple(v);
+  //}
+
+  //// recursive case
+  //template<typename T, typename... Args>
+  //std::tuple<T, Args...> toTuple(T first, Args... args) {
+  //  return std::tuple_cat(toTuple(first), toTuple(args...));
+  //}
+
+  // template<typename T>
+  // std::tuple<T> toTupleImpl(int index, std::vector<std::string> args) {
+  //   if (index < args.size()) {
+  //     return std::make_tuple(convert<T>(args.at(index)));
+  //   } else {
+  //     return {};
+  //   }
+  // }
+
+  //template<typename T, typename std::enable_if_t<std::is_fundamental_v<T>>>
+  //std::tuple<T> toTupleImpl(int index, std::vector<std::string> args) {
+  //  return { convert<T>(args.at(index)) };
+  //} 
+
+  //template<typename T, typename... Args, typename std::enable_if_t<sizeof...(Args) == 0>>
+  //std::tuple<T> toTupleImpl(int index, std::vector<std::string> args) {
+  //  return { convert<T>(args.at(index)) };
+  //} 
+  template <typename T>
+  T convert(const std::string& val);
+
+  template <>
+  int convert<int>(const std::string& val) {
+    return std::stoi(val);
+  }
+
+  template <>
+  double convert<double>(const std::string& val) {
+    return std::stod(val);
+  }
+
+  template <>
+  bool convert<bool>(const std::string& val) {
+    return val == "true" || val == "1";
+  }
+
+  template <>
+  std::string convert<std::string>(const std::string& val) {
+    return val;
+  }
+
+  //// Original
+  //template<>
+  //std::tuple<> toTupleImpl(int index, std::vector<std::string> args) {
+  //  return {};
+  //}
+  //
+  //template<typename T, typename... Args>
+  //std::tuple<T, Args...> toTupleImpl(int index, std::vector<std::string> args) {
+  //  if (index < args.size()) {
+  //    return std::tuple_cat(std::make_tuple(convert<T>(args.at(index))), toTupleImpl<Args...>(index + 1, args));
+  //  } else {
+  //    return {};
+  //  }
+  //} 
+
+  // GPT
+  // base case
+  // template<>
+  // std::tuple<> toTupleImpl<>(int, std::vector<std::string>&) {
+  //   return std::tuple<>();
+  // }
+
+  template<typename T>
+  std::tuple<T> toTupleImpl(int index, const std::vector<std::string>& args) {
+    return { convert<T>(args.at(index)) };
+  }
+
+  // recursive case
+  template<typename T, typename... Args>
+  std::tuple<T, Args...> toTupleImpl(int index, std::vector<std::string>& args) {
+    if ((index > 0) && ((index + 1) == args.size())) {
+      return { convert<T>(args.at(index)) };
+    } else if (index < args.size()) {
+      return std::tuple_cat(std::make_tuple(convert<T>(args.at(index))), toTupleImpl<Args...>(index + 1, args));
+    } else {
+      return std::tuple<Args...>();
+    }
+  }
+
+  // recursive case
+  template<typename... Args>
+  std::tuple<Args...> toTuple(std::vector<std::string> args) {
+    return toTupleImpl<Args...>(0, args);
+  }
+
+  int main()
+  {
+    toTuple<std::string, int, double>(std::vector<std::string>({"test", "1", "2.0"}));
+
+    return 0;
+  }
+
+#+END_SRC
+
+#+RESULTS:
+
+*** Tuple Write
+#+BEGIN_SRC cpp
+  //
+  template<typename Tuple, std::size_t remaining>
+  struct write_tuple
+  {
+    static void execute(Tuple const & t)
+    {
+      std::cout << std::get<std::tuple_size<Tuple>::value - remaining>(t) << std::endl;
+      write_tuple<Tuple, remaining - 1>::execute(t);
+    }
+  };
+
+  template<typename Tuple>
+  struct write_tuple<Tuple, 0>
+  {
+    static void execute(Tuple const & t) {};
+  };
+
+  template<typename Tuple>
+  void write(Tuple const & t)
+  {
+    write_tuple<Tuple, std::tuple_size<Tuple>::value>::execute(t);
+  }
+
+  // Convert
+  template <typename T>
+  T convert(const std::string& val);
+
+  template <>
+  int convert<int>(const std::string& val) {
+    std::cout << "CONVERT TO INT: " << val << std::endl;
+    return std::stoi(val);
+  }
+
+  template <>
+  double convert<double>(const std::string& val) {
+    std::cout << "CONVERT TO DOUBLE: " << val << std::endl;
+    return std::stod(val);
+  }
+
+  template <>
+  bool convert<bool>(const std::string& val) {
+    std::cout << "CONVERT TO BOOL: " << val << std::endl;
+    return val == "true" || val == "1";
+  }
+
+  template <>
+  std::string convert<std::string>(const std::string& val) {
+    std::cout << "CONVERT TO STRING: " << val << std::endl;
+    return val;
+  }
+
+  template<std::size_t N, std::size_t remaining, typename T, typename ... Ts>
+  struct pack_tuple
+  {
+    static std::tuple<T, Ts...> execute(std::array<std::string, N> v) {
+
+      std::cout << "REMAINING: " << remaining << std::endl;
+      std::tuple head = { convert<T>(v.at(N - remaining)) };
+      return std::tuple_cat(head, pack_tuple<N, remaining - 1, Ts...>::execute(v));
+
+    };
+  };
+
+  template<std::size_t N, typename T>
+  struct pack_tuple<N, 1, T>
+  {
+    static std::tuple<T> execute(std::array<std::string, N> v) {
+      return { convert<T>(v.at(N - 1)) };
+    };
+  };
+
+  template<size_t N, typename ... Ts>
+  std::tuple<Ts...> pack(std::array<std::string, N> v)
+  {
+    const std::size_t n = sizeof...(Ts);
+    return pack_tuple<N, N, Ts...>::execute(v);
+  }
+
+  int main() {
+    std::array<std::string, 4> my_array = {"test", "1", "2.0", "true"};
+    std::tuple<std::string, int, double, bool> my_tuple = pack<4, std::string, int, double, bool>(my_array);
+    write(my_tuple);
+  }
+#+END_SRC
+
+#+RESULTS:
+| REMAINING: | 4  |         |      |
+| CONVERT    | TO | STRING: | test |
+| REMAINING: | 3  |         |      |
+| CONVERT    | TO | INT:    |    1 |
+| REMAINING: | 2  |         |      |
+| CONVERT    | TO | DOUBLE: |  2.0 |
+| CONVERT    | TO | BOOL:   | true |
+| test       |    |         |      |
+| 1          |    |         |      |
+| 2          |    |         |      |
+| 1          |    |         |      |
 
 ** Enum to Integer (and back)
 #+BEGIN_SRC cpp :tangle include/cpp/unitResolver.cpp
