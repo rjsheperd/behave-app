@@ -1973,6 +1973,141 @@ class to operate on
     const bool getOnlineOnly() { return _online_only; }
   };
 
+  template<typename ... Args>
+  constexpr size_t num_args(void (Business::*mem_fun)(Args...)) {
+    return sizeof...(Args);
+  }
+
+  template<typename T, size_t N>
+  size_t size_of_array(T (&)[N])
+  {
+    return N;
+  }
+
+  template<typename T, size_t N>
+  void copy_to_array(std::vector<T> & vector, std::array<T, N> & array) {
+    std::copy_n(vector.begin(), N, array.begin());
+  }
+
+  
+      if (args <= vec_args.size()) {
+
+  template<typename ... Args>
+  auto make_lambda(void (Business::*mem_fun)(Args...)) {
+    const size_t args = num_args(mem_fun);
+
+    //return [=](std::vector<std::string> vec_args) -> size_t {
+    return [=](std::vector<std::string> vec_args) -> size_t {
+      if (args <= vec_args.size()) {
+
+
+    };
+    // std::cout << args << std::endl;
+  }
+
+  int main() {
+
+    std::vector<std::string> vec_args {"test", "1", "2.0", "true"};
+
+    // const size_t args = num_args(&Business::updateBusiness);
+    // std::cout << args << std::endl;
+    // std::array<std::string, args> array_args;
+    // copy_to_array(vec_args, array_args);
+    // // std::copy_n(vec_args.begin(), args, array_args.begin());
+
+    // for (auto &i : array_args) {
+    //   std::cout << i << std::endl;
+    // }
+
+    auto fn = make_lambda(&Business::updateBusiness);
+    std::cout << fn(vec_args);
+
+  }
+#+END_SRC 
+
+#+RESULTS:
+: 1
+
+** Template Specialization
+#+BEGIN_SRC cpp
+  template<size_t N> 
+  void special_fn() {
+    // Print number 
+    std::cout << N;
+  }
+
+  template<> 
+  void special_fn<0>() {
+    std::cout << "Ooops";
+  }
+
+  int main() {
+    special_fn<10>();
+    special_fn<0>();
+  }
+#+END_SRC
+
+#+RESULTS:
+: 10Ooops
+
+** Another shot
+#+BEGIN_SRC cpp
+  class MyClass {
+  public:
+    void printSum(int a, int b) {
+      std::cout << "Sum: " << a + b << '\n';
+    }
+  };
+
+  template <typename T>
+  T convert(const std::string& val);
+
+  template <>
+  int convert<int>(const std::string& val) {
+    std::cout << "CONVERT TO INT: " << val << std::endl;
+    return std::stoi(val);
+  }
+
+  template <>
+  double convert<double>(const std::string& val) {
+    std::cout << "CONVERT TO DOUBLE: " << val << std::endl;
+    return std::stod(val);
+  }
+
+  template <>
+  bool convert<bool>(const std::string& val) {
+    std::cout << "CONVERT TO BOOL: " << val << std::endl;
+    return val == "true" || val == "1";
+  }
+
+  template <>
+  std::string convert<std::string>(const std::string& val) {
+    std::cout << "CONVERT TO STRING: " << val << std::endl;
+    return val;
+  }
+
+  template<typename T, typename ... Args>
+  constexpr size_t num_args(void (T::*mem_fun)(Args...)) {
+    return sizeof...(Args);
+  }
+
+  template<typename T, size_t N>
+  void copy_to_array(std::vector<T> & vector, std::array<T, N> & array) {
+    std::copy_n(vector.begin(), N, array.begin());
+  }
+
+  template <typename RetType, typename T, typename... Args>
+  auto wrapFunction( RetType (T::*func)(Args...)) {
+
+    // return [func](T* obj, std::tuple<Args...> args_tuple) {
+    return [func](T* obj, std::tuple<Args...> args_tuple) -> RetType {
+
+      //static_cast<MyClass>(obj);
+      auto new_tuple = std::tuple_cat(std::tuple<T*>{obj}, args_tuple);
+      return std::apply(func, new_tuple);
+    };
+  }
+
   template<std::size_t N, std::size_t remaining, typename T, typename ... Ts>
   struct pack_tuple
   {
@@ -1999,51 +2134,33 @@ class to operate on
     out.swap(result);
   }
 
-  template<typename ... Args>
-  constexpr size_t num_args(void (Business::*mem_fun)(Args...)) {
-    return sizeof...(Args);
-  }
-
-  template<typename T, size_t N>
-  constexpr size_t size_of_array(T (&)[N])
+  template<typename RetType, typename T, typename ...Args>
+  auto funcArgsToTuple(RetType(T::*func)(Args...))
   {
-    return N;
-  }
-
-  template<typename T, size_t N>
-  void copy_to_array(std::vector<T> & vector, std::array<T, N> & array) {
-    std::copy_n(vector.begin(), N, array.begin());
-  }
-
-  template<typename ... Args>
-  auto make_lambda(void (Business::*mem_fun)(Args...)) {
-
-    const size_t N_args = num_args(mem_fun);
-    std::array<std::string, N_args> array_args;
-
-    return [&, mem_fun](Business& b, const std::vector<std::string>& vec_args) {
-      copy_to_array(vec_args, array_args);
-
-      std::tuple<Args...> tuple_args;
-      pack<Args...>(tuple_args, array_args);
-      std::cout << "Applying function with:";
-      std::apply([&](auto&&... tuple_args) { (b.*mem_fun)(std::forward<decltype(tuple_args)>(tuple_args)...); }, tuple_args);
-    };
+      return std::tuple<Args...>();
   }
 
   int main() {
+    MyClass c;
+    auto func = wrapFunction(&MyClass::printSum);
+    const size_t N_args = num_args(&MyClass::printSum);
+    std::array<std::string, N_args> array_args;
+    std::vector<std::string> vec_args {"5", "7"};
+    copy_to_array(vec_args, array_args);
+    auto tuple_args = funcArgsToTuple(&MyClass::printSum);
+    pack(tuple_args, array_args);
 
-    std::vector<std::string> vec_args {"test", "1", "2.0", "true"};
+    func(&c, tuple_args);
 
-    auto fn = make_lambda(&Business::updateBusiness);
-
-    Business b;
-
-    fn(&b, vec_args);
+    return 0;
   }
-#+END_SRC 
+
+#+END_SRC
 
 #+RESULTS:
+| CONVERT | TO | INT: | 5 |
+| CONVERT | TO | INT: | 7 |
+| Sum:    | 12 |      |   |
 
 ** Enum to Integer (and back)
 #+BEGIN_SRC cpp :tangle include/cpp/unitResolver.cpp
