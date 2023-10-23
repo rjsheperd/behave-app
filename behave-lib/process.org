@@ -957,7 +957,7 @@ int main() {
 * CPP Automated Testing
 :PROPERTIES:
 :header-args:cpp:  :flags -I include/cpp/ -I ./behave-mirror/src/behave 
-:header-args:cpp+: :includes '(<iostream> <functional> <variant> <fstream> <type_traits> <typeinfo> <typeindex> <nlohmann/json.hpp> "behaveUnits.cpp")
+:header-args:cpp+: :includes '(<iostream> <sstream>  <functional> <variant> <fstream> <type_traits> <typeinfo> <typeindex> <nlohmann/json.hpp> "behaveUnits.cpp")
 :header-args:cpp+: :main no 
 :header-args:cpp+: :cmdline "-ni -nc -nv"
 :END:
@@ -2051,10 +2051,11 @@ class to operate on
 : 10Ooops
 
 ** Another shot
-#+BEGIN_SRC cpp
+#+BEGIN_SRC cpp :tangle together.cpp
   class MyClass {
   public:
-    void printSum(int a, int b) {
+    template<typename T>
+    void printSum(T a, T b) {
       std::cout << "Sum: " << a + b << '\n';
     }
   };
@@ -2064,25 +2065,34 @@ class to operate on
 
   template <>
   int convert<int>(const std::string& val) {
-    std::cout << "CONVERT TO INT: " << val << std::endl;
     return std::stoi(val);
   }
 
   template <>
   double convert<double>(const std::string& val) {
-    std::cout << "CONVERT TO DOUBLE: " << val << std::endl;
     return std::stod(val);
   }
 
   template <>
   bool convert<bool>(const std::string& val) {
-    std::cout << "CONVERT TO BOOL: " << val << std::endl;
     return val == "true" || val == "1";
   }
 
   template <>
+  std::vector<float> convert<std::vector<float>>(const std::string& val) {
+    std::vector<float> vec;
+
+    std::istringstream iss(val);
+
+    std::copy(std::istream_iterator<float>(iss),
+	      std::istream_iterator<float>(),
+	      std::back_inserter(vec));
+
+    return vec;
+  }
+
+  template <>
   std::string convert<std::string>(const std::string& val) {
-    std::cout << "CONVERT TO STRING: " << val << std::endl;
     return val;
   }
 
@@ -2135,21 +2145,26 @@ class to operate on
   }
 
   template<typename RetType, typename T, typename ...Args>
-  auto funcArgsToTuple(RetType(T::*func)(Args...))
+  auto func_args_tuple(RetType(T::*func)(Args...))
   {
-      return std::tuple<Args...>();
+    return std::tuple<Args...>();
+  }
+
+  template<size_t N, typename RetType, typename T, typename ...Args>
+  auto packed_tuple(RetType(T::*func)(Args...), T* obj, std::vector<std::string> vec_args) {
+    std::array<std::string, N> array_args;
+    copy_to_array(vec_args, array_args);
+    auto tuple_args = func_args_tuple(func);
+    pack(tuple_args, array_args);
+    return tuple_args;
   }
 
   int main() {
     MyClass c;
-    auto func = wrapFunction(&MyClass::printSum);
-    const size_t N_args = num_args(&MyClass::printSum);
-    std::array<std::string, N_args> array_args;
+    auto func = wrapFunction(&MyClass::printSum<int>);
+    const size_t N_args = num_args(&MyClass::printSum<int>);
     std::vector<std::string> vec_args {"5", "7"};
-    copy_to_array(vec_args, array_args);
-    auto tuple_args = funcArgsToTuple(&MyClass::printSum);
-    pack(tuple_args, array_args);
-
+    auto tuple_args = packed_tuple<N_args>(&MyClass::printSum<int>, &c, vec_args);
     func(&c, tuple_args);
 
     return 0;
@@ -2158,9 +2173,35 @@ class to operate on
 #+END_SRC
 
 #+RESULTS:
-| CONVERT | TO | INT: | 5 |
-| CONVERT | TO | INT: | 7 |
-| Sum:    | 12 |      |   |
+: Sum: 12
+
+** Matrix Conversion
+#+BEGIN_SRC cpp
+
+int main () {
+  std::string Numbers = "0.3 5.7 9.8 6.2 0.54 6.3 0";
+
+  // If possible, always prefer std::vector to naked array
+  std::vector<float> v;
+
+  // Build an istream that holds the input string
+  std::istringstream iss(Numbers);
+
+  // Iterate over the istream, using >> to grab floats
+  // and push_back to store them in the vector
+  std::copy(std::istream_iterator<float>(iss),
+        std::istream_iterator<float>(),
+        std::back_inserter(v));
+
+  // Put the result on standard out
+  std::copy(v.begin(), v.end(),
+        std::ostream_iterator<float>(std::cout, ", "));
+  std::cout << "\n";
+}
+#+END_SRC
+
+#+RESULTS:
+| 0.3 | 5.7 | 9.8 | 6.2 | 0.54 | 6.3 | 0 |   |
 
 ** Enum to Integer (and back)
 #+BEGIN_SRC cpp :tangle include/cpp/unitResolver.cpp
