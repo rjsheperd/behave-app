@@ -1867,6 +1867,115 @@ class to operate on
   template<std::size_t N, std::size_t remaining, typename T, typename ... Ts>
   struct pack_tuple
   {
+    static std::tuple<T, Ts...> execute(std::vector<std::string> v) {
+
+      std::tuple head = { convert<T>(v.at(N - remaining)) };
+      return std::tuple_cat(head, pack_tuple<N, remaining - 1, Ts...>::execute(v));
+
+    };
+  };
+
+  template<std::size_t N, typename T>
+  struct pack_tuple<N, 1, T>
+  {
+    static std::tuple<T> execute(std::vector<std::string> v) {
+      return { convert<T>(v.at(N - 1)) };
+    };
+  };
+
+  template<typename ... Ts>
+  void pack(std::tuple<Ts...> & out, std::vector<std::string> v)
+  {
+    const size_t N = v.size();
+    auto result = pack_tuple<N, Ts...>::execute(v);
+    out.swap(result);
+  }
+
+  class Business {
+  private:
+    std::string _name;
+    int _num_employees;
+    double _profit;
+    bool _online_only;
+
+  public:
+    void updateBusiness(const std::string& name, int num_employees, double profit, bool online_only) {
+      _name = name;
+      _num_employees = num_employees;
+      _profit = profit;
+      _online_only = online_only;
+    }
+
+    const std::string getName() { return _name; }
+    const int getNumEmployees() { return _num_employees; }
+    const double getProfit() { return _profit; }
+    const bool getOnlineOnly() { return _online_only; }
+  };
+
+
+  template<typename ... Args>
+  auto make_lambda(void (Business::*mem_fun)(Args...)) {
+    return [mem_fun](Business& b, const std::vector<std::vector>& string_vals) {
+      std::tuple<Args...> args;
+      pack<Args...>(args, string_vals);
+      std::cout << "Applying function with:";
+      write(args);
+      std::apply([&](auto&&... args) { (b.*mem_fun)(std::forward<decltype(args)>(args)...); }, args);
+    };
+  }
+
+  template<typename ... Args>
+  int args_size(void (Business::*mem_fun)(Args...)) {
+    return sizeof(Args)...;
+  }
+
+  int main() {
+
+    // std::tuple<std::string, int, float, bool> t;
+    // std::vector<std::string> my_vec = {"test business", "1", "2.0", "true"};
+    // pack(t, my_vec);
+
+    // auto fn = make_lambda(&Business::updateBusiness);
+    // Business b;
+
+    args_size(&Business::updateBusiness);
+
+    // fn(&b, my_vec);
+
+    // std::cout << b.getName();
+  }
+#+END_SRC
+
+#+RESULTS:
+
+** Member Function Num of Arguments
+
+#+BEGIN_SRC cpp
+
+  class Business {
+  private:
+    std::string _name;
+    int _num_employees;
+    double _profit;
+    bool _online_only;
+
+  public:
+    void updateBusiness(const std::string& name, int num_employees, double profit, bool online_only) {
+      _name = name;
+      _num_employees = num_employees;
+      _profit = profit;
+      _online_only = online_only;
+    }
+
+    const std::string getName() { return _name; }
+    const int getNumEmployees() { return _num_employees; }
+    const double getProfit() { return _profit; }
+    const bool getOnlineOnly() { return _online_only; }
+  };
+
+  template<std::size_t N, std::size_t remaining, typename T, typename ... Ts>
+  struct pack_tuple
+  {
     static std::tuple<T, Ts...> execute(std::array<std::string, N> v) {
 
       std::tuple head = { convert<T>(v.at(N - remaining)) };
@@ -1890,19 +1999,51 @@ class to operate on
     out.swap(result);
   }
 
-  int main() {
-    std::array<std::string, 4> my_array = {"test", "1", "2.0", "true"};
-    std::tuple<std::string, int, double, bool> my_tuple;
-    pack(my_tuple, my_array);
-    write(my_tuple);
+  template<typename ... Args>
+  constexpr size_t num_args(void (Business::*mem_fun)(Args...)) {
+    return sizeof...(Args);
   }
-#+END_SRC
+
+  template<typename T, size_t N>
+  constexpr size_t size_of_array(T (&)[N])
+  {
+    return N;
+  }
+
+  template<typename T, size_t N>
+  void copy_to_array(std::vector<T> & vector, std::array<T, N> & array) {
+    std::copy_n(vector.begin(), N, array.begin());
+  }
+
+  template<typename ... Args>
+  auto make_lambda(void (Business::*mem_fun)(Args...)) {
+
+    const size_t N_args = num_args(mem_fun);
+    std::array<std::string, N_args> array_args;
+
+    return [&, mem_fun](Business& b, const std::vector<std::string>& vec_args) {
+      copy_to_array(vec_args, array_args);
+
+      std::tuple<Args...> tuple_args;
+      pack<Args...>(tuple_args, array_args);
+      std::cout << "Applying function with:";
+      std::apply([&](auto&&... tuple_args) { (b.*mem_fun)(std::forward<decltype(tuple_args)>(tuple_args)...); }, tuple_args);
+    };
+  }
+
+  int main() {
+
+    std::vector<std::string> vec_args {"test", "1", "2.0", "true"};
+
+    auto fn = make_lambda(&Business::updateBusiness);
+
+    Business b;
+
+    fn(&b, vec_args);
+  }
+#+END_SRC 
 
 #+RESULTS:
-| test |
-|    1 |
-|    2 |
-|    1 |
 
 ** Enum to Integer (and back)
 #+BEGIN_SRC cpp :tangle include/cpp/unitResolver.cpp
