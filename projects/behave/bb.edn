@@ -1,25 +1,37 @@
 {:tasks 
- {-project  "cljweb-behave"
-  reload    (shell "systemctl --user daemon-reload")
-  status    {:depends [-project]
-             :task (shell (format "systemctl --user status %s" -project))}
-  start     {:depends [-project]
-             :task (shell (format "systemctl --user start %s" -project))}
-  stop      {:depends [-project]
-             :task (shell (format "systemctl --user stop %s" -project))}
-  build-js  (clojure "-M:compile-cljs")
-  uber      (clojure "-X triangulum.packaging/build-uberjar :app-name behave7 :main-ns behave.core")
-  pull      (do
-              (shell "git pull")
-              (shell "git submodule init")
-              (shell "git submodule update")
-              (shell "git submodule status"))
-  restart   (do
-              (run 'stop)
-              (run 'start))
-  deploy    (do
-              (run 'stop)
-              (run 'pull)
-              (run 'build-js)
-              (run 'uber)
-              (run 'start))}}
+ {-project     "cljweb-behave"
+  reload       (shell "systemctl --user daemon-reload")
+  status       {:depends [-project]
+                :task    (shell (format "systemctl --user status %s" -project))}
+  start        {:depends [-project]
+                :task    (shell (format "systemctl --user start %s" -project))}
+  stop         {:depends [-project]
+                :task    (shell (format "systemctl --user stop %s" -project))}
+  build-cljs   (clojure "-M:compile-cljs")
+  build-sw     (shell "bun build-sw && bun bundle-sw")
+  -app-version (->> "resources/public/cljs/manifest.edn"
+                    (slurp)
+                    (re-find (re-pattern "app-(.*).js"))
+                    (last))
+  update-index {:depends [-app-version]
+                :task    (let [f "resources/public/index.html"]
+                           (as-> (slurp f) $
+                             (clojure.string/replace $ (re-pattern "app-.*.js") (str "app-" -app-version ".js"))
+                             (spit f $)))}
+  build-js     {:depends [build-cljs build-sw update-index]
+                :task    (println "Done!")}
+  uber         (clojure "-X triangulum.packaging/build-uberjar :app-name behave7 :main-ns behave.core")
+  pull         (do
+                 (shell "git pull")
+                 (shell "git submodule init")
+                 (shell "git submodule update")
+                 (shell "git submodule status"))
+  restart      (do
+                 (run 'stop)
+                 (run 'start))
+  deploy       (do
+                 (run 'stop)
+                 (run 'pull)
+                 (run 'build-js)
+                 (run 'uber)
+                 (run 'start))}}

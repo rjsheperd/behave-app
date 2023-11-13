@@ -1,9 +1,11 @@
 {
-  "name": "Behave+",
-  "description": "Wildfire Analysis toolkit.",
-  "short_name": "B+",
   "background_color": "#ffffff",
+  "description": "Wildfire Analysis toolkit.",
   "display": "standalone",
+  "name": "Behave+",
+  "short_name": "B+",
+  "start_url": ".",
+  "orientation": "portrait",
   "theme_color": "#FFAA55",
   "icons": [
     {

@@ -21,8 +21,6 @@
             [behave.subs]
             [day8.re-frame.http-fx]))
 
-(def ^:private CANCEL-TIMEOUT-MS 9000)
-
 (defn not-found []
   [:div
    [:h1 (str @(<t "notfound") " :(")]])
@@ -47,25 +45,16 @@
   (when issue-collector
     (rf/dispatch [:system/add-script issue-collector])))
 
-(defn- before-unload-fn [e]
-  (.preventDefault e)
-  (js/setTimeout #(rf/dispatch [:system/cancel-close]) CANCEL-TIMEOUT-MS)
-  (rf/dispatch [:system/close]))
-
-(defn add-before-unload-event! [{:keys [mode]}]
-  (when (= mode "prod")
-    (.addEventListener js/window "beforeunload" before-unload-fn)))
-
 (defn app-shell [params]
   (let [route              (rf/subscribe [:handler])
-        sync-loaded?       (rf/subscribe [:state :sync-loaded?])
-        vms-loaded?        (rf/subscribe [:state :vms-loaded?])
+        app-loaded?        (rf/subscribe [:app/loaded?])
+        app-print?         (rf/subscribe [:app/print?])
         vms-export-results (rf/subscribe [:state :vms-export-http-results])
         page               (get handler->page (:handler @route) not-found)
         params             (-> (merge params (:route-params @route))
                                (assoc :route-handler (:handler @route)))]
-    (if (= (:handler @route) :ws/print)
-      (if (and @vms-loaded? @sync-loaded?)
+    (if @app-print?
+      (if @app-loaded?
         [page params]
         [:h3 "Loading..."])
       [:div.page
@@ -90,7 +79,7 @@
         [:div.container
          [:div.working-area
           {:area-live "assertive"}
-          (if (and @vms-loaded? @sync-loaded?)
+          (if @app-loaded?
             [page params]
             [:h3 "Loading..."])]
          [help-area params]]]])))
@@ -106,7 +95,6 @@
     (load-vms!)
     (load-store!)
     (load-scripts! params)
-    (add-before-unload-event! params)
     (render [app-shell params] (.getElementById js/document "app"))))
 
 (defn- ^:after-load mount-root!

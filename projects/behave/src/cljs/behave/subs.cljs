@@ -45,6 +45,13 @@
     (and (:vms-loaded? state)
          (:sync-loaded? state))))
 
+;;; Print
+
+(rf/reg-sub
+  :app/print?
+  (fn [{state :state} [_]]
+    (:print? state)))
+
 ;;; Settings
 
 (rf/reg-sub

@@ -41,7 +41,7 @@
   (when ok
     (println ok body)))
 
-(defn load-store! []
+(defn- init-sync! []
   (ajax-request {:uri             "/sync"
                  :handler         load-data-handler
                  :format          {:content-type "application/text" :write str}
@@ -49,6 +49,10 @@
                                    :type         :arraybuffer
                                    :content-type "application/msgpack"
                                    :read         pr/-body}}))
+
+(defn load-store! []
+  (rf/dispatch-sync [:ds/initialize (->ds-schema all-schemas) []])
+  (rf/dispatch-sync [:state/set :sync-loaded? true]))
 
 (defn- batch-sync-tx-data []
   (when-not (empty? @batch)
@@ -99,7 +103,7 @@
    @conn
    (do
      (reset! conn (d/conn-from-datoms datoms schema))
-     (d/listen! @conn :sync-tx-data sync-tx-data)
+     #_(d/listen! @conn :sync-tx-data sync-tx-data)
      (rp/connect! @conn)
      (re/init! @conn)
      #_(js/setInterval sync-latest-datoms! 5000)

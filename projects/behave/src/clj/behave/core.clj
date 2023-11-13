@@ -1,7 +1,6 @@
 (ns behave.core
   (:require [clojure.java.io              :as io]
             [clojure.java.browse          :refer [browse-url]]
-            [clojure.core.async           :refer [<! alts! put! chan go-loop timeout]]
             [clojure.edn                  :as edn]
             [clojure.string               :as str]
             [clojure.stacktrace           :as st]
@@ -23,35 +22,6 @@
             [behave.views                 :refer [render-page render-tests-page]])
   (:gen-class))
 
-;;; Constants
-
-(def ^:private KILL-TIMEOUT-MS 10000) ;; 10 seconds
-
-;;; State
-
-(def ^:private kill-channel (atom nil))
-(def ^:private cancel-channel (atom nil))
-(def ^:private close-time (atom 0))
-
-(defn- now-in-ms
-  "Returns the current time since Jan. 1, 1970 in milliseconds."
-  []
-  (inst-ms (java.util.Date.)))
-
-(defn- watch-kill-signal!
-  "Creates a channel to listen on for a 'kill' signal. Once a message is put on the kill channel, waits 10 seconds to cancel the kill."
-  []
-  (let [kill-chan   (chan)
-        cancel-chan (chan)]
-    (go-loop []
-      (<! kill-chan)
-      (let [[_ ch] (alts! [cancel-chan (timeout KILL-TIMEOUT-MS)])]
-        (if (not= ch cancel-chan)
-          (.exit (Runtime/getRuntime) 0) ;; Exit only if we hit timeout. Uses Runtime exit to kill entire JVM Process
-          (recur))))
-    (reset! kill-channel kill-chan)
-    (reset! cancel-channel cancel-chan)))
-
 (defn init! []
   (load-config (io/resource "config.edn"))
   (let [config (update-in (get-config :database :config)
@@ -70,20 +40,6 @@
   (vms-sync!)
   {:status 200 :body "OK"})
 
-(defn close-handler [{:keys [params]}]
-  (if (= (get-config :server :mode) "prod")
-    (let [{:keys [cancel]} params]
-      (cond
-        (nil? cancel)
-        (do
-          (reset! close-time (now-in-ms))
-          (put! @kill-channel true))
-
-        :else
-        (put! @cancel-channel true))
-      {:status 200 :body "OK"})
-    {:status 404 :body "Not Found"}))
-
 (defn bad-uri?
   [uri]
   (str/includes? (str/lower-case uri) "php"))
@@ -94,7 +50,6 @@
                        (str/starts-with? uri "/vms-sync") #'vms-sync-handler
                        (str/starts-with? uri "/sync")     #'sync-handler
                        (str/starts-with? uri "/test")     #'render-tests-page
-                       (str/starts-with? uri "/close")    #'close-handler
                        (match-route routes uri)           (render-page (match-route routes uri))
                        :else                              (not-found "404 Not Found"))]
     (next-handler request)))
@@ -175,17 +130,12 @@
 
 (defn -main [& _args]
   (init!)
-  (let [mode      (get-config :server :mode)
-        http-port (or (get-config :server :http-port) 8080)]
+  (let [mode         (get-config :server :mode)
+        http-port    (or (get-config :server :http-port) 8080)
+        open-browser #(when (= "prod" mode) (browse-url (str "http://localhost:" http-port)))]
     (when (= "dev" mode) (vms-sync!))
     (server/start-server! {:handler (create-handler-stack {:reload? (= mode "dev") :figwheel? false})
                            :port    http-port})
     (logging/start-logging! {:log-dir             (get-config :logging :log-dir)
                              :log-memory-interval (get-config :logging :log-memory-interval)})
-    (when (= "prod" mode)
-      (watch-kill-signal!) ;; Watch on the main thread
-      (browse-url (str "http://localhost:" http-port)))))
-
-(comment
-  (-main)
-  (server/stop-server!))
+    (open-browser)))

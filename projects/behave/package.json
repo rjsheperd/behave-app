@@ -1,0 +1,19 @@
+{
+  "name": "cljs-pwa-starter",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build-sw": "workbox injectManifest workbox-config.js",
+    "bundle-sw": "esbuild dist/js/sw.js --bundle --minify --outfile=resources/public/sw.js"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "esbuild": "^0.19.5",
+    "workbox-cli": "^7.0.0"
+  },
+  "dependencies": {
+    "workbox-sw": "^7.0.0"
+  }
+}

@@ -168,7 +168,8 @@
  (fn [_ _]
    (js/window.location.reload)))
 
-(rf/reg-event-fx
+(rf/reg-event-db
  :toolbar/print
- (fn [_ [_ ws-uuid]]
-   (.open js/window (str "/worksheets/" ws-uuid "/print"))))
+ (rf/path :state)
+ (fn [db _]
+   (assoc db :print true)))
