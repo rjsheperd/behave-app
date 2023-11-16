@@ -1,8 +1,8 @@
 (ns behave-cms.export
-  (:require [clojure.java.io :as io]
-            [clojure.string  :as str]
-            [file-utils.interface :refer [resource-file zip-file]]
-            [date-utils.interface :refer [today]])
+  (:require [clojure.java.io             :as io]
+            [clojure.string              :as str]
+            [behave.file-utils.interface :refer [resource-file zip-file]]
+            [behave.date-utils.interface :refer [today]])
   (:import [java.io FileInputStream]))
 
 (defn sync-images

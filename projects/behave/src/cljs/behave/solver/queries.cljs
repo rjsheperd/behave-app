@@ -1,9 +1,9 @@
 (ns behave.solver.queries
-  (:require [datascript.core    :as d]
-            [data-utils.interface :refer [is-digit? parse-int parse-float]]
-            [behave.store        :as store]
-            [behave.schema.core  :refer [rules]]
-            [behave.vms.store    :refer [vms-conn]]))
+  (:require [datascript.core             :as d]
+            [behave.data-utils.interface :refer [is-digit? parse-int parse-float]]
+            [behave.store                :as store]
+            [behave.schema.core          :refer [rules]]
+            [behave.vms.store            :refer [vms-conn]]))
 
 ;;; VMS Queries
 

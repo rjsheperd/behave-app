@@ -2,7 +2,7 @@
   (:require [behave-cms.events]
             [behave-cms.subs]
             [behave-cms.simple-test]
-            [browser-utils.core :refer [add-script]]
+            [behave.browser-utils.core :refer [add-script]]
             [cljs-test-display.core]
             [clojure.string :as str]
             [figwheel.main.testing :refer [run-tests]]

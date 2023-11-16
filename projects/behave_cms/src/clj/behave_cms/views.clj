@@ -1,14 +1,14 @@
 (ns behave-cms.views
   (:import  [java.io ByteArrayOutputStream ByteArrayInputStream])
-  (:require [clojure.edn       :as edn]
-            [clojure.java.io   :as io]
-            [clojure.string    :as str]
-            [clojure.data.json :as json]
-            [cognitect.transit :as transit]
-            [msgpack.core      :as msg]
+  (:require [clojure.edn             :as edn]
+            [clojure.java.io         :as io]
+            [clojure.string          :as str]
+            [clojure.data.json       :as json]
+            [cognitect.transit       :as transit]
+            [msgpack.core            :as msg]
             [msgpack.clojure-extensions]
-            [config.interface  :refer [get-config]]
-            [hiccup.page       :refer [html5 include-css include-js]]))
+            [behave.config.interface :refer [get-config]]
+            [hiccup.page             :refer [html5 include-css include-js]]))
 
 (defn- find-app-js []
   (if-let [manifest (io/resource "public/cljs/manifest.edn")]

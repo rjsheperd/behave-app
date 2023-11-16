@@ -1,14 +1,14 @@
 (ns behave.worksheet.views
-  (:require [behave.components.core       :as c]
-            [behave.components.navigation :refer [wizard-navigation]]
-            [behave.tool.views            :refer [tool tool-selector]]
-            [behave.translate             :refer [<t bp]]
+  (:require [behave.components.core        :as c]
+            [behave.components.navigation  :refer [wizard-navigation]]
+            [behave.tool.views             :refer [tool tool-selector]]
+            [behave.translate              :refer [<t bp]]
             [behave.worksheet.events]
-            [datascript.core              :refer [squuid]]
-            [re-frame.core                :as rf]
-            [reagent.core                 :as r]
-            [dom-utils.interface          :refer [input-value]]
-            [string-utils.interface       :refer [->str]]))
+            [datascript.core               :refer [squuid]]
+            [re-frame.core                 :as rf]
+            [reagent.core                  :as r]
+            [behave.dom-utils.interface    :refer [input-value]]
+            [behave.string-utils.interface :refer [->str]]))
 
 (defn- workflow-select-header [{:keys [icon header description]}]
   [:div.workflow-select__header

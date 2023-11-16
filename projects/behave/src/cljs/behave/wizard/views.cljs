@@ -10,18 +10,18 @@
             [behave.components.results.inputs     :refer [inputs-table]]
             [behave.components.results.table      :refer [result-table-download-link]]
             [behave.tool.views                    :refer [tool tool-selector]]
-            [behave-routing.main                  :refer [routes]]
+            [behave.behave-routing.main           :refer [routes]]
             [behave.translate                     :refer [<t bp]]
             [behave.wizard.events]
             [behave.wizard.subs]
             [bidi.bidi                            :refer [path-for]]
             [behave.worksheet.events]
             [behave.worksheet.subs]
-            [dom-utils.interface                  :refer [input-int-value input-value]]
+            [behave.dom-utils.interface           :refer [input-int-value input-value]]
             [goog.string                          :as gstring]
             [goog.string.format]
             [re-frame.core                        :refer [dispatch dispatch-sync subscribe]]
-            [string-utils.interface               :refer [->kebab]]
+            [behave.string-utils.interface        :refer [->kebab]]
             [reagent.core                         :as r]))
 
 ;;; Components

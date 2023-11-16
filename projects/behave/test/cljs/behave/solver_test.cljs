@@ -1,14 +1,14 @@
 (ns behave.solver-test
-  (:require [clojure.string       :as str]
-            [cljs.test            :refer [deftest is join-fixtures testing use-fixtures are] :include-macros true]
-            [csv-parser.interface :refer [parse-csv]]
-            [data-utils.interface :refer [parse-float parse-int]]
-            [datascript.core      :as d]
-            [behave.fixtures      :as fx]
-            [behave.lib.enums     :as enums]
-            [behave.solver.core   :refer [solve-worksheet]]
-            [behave.vms.store     :refer [vms-conn]]
-            [behave.schema.core   :refer [rules]])
+  (:require [clojure.string              :as str]
+            [cljs.test                   :refer [deftest is join-fixtures testing use-fixtures are] :include-macros true]
+            [behave.csv-parser.interface :refer [parse-csv]]
+            [behave.data-utils.interface :refer [parse-float parse-int]]
+            [datascript.core             :as d]
+            [behave.fixtures             :as fx]
+            [behave.lib.enums            :as enums]
+            [behave.solver.core          :refer [solve-worksheet]]
+            [behave.vms.store            :refer [vms-conn]]
+            [behave.schema.core          :refer [rules]])
   (:require-macros [behave.macros :refer [inline-resource]]))
 
 ;;; Helpers

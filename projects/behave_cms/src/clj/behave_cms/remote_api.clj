@@ -3,17 +3,17 @@
             [clojure.repl      :refer [demunge]]
             [clojure.string    :as str]
             [bidi.bidi         :refer [match-route]]
-            [config.interface  :refer [get-config]]
-            [behave-cms.authentication  :refer [invite-user!
+            [behave.config.interface   :refer [get-config]]
+            [behave-cms.authentication :refer [invite-user!
                                                 login!
                                                 logout!
                                                 set-email!
                                                 reset-password!
                                                 reset-key!
                                                 verify-email!]]
-            [behave-cms.routes          :refer [api-routes]]
-            [behave-cms.views           :refer [data-response]]
-            [behave-cms.export          :refer [sync-images]]))
+            [behave-cms.routes         :refer [api-routes]]
+            [behave-cms.views          :refer [data-response]]
+            [behave-cms.export         :refer [sync-images]]))
 
 (defn log-str [& args]
   (when (= "dev" (get-config :server :mode))

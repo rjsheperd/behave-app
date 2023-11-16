@@ -1,12 +1,12 @@
 (ns behave.diagram-test
-  (:require [cljs.test            :refer [is deftest testing]]
-            [csv-parser.interface :refer [parse-csv]]
-            [behave.lib.surface   :as surface]
-            [behave.lib.contain   :as contain]
-            [behave.lib.fuel-models   :as fuel-models]
-            [behave.lib.enums     :as enums]
-            [behave.lib.units     :refer [get-unit]]
-            [clojure.string :as str])
+  (:require [cljs.test                   :refer [is deftest testing]]
+            [behave.csv-parser.interface :refer [parse-csv]]
+            [behave.lib.surface          :as surface]
+            [behave.lib.contain          :as contain]
+            [behave.lib.fuel-models      :as fuel-models]
+            [behave.lib.enums            :as enums]
+            [behave.lib.units            :refer [get-unit]]
+            [clojure.string              :as str])
   (:require-macros [behave.macros :refer [inline-resource]]))
 
 ;; Helpers

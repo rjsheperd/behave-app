@@ -1,10 +1,10 @@
 (ns behave.download-vms
-  (:require [clojure.java.io    :as io]
-            [clj-http.client    :as client]
-            [me.raynes.fs       :as fs]
-            [file-utils.interface :refer [resource-file unzip-file]]
-            [date-utils.interface :refer [today]]
-            [logging.interface :refer [log-str]]))
+  (:require [clojure.java.io             :as io]
+            [clj-http.client             :as client]
+            [me.raynes.fs                :as fs]
+            [behave.file-utils.interface :refer [resource-file unzip-file]]
+            [behave.date-utils.interface :refer [today]]
+            [behave.logging.interface    :refer [log-str]]))
 
 (defn export-images-from-vms [auth-token & [url]]
   (log-str "Beginning download of images from VMS...")

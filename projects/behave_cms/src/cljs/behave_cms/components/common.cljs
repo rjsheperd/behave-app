@@ -1,10 +1,10 @@
 (ns behave-cms.components.common
-  (:require [clojure.string         :as str]
-            [herb.core              :refer [<class]]
-            [reagent.core           :as r]
-            [string-utils.interface :refer [->str ->kebab]]
-            [behave-cms.styles      :as $]
-            [behave-cms.utils       :as u]))
+  (:require [clojure.string                :as str]
+            [herb.core                     :refer [<class]]
+            [reagent.core                  :as r]
+            [behave.string-utils.interface :refer [->str ->kebab]]
+            [behave-cms.styles             :as $]
+            [behave-cms.utils              :as u]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; UI Styles

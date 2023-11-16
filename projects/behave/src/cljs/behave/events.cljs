@@ -1,5 +1,5 @@
 (ns behave.events
-  (:require [browser-utils.core :refer [add-script script-exist?]]
+  (:require [behave.browser-utils.core :refer [add-script script-exist?]]
             [ajax.core :as ajax]
             [re-frame.core :as rf]
             [behave.tool.events]))

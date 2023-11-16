@@ -3,7 +3,7 @@
             [behave.lib.mortality            :as mortality]
             [behave.lib.species-master-table :as species-master-table]
             [clojure.string                  :as str]
-            [csv-parser.interface            :refer [parse-csv]]
+            [behave.csv-parser.interface     :refer [parse-csv]]
             [cljs.test                       :refer [is deftest testing]])
   (:require-macros [behave.macros :refer [inline-resource]]))
 

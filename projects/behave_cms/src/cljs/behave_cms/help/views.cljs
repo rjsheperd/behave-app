@@ -1,16 +1,13 @@
 (ns behave-cms.help.views
-  (:require [clojure.string             :as str]
-            [clojure.set                :refer [rename-keys]]
-            [clojure.walk               :refer [postwalk]]
-            [reagent.core               :as r]
-            [re-frame.core              :as rf]
-            [herb.core                  :refer [<class]]
-            [hickory.core               :refer [parse-fragment as-hiccup]]
-            [behave-cms.help.markdown   :refer [md->hiccup]]
-            [data-utils.interface       :refer [parse-int]]
+  (:require [clojure.string              :as str]
+            [reagent.core                :as r]
+            [re-frame.core               :as rf]
+            [herb.core                   :refer [<class]]
+            [behave-cms.help.markdown    :refer [md->hiccup]]
+            [behave.data-utils.interface :refer [parse-int]]
             [behave-cms.help.events]
             [behave-cms.help.subs]
-            [behave-cms.utils           :as u]))
+            [behave-cms.utils            :as u]))
 
 ;;; Styling
 

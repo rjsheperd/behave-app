@@ -1,18 +1,18 @@
 (ns behave.solver.core
-  (:require [behave.solver.diagrams   :refer [store-all-diagrams!]]
-            [behave.solver.generators :refer [generate-runs inputs-map-to-vector]]
-            [behave.solver.queries    :as q]
-            [behave.solver.table      :as t]
-            [behave.lib.contain       :as contain]
-            [behave.lib.crown         :as crown]
-            [behave.lib.mortality     :as mortality]
-            [behave.lib.surface       :as surface]
-            [behave.lib.spot          :as spot]
-            [behave.logger            :refer [log]]
-            [clojure.string           :as str]
-            [clojure.set              :as set]
-            [re-frame.core            :as rf]
-            [map-utils.interface      :refer [index-by]]))
+  (:require [behave.solver.diagrams     :refer [store-all-diagrams!]]
+            [behave.solver.generators   :refer [generate-runs inputs-map-to-vector]]
+            [behave.solver.queries      :as q]
+            [behave.solver.table        :as t]
+            [behave.lib.contain         :as contain]
+            [behave.lib.crown           :as crown]
+            [behave.lib.mortality       :as mortality]
+            [behave.lib.surface         :as surface]
+            [behave.lib.spot            :as spot]
+            [behave.logger              :refer [log]]
+            [clojure.string             :as str]
+            [clojure.set                :as set]
+            [re-frame.core              :as rf]
+            [behave.map-utils.interface :refer [index-by]]))
 
 ;;; Helpers
 

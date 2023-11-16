@@ -1,11 +1,11 @@
 (ns behave-cms.components.entity-form
-  (:require [clojure.string :as str]
-            [reagent.core      :as r]
-            [re-frame.core     :as rf]
-            [string-utils.interface :refer [->kebab ->str]]
-            [behave.schema.core :refer [all-schemas]]
-            [behave-cms.components.common :refer [dropdown]]
-            [behave-cms.utils  :as u]))
+  (:require [clojure.string                :as str]
+            [reagent.core                  :as r]
+            [re-frame.core                 :as rf]
+            [behave.string-utils.interface :refer [->kebab ->str]]
+            [behave.schema.core            :refer [all-schemas]]
+            [behave-cms.components.common  :refer [dropdown]]
+            [behave-cms.utils              :as u]))
 
 ;;; Constants
 (def ^:private db-attrs             (map :db/ident all-schemas))

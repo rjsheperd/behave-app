@@ -1,9 +1,9 @@
 (ns behave.contain-test
-  (:require [cljs.test            :refer [is deftest testing]]
-            [csv-parser.interface :refer [parse-csv]]
-            [behave.lib.contain   :as contain]
-            [behave.lib.enums     :as enums]
-            [behave.lib.units     :refer [get-unit]])
+  (:require [cljs.test                   :refer [is deftest testing]]
+            [behave.csv-parser.interface :refer [parse-csv]]
+            [behave.lib.contain          :as contain]
+            [behave.lib.enums            :as enums]
+            [behave.lib.units            :refer [get-unit]])
   (:require-macros [behave.macros :refer [inline-resource]]))
 
 ;; Helpers

@@ -1,14 +1,14 @@
 (ns behave.fixtures
   (:require
-   [behave.schema.core :refer [all-schemas]]
-   [behave.store :as bs]
-   [behave.vms.store :as vms]
-   [datascript.core :as d]
-   [ds-schema-utils.interface :refer [->ds-schema]]
-   [re-frame.core :as rf]
-   [re-posh.core :as rp]
-   [re-posh.db :as rpdb]
-   [austinbirch.reactive-entity :as re]))
+   [behave.schema.core               :refer [all-schemas]]
+   [behave.store                     :as bs]
+   [behave.vms.store                 :as vms]
+   [datascript.core                  :as d]
+   [behave.ds-schema-utils.interface :refer [->ds-schema]]
+   [re-frame.core                    :as rf]
+   [re-posh.core                     :as rp]
+   [re-posh.db                       :as rpdb]
+   [austinbirch.reactive-entity      :as re]))
 
 ;;; Re-Frame Event Logging
 

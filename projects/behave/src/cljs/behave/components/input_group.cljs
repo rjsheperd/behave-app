@@ -1,11 +1,11 @@
 (ns behave.components.input-group
-  (:require [reagent.core            :as r]
-            [re-frame.core           :as rf]
-            [behave.components.core  :as c]
-            [dom-utils.interface     :refer [input-value]]
-            [string-utils.interface  :refer [->kebab]]
-            [behave.translate        :refer [<t bp]]
-            [behave.utils            :refer [inclusive-range]]
+  (:require [reagent.core                    :as r]
+            [re-frame.core                   :as rf]
+            [behave.components.core          :as c]
+            [behave.dom-utils.interface      :refer [input-value]]
+            [behave.string-utils.interface   :refer [->kebab]]
+            [behave.translate                :refer [<t bp]]
+            [behave.utils                    :refer [inclusive-range]]
             [behave.components.unit-selector :refer [unit-display]]))
 
 ;;; Helpers

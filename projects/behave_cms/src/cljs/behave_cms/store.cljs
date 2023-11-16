@@ -1,19 +1,18 @@
 (ns behave-cms.store
-  (:require [clojure.set                :refer [union]]
-            [clojure.edn                :as edn]
-            [ajax.core                  :refer [ajax-request]]
-            [ajax.edn                   :refer [edn-request-format
+  (:require [clojure.set                       :refer [union]]
+            [ajax.core                         :refer [ajax-request]]
+            [ajax.edn                          :refer [edn-request-format
                                                 edn-response-format]]
-            [ajax.protocols             :as pr]
-            [datascript.core            :as d]
-            [re-frame.core              :as rf]
-            [re-posh.core               :as rp]
-            [datom-compressor.interface :as c]
-            [ds-schema-utils.interface  :refer [->ds-schema]]
-            [datom-utils.interface      :refer [split-datom]]
-            [behave.schema.core         :refer [all-schemas]]
-            [behave-cms.config          :refer [get-config]]
-            [austinbirch.reactive-entity :as re]))
+            [ajax.protocols                    :as pr]
+            [datascript.core                   :as d]
+            [re-frame.core                     :as rf]
+            [re-posh.core                      :as rp]
+            [behave.datom-compressor.interface :as c]
+            [behave.ds-schema-utils.interface  :refer [->ds-schema]]
+            [behave.datom-utils.interface      :refer [split-datom]]
+            [behave.schema.core                :refer [all-schemas]]
+            [behave-cms.config                 :refer [get-config]]
+            [austinbirch.reactive-entity       :as re]))
 
 ;;; State
 

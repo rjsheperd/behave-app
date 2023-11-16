@@ -1,13 +1,13 @@
 (ns behave.vms.store
-  (:require [ajax.core                  :refer [ajax-request]]
-            [ajax.protocols             :as pr]
-            [datascript.core            :as d]
-            [posh.reagent               :refer [pull pull-many q posh!]
-                                        :rename {q posh-query pull posh-pull pull-many posh-pull-many}]
-            [re-frame.core              :as rf]
-            [datom-compressor.interface :as c]
-            [ds-schema-utils.interface  :refer [->ds-schema]]
-            [behave.schema.core         :refer [all-schemas]]))
+  (:require [ajax.core                         :refer [ajax-request]]
+            [ajax.protocols                    :as pr]
+            [datascript.core                   :as d]
+            [posh.reagent                      :refer [pull pull-many q posh!]
+                                               :rename {q posh-query pull posh-pull pull-many posh-pull-many}]
+            [re-frame.core                     :as rf]
+            [behave.datom-compressor.interface :as c]
+            [behave.ds-schema-utils.interface  :refer [->ds-schema]]
+            [behave.schema.core                :refer [all-schemas]]))
 
 ;;; State
 

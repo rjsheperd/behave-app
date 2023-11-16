@@ -1,11 +1,11 @@
 (ns behave.tool.views
-  (:require [behave.components.core :as c]
+  (:require [behave.components.core          :as c]
             [behave.components.unit-selector :refer [unit-display]]
-            [behave.translate       :refer [<t bp]]
-            [dom-utils.interface    :refer [input-value]]
-            [reagent.core           :as r]
-            [string-utils.interface :refer [->kebab]]
-            [re-frame.core          :as rf]))
+            [behave.translate                :refer [<t bp]]
+            [behave.dom-utils.interface      :refer [input-value]]
+            [reagent.core                    :as r]
+            [behave.string-utils.interface   :refer [->kebab]]
+            [re-frame.core                   :as rf]))
 
 (defn tool-selector
   "A Modal used for selecting a tool"

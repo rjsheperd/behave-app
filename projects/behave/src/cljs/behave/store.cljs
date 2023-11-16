@@ -1,18 +1,18 @@
 (ns behave.store
-  (:require [clojure.set :refer [union]]
-            [clojure.edn :as edn]
-            [ajax.core :refer [ajax-request]]
-            [ajax.edn  :refer [edn-request-format]]
-            [ajax.protocols :as pr]
-            [datascript.core :as d]
-            [re-frame.core :as rf]
-            [re-posh.core :as rp]
-            [browser-utils.interface :refer [debounce]]
-            [datom-compressor.interface :as c]
-            [ds-schema-utils.interface :refer [->ds-schema]]
-            [datom-utils.interface :refer [split-datom]]
-            [behave.schema.core :refer [all-schemas]]
-            [austinbirch.reactive-entity :as re]))
+  (:require [clojure.set                       :refer [union]]
+            [clojure.edn                       :as edn]
+            [ajax.core                         :refer [ajax-request]]
+            [ajax.edn                          :refer [edn-request-format]]
+            [ajax.protocols                    :as pr]
+            [datascript.core                   :as d]
+            [re-frame.core                     :as rf]
+            [re-posh.core                      :as rp]
+            [behave.browser-utils.interface    :refer [debounce]]
+            [behave.datom-compressor.interface :as c]
+            [behave.ds-schema-utils.interface  :refer [->ds-schema]]
+            [behave.datom-utils.interface      :refer [split-datom]]
+            [behave.schema.core                :refer [all-schemas]]
+            [austinbirch.reactive-entity       :as re]))
 
 ;;; State
 

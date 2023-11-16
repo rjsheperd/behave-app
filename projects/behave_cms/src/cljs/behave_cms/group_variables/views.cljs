@@ -2,7 +2,7 @@
   (:require [clojure.set                        :refer [rename-keys]]
             [reagent.core                       :as r]
             [re-frame.core                      :as rf]
-            [data-utils.interface               :refer [parse-int]]
+            [behave.data-utils.interface        :refer [parse-int]]
             [behave-cms.components.common       :refer [accordion
                                                         checkbox
                                                         dropdown

@@ -1,13 +1,12 @@
 (ns behave-cms.components.conditionals
-  (:require
-   [clojure.spec.alpha           :as s]
-   [clojure.string               :as str]
-   [behave.schema.conditionals]
-   [behave-cms.components.common :refer [dropdown checkboxes simple-table]]
-   [behave-cms.utils             :as u]
-   [reagent.core                 :as r]
-   [re-frame.core                :as rf]
-   [string-utils.interface       :refer [->str]]))
+  (:require [clojure.spec.alpha            :as s]
+            [clojure.string                :as str]
+            [behave.schema.conditionals]
+            [behave-cms.components.common  :refer [dropdown checkboxes simple-table]]
+            [behave-cms.utils              :as u]
+            [reagent.core                  :as r]
+            [re-frame.core                 :as rf]
+            [behave.string-utils.interface :refer [->str]]))
 
 ;;; Helpers
 

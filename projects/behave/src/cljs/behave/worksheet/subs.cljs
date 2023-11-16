@@ -1,16 +1,16 @@
 (ns behave.worksheet.subs
-  (:require [clojure.string              :as str]
-            [clojure.set                 :as set]
-            [austinbirch.reactive-entity :as re]
-            [datascript.core             :as d]
-            [re-posh.core                :as rp]
-            [re-frame.core               :as rf]
-            [behave.store                :as s]
-            [behave.vms.store            :refer [vms-conn]]
-            [behave.schema.core          :refer [rules]]
-            [map-utils.interface         :refer [index-by]]
-            [number-utils.core           :refer [parse-float to-precision]]
-            [string-utils.interface      :refer [->str ->kebab]]))
+  (:require [clojure.string                :as str]
+            [clojure.set                   :as set]
+            [austinbirch.reactive-entity   :as re]
+            [datascript.core               :as d]
+            [re-posh.core                  :as rp]
+            [re-frame.core                 :as rf]
+            [behave.store                  :as s]
+            [behave.vms.store              :refer [vms-conn]]
+            [behave.schema.core            :refer [rules]]
+            [behave.map-utils.interface    :refer [index-by]]
+            [number-utils.core             :refer [parse-float to-precision]]
+            [behave.string-utils.interface :refer [->str ->kebab]]))
 
 ;; Helpers
 (defn make-tree

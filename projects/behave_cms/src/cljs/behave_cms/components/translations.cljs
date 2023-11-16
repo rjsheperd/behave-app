@@ -1,7 +1,7 @@
 (ns behave-cms.components.translations
   (:require [reagent.core :as r]
             [re-frame.core :as rf]
-            [data-utils.interface :refer [parse-int]]
+            [behave.data-utils.interface :refer [parse-int]]
             [behave-cms.utils :as u]))
 
 (defn- upsert-translation! [data]

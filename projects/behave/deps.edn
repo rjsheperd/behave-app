@@ -16,6 +16,9 @@
              org.xerial/sqlite-jdbc                  {:mvn/version "3.43.0.0"}
              cljs-ajax/cljs-ajax                     {:mvn/version "0.8.4"}
              org.clojure/data.xml                    {:mvn/version "0.2.0-alpha7"}
+             sig-gis/triangulum                      {:git/url "https://github.com/sig-gis/triangulum"
+                                                      :git/tag "2023.05.15"
+                                                      :sha     "6a92593c2764060a3a8d0e6db72e5a8b411b1655"}
 
              ;; ClojureScript
              org.clojure/clojurescript     {:mvn/version "1.11.54"}

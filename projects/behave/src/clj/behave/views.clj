@@ -1,10 +1,10 @@
 (ns behave.views
-  (:require [clojure.data.json :as json]
-            [clojure.java.io   :as io]
-            [clojure.string    :as str]
-            [clojure.edn       :as edn]
-            [config.interface  :refer [get-config]]
-            [hiccup.page       :refer [html5 include-css include-js]]))
+  (:require [clojure.data.json       :as json]
+            [clojure.java.io         :as io]
+            [clojure.string          :as str]
+            [clojure.edn             :as edn]
+            [behave.config.interface :refer [get-config]]
+            [hiccup.page             :refer [html5 include-css include-js]]))
 
 (defmacro inline-resource [resource-path]
   (slurp (clojure.java.io/resource resource-path)))

@@ -1,7 +1,7 @@
 (ns behave-cms.utils.mail
-  (:require [postal.core :refer [send-message]]
-            [config.interface   :refer [get-config]]
-            [logging.interface :refer [log-str]]))
+  (:require [postal.core              :refer [send-message]]
+            [behave.config.interface  :refer [get-config]]
+            [behave.logging.interface :refer [log-str]]))
 
 (defn get-site-url []
   (:site-url (get-config :mail)))

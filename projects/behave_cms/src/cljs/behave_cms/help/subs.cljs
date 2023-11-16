@@ -1,15 +1,8 @@
 (ns behave-cms.help.subs
-  (:require [clojure.string             :as str]
-            [clojure.set                :refer [rename-keys]]
-            [clojure.walk               :refer [postwalk]]
-            [applied-science.js-interop :as j]
-            [reagent.core               :as r]
-            [re-frame.core              :as rf]
-            [re-posh.core               :as rp]
-            [herb.core                  :refer [<class]]
-            [markdown2hiccup.interface  :refer [md->hiccup]]
-            [data-utils.interface       :refer [parse-int]]
-            [behave-cms.utils           :as u]))
+  (:require [reagent.core  :as r]
+            [re-frame.core :as rf]
+            [re-posh.core  :as rp]
+            [behave.markdown2hiccup.interface :refer [md->hiccup]]))
 
 ;;; Database
 

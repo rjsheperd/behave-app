@@ -1,9 +1,9 @@
 (ns behave-cms.store
-  (:require [behave.schema.core    :refer [all-schemas]]
-            [datahike.api          :as d]
-            [datahike-store.main   :as s]
-            [config.interface      :refer [get-config]]
-            [datom-utils.interface :refer [safe-deref unwrap]]))
+  (:require [behave.schema.core           :refer [all-schemas]]
+            [datahike.api                 :as d]
+            [behave.datahike-store.main   :as s]
+            [behave.config.interface      :refer [get-config]]
+            [behave.datom-utils.interface :refer [safe-deref unwrap]]))
 
 (defn connect! [config & [reset?]]
   (if reset?

@@ -6,7 +6,7 @@
                                                  update-entity!]]
             [behave-cms.utils.mail :refer [get-site-url email? send-mail]]
             [behave-cms.views      :refer [data-response]]
-            [datom-utils.interface :refer [safe-deref]])
+            [behave.datom-utils.interface :refer [safe-deref]])
   (:import [org.mindrot.jbcrypt BCrypt]
            [java.util Random]
            [java.net URLEncoder]))

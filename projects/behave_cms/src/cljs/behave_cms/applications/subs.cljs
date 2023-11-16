@@ -1,7 +1,7 @@
 (ns behave-cms.applications.subs
   (:require [bidi.bidi :refer [path-for]]
             [re-frame.core :as rf]
-            [string-utils.interface :refer [->kebab]]
+            [behave.string-utils.interface :refer [->kebab]]
             [behave-cms.routes :refer [app-routes]]))
 
 (rf/reg-sub

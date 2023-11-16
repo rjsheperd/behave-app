@@ -1,11 +1,11 @@
 (ns behave.wizard.events
   (:require [behave.solver.core            :refer [solve-worksheet]]
-            [behave-routing.main           :refer [routes]]
+            [behave.behave-routing.main    :refer [routes]]
             [bidi.bidi                     :refer [path-for]]
             [clojure.string                :as str]
             [clojure.walk                  :refer [postwalk]]
             [re-frame.core                 :as rf]
-            [string-utils.interface        :refer [->str]]
+            [behave.string-utils.interface :refer [->str]]
             [vimsical.re-frame.cofx.inject :as inject]))
 
 (rf/reg-event-fx

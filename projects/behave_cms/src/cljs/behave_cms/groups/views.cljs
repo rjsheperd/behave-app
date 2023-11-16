@@ -1,6 +1,6 @@
 (ns behave-cms.groups.views
   (:require [re-frame.core :as rf]
-            [string-utils.interface :refer [->str]]
+            [behave.string-utils.interface         :refer [->str]]
             [behave-cms.components.common          :refer [accordion checkbox simple-table window]]
             [behave-cms.components.conditionals    :refer [conditionals-table manage-conditionals]]
             [behave-cms.components.entity-form     :refer [entity-form]]

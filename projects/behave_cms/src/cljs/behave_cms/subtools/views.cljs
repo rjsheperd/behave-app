@@ -1,15 +1,15 @@
 (ns behave-cms.subtools.views
-  (:require [clojure.set   :refer [difference]]
-            [reagent.core  :as r]
-            [re-frame.core :as rf]
-            [string-utils.interface :refer [->kebab]]
+  (:require [clojure.set                           :refer [difference]]
+            [reagent.core                          :as r]
+            [re-frame.core                         :as rf]
+            [behave.string-utils.interface         :refer [->kebab]]
             [behave-cms.components.common          :refer [accordion radio-buttons simple-table window]]
             [behave-cms.components.cpp-editor      :refer [cpp-editor-form]]
             [behave-cms.help.views                 :refer [help-editor]]
             [behave-cms.components.sidebar         :refer [->sidebar-links sidebar sidebar-width]]
             [behave-cms.components.translations    :refer [all-translations]]
             [behave-cms.components.variable-search :refer [variable-search]]
-            [behave-cms.utils :as u]
+            [behave-cms.utils                      :as u]
             [behave-cms.subs]
             [behave-cms.events]))
 

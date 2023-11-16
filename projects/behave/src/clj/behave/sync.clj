@@ -1,8 +1,8 @@
 (ns behave.sync
-  (:require [datom-compressor.interface :as c]
-            [datom-store.main :as s]
-            [transport.interface :refer [clj-> mime->type]]
-            [logging.interface  :refer [log-str]])
+  (:require [behave.datom-compressor.interface :as c]
+            [behave.datom-store.main           :as s]
+            [behave.transport.interface        :refer [clj-> mime->type]]
+            [behave.logging.interface          :refer [log-str]])
   (:import  [java.io ByteArrayInputStream]))
 
 (defn sync-handler [{:keys [request-method params accept] :as req}]

@@ -1,8 +1,8 @@
 (ns behave.subs
-  (:require [bidi.bidi           :refer [match-route]]
-            [re-frame.core       :as rf]
-            [re-posh.core        :as rp]
-            [behave-routing.main :refer [routes]]
+  (:require [bidi.bidi                  :refer [match-route]]
+            [re-frame.core              :as rf]
+            [re-posh.core               :as rp]
+            [behave.behave-routing.main :refer [routes]]
             [behave.vms.subs]
             [behave.wizard.subs]
             [behave.print.subs]

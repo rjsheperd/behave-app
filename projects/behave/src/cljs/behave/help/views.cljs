@@ -1,8 +1,8 @@
 (ns behave.help.views
-  (:require [re-frame.core             :refer [subscribe dispatch]]
-            [markdown2hiccup.interface :refer [md->hiccup]]
-            [behave.components.core    :as c]
-            [behave.translate          :refer [<t]]
+  (:require [re-frame.core                    :refer [subscribe dispatch]]
+            [behave.markdown2hiccup.interface :refer [md->hiccup]]
+            [behave.components.core           :as c]
+            [behave.translate                 :refer [<t]]
             [behave.help.events]
             [behave.help.subs]))
 

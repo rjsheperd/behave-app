@@ -1,9 +1,9 @@
 (ns behave.components.unit-selector
-  (:require [reagent.core            :as r]
-            [re-frame.core           :as rf]
-            [behave.components.core  :as c]
-            [dom-utils.interface     :refer [input-value]]
-            [behave.translate        :refer [<t bp]]))
+  (:require [reagent.core               :as r]
+            [re-frame.core              :as rf]
+            [behave.components.core     :as c]
+            [behave.dom-utils.interface :refer [input-value]]
+            [behave.translate           :refer [<t bp]]))
 
 ;;; Helpers
 

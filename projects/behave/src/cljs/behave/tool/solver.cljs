@@ -2,7 +2,7 @@
   (:require [re-frame.core         :as rf]
             [goog.object           :as obj]
             [behave.solver.queries :as q]
-            [browser-utils.core    :refer [format-intl-number]]
+            [behave.browser-utils.core    :refer [format-intl-number]]
             [clojure.string        :as str]
             [behave.logger         :refer [log]]
             [behave.lib.ignite]

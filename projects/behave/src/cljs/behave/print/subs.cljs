@@ -2,7 +2,7 @@
   (:require [re-frame.core  :as rf]
             [clojure.string :as str]
             [re-posh.core   :as rp]
-            [string-utils.interface :refer [split-commas-or-spaces]]))
+            [behave.string-utils.interface :refer [split-commas-or-spaces]]))
 
 (rf/reg-sub
  :print/matrix-table-multi-valued-inputs
