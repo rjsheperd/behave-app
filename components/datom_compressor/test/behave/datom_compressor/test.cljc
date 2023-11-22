@@ -1,4 +1,4 @@
-(ns datom-compressor.test
+(ns behave.datom-compressor.test
   (:require
     #?(:clj  [clojure.test :refer [deftest is]]
        :cljs [cljs.test :refer-macros [deftest is]])

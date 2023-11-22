@@ -1,1 +1,1 @@
-(ns behave-schema.test)
+(ns behave.behave-schema.test)

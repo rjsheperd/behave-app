@@ -1,4 +1,4 @@
-(ns logging.runtime)
+(ns behave.logging.runtime)
 
 (def MEGABYTE-FACTOR (* 1024 1024))
 

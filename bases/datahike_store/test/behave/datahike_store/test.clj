@@ -1,1 +1,1 @@
-(ns datahike_store.test)
+(ns behave.datahike-store.test)

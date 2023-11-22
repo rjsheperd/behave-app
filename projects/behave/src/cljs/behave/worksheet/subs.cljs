@@ -9,7 +9,7 @@
             [behave.vms.store              :refer [vms-conn]]
             [behave.schema.core            :refer [rules]]
             [behave.map-utils.interface    :refer [index-by]]
-            [number-utils.core             :refer [parse-float to-precision]]
+            [behave.number-utils.interface :refer [parse-float to-precision]]
             [behave.string-utils.interface :refer [->str ->kebab]]))
 
 ;; Helpers

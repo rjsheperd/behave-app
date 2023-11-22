@@ -1,6 +1,6 @@
 (ns behave.logging.core
-  (:require [triangulum.logging :refer [log-str set-log-path!]]
-            [logging.runtime    :refer [get-system-information]]))
+  (:require [triangulum.logging     :refer [log-str set-log-path!]]
+            [behave.logging.runtime :refer [get-system-information]]))
 
 (defonce ^:private memory-logging (atom nil))
 

@@ -1,1 +1,1 @@
-(ns datom-store.test)
+(ns behave.datom-store.test)

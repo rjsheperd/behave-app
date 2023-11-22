@@ -1,1 +1,1 @@
-(ns behave-routing.test)
+(ns behave.behave-routing.test)
