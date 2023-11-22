@@ -1,0 +1,17 @@
+{:source-paths ["src/cljs" "test/cljs"]
+ :dependencies [[cljsjs/vega "5.20.2-0"]
+                [cljsjs/vega-lite  "5.1.1-0"]]
+ :dev-http {8000 "resources/public"}
+ :builds
+ {:app
+  {:target :browser
+   :output-dir "resources/public/cljs"
+   :asset-path "/cljs"
+   :modules
+   {:main
+    {:init-fn    behave.client/init}}}
+
+  :test-karma {:target    :karma
+               :output-to "out/karma-tests.js"
+               :ns-regexp "^behave\\."
+               :autorun   true}}}

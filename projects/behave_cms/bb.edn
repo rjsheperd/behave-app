@@ -1,20 +1,28 @@
 {:tasks
- {-project  "cljweb-behave-cms"
-  reload    (shell "systemctl --user daemon-reload")
-  status    {:depends [-project]
-             :task (shell (format "systemctl --user status %s" -project))}
-  start     {:depends [-project]
-             :task (shell (format "systemctl --user start %s" -project))}
-  stop      {:depends [-project]
-             :task (shell (format "systemctl --user stop %s" -project))}
-  build-js  (clojure "-M:compile-cljs")
-  uber      (clojure "-X triangulum.packaging/build-uberjar :app-name behave-cms :main-ns behave-cms.server")
-  pull      (shell "git pull")
-  restart   (do
-              (run 'stop)
-              (run 'start))
-  deploy    (do
-              (run 'stop)
-              (run 'pull)
-              (run 'build-js)
-              (run 'start))}}
+ {-project "cljweb-behave-cms"
+  reload   (shell "systemctl --user daemon-reload")
+  status   {:depends [-project]
+            :task    (shell (format "systemctl --user status %s" -project))}
+  start    {:depends [-project]
+            :task    (shell (format "systemctl --user start %s" -project))}
+  stop     {:depends [-project]
+            :task    (shell (format "systemctl --user stop %s" -project))}
+  -bunx?   (= 0 (:exit (shell "which bunx")))
+  test     {:depends [-bunx?]
+            :task
+            (do
+              (clojure "-M:shadow-cljs compile test")
+              (let [npx (if -bunx? "bunx" "npx")]
+                (shell (str npx " karma start"))))}
+  build-js (clojure "-M:shadow-cljs release app")
+  uber     (clojure "-M:build-uberjar")
+  pull     (shell "git pull")
+  restart  (do
+             (run 'stop)
+             (run 'start))
+  deploy   (do
+             (run 'stop)
+             (run 'pull)
+             (run 'build-js)
+             (run 'start))}}
+
