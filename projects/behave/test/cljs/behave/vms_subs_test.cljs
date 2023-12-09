@@ -1,4 +1,4 @@
-(ns behave.vms-sub-test
+(ns behave.vms-subs-test
   (:require
    [cljs.test :refer [use-fixtures deftest is join-fixtures] :include-macros true]
    [re-frame.core :as rf]

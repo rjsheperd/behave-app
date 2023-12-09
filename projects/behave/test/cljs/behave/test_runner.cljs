@@ -1,5 +1,5 @@
 (ns behave.test-runner
-  (:require [behave.events]
+  #_(:require [behave.events]
             [behave.help.subs]
             [behave.subs]
             [behave.vms.store :refer [load-vms!]]
@@ -27,12 +27,12 @@
             [re-frame.core :as rf]
             [re-posh.core :as rp]))
 
-(rp/reg-event-fx
+#_(rp/reg-event-fx
  :transact
  (fn [_ [_ datoms]]
    {:transact datoms}))
 
-(defn run-the-tests []
+#_(defn run-the-tests []
   (run-tests (cljs-test-display.core/init! "app-testing")
              'behave.crown-test
              'behave.contain-test
@@ -48,7 +48,7 @@
              'behave.worksheet-subs-test
              ))
 
-(defn ^:after-load init []
+#_(defn ^:after-load init []
   (let [window-keys    (js->clj (.keys js/Object js/window))
         module-loaded? (seq (filter #(str/starts-with? % "Module") window-keys))
         vms-loaded?    @(rf/subscribe [:state :vms-loaded?])]
@@ -66,4 +66,4 @@
       :else
       (run-the-tests))))
 
-(init)
+#_(init)

@@ -8,6 +8,7 @@ module.exports = function(config) {
       plugins: ['karma-cljs-test', 'karma-chrome-launcher', 'karma-junit-reporter'],
     colors: true,
     logLevel: config.LOG_INFO,
+    singleRun: true,
     client: {args: ["shadow.test.karma.init"], singleRun: true},
 
     // JUnit Report

@@ -8,10 +8,10 @@
    :output-dir "resources/public/cljs"
    :asset-path "/cljs"
    :modules
-   {:main
+   {:app
     {:init-fn    behave.client/init}}}
 
-  :test-karma {:target    :karma
-               :output-to "out/karma-tests.js"
-               :ns-regexp "^behave\\."
-               :autorun   true}}}
+  :test {:target    :karma
+         :output-to "out/karma-tests.js"
+         :ns-regexp "^behave\\."
+         :autorun   true}}}
