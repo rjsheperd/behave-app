@@ -1,10 +1,11 @@
 (ns behave.views
-  (:require [clojure.data.json :as json]
-            [clojure.java.io   :as io]
-            [clojure.string    :as str]
-            [clojure.edn       :as edn]
-            [config.interface  :refer [get-config]]
-            [hiccup.page       :refer [html5 include-css include-js]]))
+  (:require [clojure.data.json   :as json]
+            [clojure.java.io     :as io]
+            [clojure.string      :as str]
+            [clojure.edn         :as edn]
+            [config.interface    :refer [get-config]]
+            [transport.interface :refer [clj->json]]
+            [hiccup.page         :refer [html5 include-css include-js]]))
 
 (defmacro inline-resource [resource-path]
   (slurp (clojure.java.io/resource resource-path)))
@@ -59,6 +60,12 @@
               [:div#app-testing]
               (include-js "/js/behave-min.js" "/cljs/app-testing.js")])})
 
+(defn add-sentry [{:keys [js config]}]
+  [:<>
+   [:script {:type "text/javascript" :src js}]
+   [:script {:type "text/javascript"}
+    (str "window.onSentryLoad = function() { Sentry.init (" (clj->json config) ") };")]])
+
 (defn render-page [{:keys [route-params] :as match}]
   (fn [{:keys [params figwheel?]}]
     {:status  (if (some? match) 200 404)
@@ -67,6 +74,7 @@
                 (head-meta-css)
                 [:body
                  [:div#app]
+                 (when (get-config :sentry) (add-sentry (get-config :sentry)))
                  (cljs-init (merge route-params params (get-config :client) (get-config :server)) figwheel?)
                  (include-js "/js/behave-min.js" "/js/katex.min.js")
                  (when figwheel? (include-js (find-app-js)))])}))

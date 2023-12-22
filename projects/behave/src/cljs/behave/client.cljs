@@ -44,12 +44,9 @@
                     :tools/all           tools/root-component
                     :tools/page          tools/root-component})
 
-(defn load-scripts! [{:keys [issue-collector sentry]}]
+(defn load-scripts! [{:keys [issue-collector]}]
   (when issue-collector
-    (rf/dispatch [:system/add-script issue-collector]))
-  (when sentry
-    (rf/dispatch [:system/add-script sentry])))
-
+    (rf/dispatch [:system/add-script issue-collector])))
 
 (defn- before-unload-fn [e]
   (when-not (str/includes? (.-pathname (.-location js/window)) "print")
