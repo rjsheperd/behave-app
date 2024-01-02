@@ -19,6 +19,7 @@
                      :functions         :function
                      :groups            :group
                      :lists             :list
+                     :domains           :domain
                      :group-variables   :group-variable
                      :help-pages        :help-page
                      :languages         :language
@@ -100,6 +101,7 @@
       (entity-route :subgroups)
       (entity-route :group-variables)
       (entity-route :variables)
+      (entity-route :domains)
       (entity-route :lists)
       (entity-route :help-pages)
       (entity-route :tools)

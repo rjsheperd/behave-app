@@ -10,7 +10,7 @@
             [behave-cms.events]
             [behave-cms.subs]))
 
-(def columns [:variable/name :variable/bp6-label :variable/bp6-code :variable/kind])
+(def columns [:variable/name :variable/domain-uuid :variable/bp6-label :variable/bp6-code :variable/kind])
 
 (defn variables-table []
   (let [variables (rf/subscribe [:pull-with-attr :variable/name])
@@ -58,6 +58,7 @@
           [:div.mb-3 {:keys field-key}
            [:label.form-label label]
            (condp = type
+
              :dimension
              [:select.form-select {:default-value @value
                                    :on-change     #(on-change (u/input-value %))}
@@ -120,7 +121,8 @@
         set-field (fn [& fields]
                     (fn [value]
                       (rf/dispatch [:state/set-state (apply conj [:editors :variables] fields) value])))
-        kind      (get-field :variable/kind)]
+        kind      (get-field :variable/kind)
+        domains   (rf/subscribe [:domains])]
     [:<>
      [:div.row
       [:h3 (if id
@@ -133,6 +135,12 @@
                      :fields [{:label     "Name"
                                :required? true
                                :field-key :variable/name}
+                              {:label     "domain"
+                               :field-key :variable/domain-uuid
+                               :type      :select
+                               :required? false
+                               :options   (for [{domain-name :domain/name cat-uuid :bp/uuid} @domains]
+                                            {:label domain-name :value cat-uuid})}
                               {:label     "BP6 Label"
                                :disabled? true
                                :field-key :variable/bp6-label}

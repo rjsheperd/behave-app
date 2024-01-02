@@ -16,13 +16,13 @@
 ;;; Private Views
 
 (defn- subgroup-form [group-id subgroup-id]
-  [entity-form {:entity        :group
-                :parent-field  :group/_children
-                :parent-id     group-id
-                :id            subgroup-id
-                :fields        [{:label     "Name"
-                                 :required? true
-                                 :field-key :group/name}]}])
+  [entity-form {:entity       :group
+                :parent-field :group/_children
+                :parent-id    group-id
+                :id           subgroup-id
+                :fields       [{:label     "Name"
+                                :required? true
+                                :field-key :group/name}]}])
 
 (defn- manage-subgroup [group-id]
   (let [subgroup (rf/subscribe [:state :subgroup])]
@@ -33,21 +33,22 @@
     [simple-table
      [:group/name]
      (sort-by :group/order @subgroups)
-     {:on-select #(rf/dispatch [:state/set-state :subgroup (:db/id %)])
-      :on-delete #(when (js/confirm (str "Are you sure you want to delete the subgroup " (:group/name %) "?"))
-                    (rf/dispatch [:api/delete-entity %]))
+     {:on-select   #(rf/dispatch [:state/set-state :subgroup (:db/id %)])
+      :on-delete   #(when (js/confirm (str "Are you sure you want to delete the subgroup " (:group/name %) "?"))
+                      (rf/dispatch [:api/delete-entity %]))
       :on-increase #(rf/dispatch [:api/reorder % @subgroups :group/order :inc])
       :on-decrease #(rf/dispatch [:api/reorder % @subgroups :group/order :dec])}]))
 
 (defn- variables-table [group-id]
   (let [group-variables (rf/subscribe [:group/variables group-id])]
     [simple-table
-     [:variable/name]
+     [:variable/name :variable/domain-uuid]
      (sort-by :group-variable/order @group-variables)
      {:on-delete   #(when (js/confirm (str "Are you sure you want to delete the variable " (:variable/name %) "?"))
                       (rf/dispatch [:api/delete-entity %]))
       :on-increase #(rf/dispatch [:api/reorder % @group-variables :group-variable/order :inc])
-      :on-decrease #(rf/dispatch [:api/reorder % @group-variables :group-variable/order :dec])}]))
+      :on-decrease #(rf/dispatch [:api/reorder % @group-variables :group-variable/order :dec])
+      :on-select   #(rf/dispatch [:subgroups/edit-variables (:db/id (first (:variable/_group-variables %)))])}]))
 
 (defn- add-variable [group-id]
   (let [translation-key  (rf/subscribe [:entity-attr group-id :group/translation-key])

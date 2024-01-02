@@ -919,6 +919,20 @@ body {
 /* -- End Tool -- */
 
 
+/* -- Settings View -- */
+
+.settings__general-units .input-dropdown {
+  display: inline;
+}
+
+
+.settings__general-units .input-number__input {
+  width: 40px;
+}
+
+/* -- End View -- */
+
+
 /* -- Print View -- */
 
 .print__ws-name {
@@ -989,3 +1003,8 @@ body {
 }
 
 /* -- End Print View -- */
+
+.result-matrix-cell-value {
+  display: flex;
+  flex-direction: row;
+}

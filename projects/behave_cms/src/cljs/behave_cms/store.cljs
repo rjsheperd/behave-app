@@ -1,15 +1,16 @@
 (ns behave-cms.store
   (:require [clojure.set                       :refer [union]]
+            [clojure.edn                       :as edn]
             [ajax.core                         :refer [ajax-request]]
             [ajax.edn                          :refer [edn-request-format
-                                                edn-response-format]]
+                                                      edn-response-format]]
             [ajax.protocols                    :as pr]
             [datascript.core                   :as d]
             [re-frame.core                     :as rf]
             [re-posh.core                      :as rp]
             [behave.datom-compressor.interface :as c]
             [behave.ds-schema-utils.interface  :refer [->ds-schema]]
-            [behave.datom-utils.interface      :refer [split-datom]]
+            [behave.datom-utils.interface      :refer [safe-deref split-datom]]
             [behave.schema.core                :refer [all-schemas]]
             [behave-cms.config                 :refer [get-config]]
             [austinbirch.reactive-entity       :as re]))
@@ -105,3 +106,6 @@
  :ds/transact
  (fn [_ [_ tx-data]]
    (first tx-data)))
+
+(defn entity-from-uuid [db uuid]
+  (d/entity (safe-deref db) [:bp/uuid uuid]))
