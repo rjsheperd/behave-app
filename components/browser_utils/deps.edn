@@ -1,3 +1,10 @@
-{:paths ["src" "resources"]
- :deps {}
- :aliases {:test {:extra-paths ["test"]}}}
+{:paths   ["src" "resources"]
+ :deps    {}
+ :aliases {:test {:extra-paths ["test"]
+                  :extra-deps  {lambdaisland/kaocha            {:mvn/version "1.87.1366"}
+                                com.lambdaisland/kaocha-cljs   {:mvn/version "1.5.154"}
+                                polylith-kaocha/kaocha-wrapper {:git/url   "https://github.com/imrekoszo/polylith-kaocha"
+                                                                :git/tag   "v0.8.2"
+                                                                :git/sha   "d1fcd40"
+                                                                :deps/root "projects/kaocha-wrapper"}}
+                  :main-opts   ["-m" "kaocha.runner"]}}}
