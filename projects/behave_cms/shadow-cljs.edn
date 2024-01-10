@@ -1,4 +1,7 @@
-{:source-paths ["src/cljs" "test/cljs"]
+{:deps         true
+ :dependencies [[cider/cider-nrepl "0.44.0"]]
+ :source-paths ["src/cljs" "test/cljs"]
+ :nrepl        {:middleware [cider.nrepl/cider-middleware]}
  :dev-http     {8080 "public"
                 8021 "out/test"}
  :builds
@@ -8,7 +11,11 @@
    :asset-path "/cljs"
    :modules
    {:app
-    {:init-fn behave-cms.client/init}}}
+    {:init-fn behave-cms.client/init
+     :devtools {:repl-pprint true}
+     :dev-http
+     {8000 {:root "resources/public"
+            :proxy-url "http://localhost:8003"}}}}}
 
   :test {:target    :karma
          :output-to "out/karma-tests.js"

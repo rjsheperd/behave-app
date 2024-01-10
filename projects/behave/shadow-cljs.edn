@@ -1,15 +1,22 @@
-{:source-paths ["src/cljs" "test/cljs"]
+{:deps         true
+ :source-paths ["src/cljs" "test/cljs"]
  :dependencies [[cljsjs/vega "5.20.2-0"]
-                [cljsjs/vega-lite  "5.1.1-0"]]
- :dev-http {8000 "resources/public"}
+                [cljsjs/vega-lite  "5.1.1-0"]
+                [cider/cider-nrepl "0.44.0"]];; mandatory (unless it's inherited from deps.edn or otherwise present in the classpath of shadow-cljs's JVM process)
+ :nrepl        {:middleware [cider.nrepl/cider-middleware]}
+ :dev-http     {8000 "resources/public"}
  :builds
  {:app
-  {:target :browser
+  {:target     :browser
    :output-dir "resources/public/cljs"
    :asset-path "/cljs"
    :modules
    {:app
-    {:init-fn    behave.client/init}}}
+    {:init-fn  behave.client/init
+     :devtools {:repl-pprint true}
+     :dev-http
+     {8000 {:root "resources/public"
+            :proxy-url "http://localhost:8003"}}}}}
 
   :test {:target    :karma
          :output-to "out/karma-tests.js"
