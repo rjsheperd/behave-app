@@ -6,23 +6,7 @@
                         :auto-add false}
  :tag-patterns         {:stable  "stable-*"
                         :release "v[0-9]*"}
- :test                 {:create-test-runner [:default polylith-kaocha.test-runner/create]}
+ :test                 {:create-test-runner polylith-kaocha.test-runner/create}
  :projects             {"development" {:alias "dev"}
-                        "app"         {:alias "behave/app"
-                                       :test  {:polylith-kaocha/config-resource                    "tests.edn"
-                                               :polylith-kaocha.kaocha-wrapper/post-load-config    polylith-kaocha.example.hooks/post-load-config
-                                               :polylith-kaocha.kaocha-wrapper/post-enhance-config polylith-kaocha.example.hooks/post-enhance-config
-                                               :polylith-kaocha/tests-present?                     polylith-kaocha.example.hooks/tests-present?
-                                               :polylith-kaocha/run-tests                          polylith-kaocha.example.hooks/run-tests
-
-                                               ;; must be available on the poly tool's classpath
-                                               :polylith-kaocha/runner-opts->kaocha-poly-opts polylith-kaocha.hooks/runner-opts->kaocha-poly-opts}}
-                        "cms"         {:alias "behave/cms"
-                                       :test  {:polylith-kaocha/config-resource                    "tests.edn"
-                                               :polylith-kaocha.kaocha-wrapper/post-load-config    polylith-kaocha.example.hooks/post-load-config
-                                               :polylith-kaocha.kaocha-wrapper/post-enhance-config polylith-kaocha.example.hooks/post-enhance-config
-                                               :polylith-kaocha/tests-present?                     polylith-kaocha.example.hooks/tests-present?
-                                               :polylith-kaocha/run-tests                          polylith-kaocha.example.hooks/run-tests
-
-                                               ;; must be available on the poly tool's classpath
-                                               :polylith-kaocha/runner-opts->kaocha-poly-opts polylith-kaocha.hooks/runner-opts->kaocha-poly-opts}}}}
+                        "app"         {:alias "behave/app"}
+                        "cms"         {:alias "behave/cms"}}}
