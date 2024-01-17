@@ -20,7 +20,8 @@
                                                independent-worksheet-page]]
             [behave.events]
             [behave.subs]
-            [day8.re-frame.http-fx]))
+            [day8.re-frame.http-fx]
+            ["@sentry/browser" :as sentry]))
 
 (def ^:private CANCEL-TIMEOUT-MS 4000)
 
@@ -105,6 +106,22 @@
     (rf/dispatch-sync [:initialize])
     (rf/dispatch-sync [:navigate (-> js/window .-location .-pathname)])
     (.addEventListener js/window "popstate" #(rf/dispatch [:popstate %]))
+    (.init sentry (clj->js {:dsn          (get-in params [:sentry :dsn])
+                            :release      (get-in params [:sentry :release]),
+                            :integrations [(sentry/BrowserTracing.)]
+
+                            ;; Set tracesSampleRate to 1.0 to capture 100%
+                            ;; of transactions for performance monitoring.
+                            ;; We recommend adjusting this value in production
+                            :tracesSampleRate 1.0
+
+                            ;; Set `tracePropagationTargets` to control for which URLs distributed tracing should be enabled
+                            :tracePropagationTargets ["localhost"]
+
+                            ;; Capture Replay for 10% of all sessions,
+                            ;; plus for 100% of sessions with an error
+                            :replaysSessionSampleRate 0.1,
+                            :replaysOnErrorSampleRate 1.0}))
     (load-translations!)
     (load-vms!)
     (load-store!)
