@@ -5,7 +5,7 @@ module.exports = function(config) {
     basePath: 'out',
     files: ['karma-tests.js'],
     frameworks: ['cljs-test'],
-      plugins: ['karma-cljs-test', 'karma-chrome-launcher', 'karma-junit-reporter'],
+    plugins: ['karma-cljs-test', 'karma-chrome-launcher', 'karma-junit-reporter'],
     colors: true,
     logLevel: config.LOG_INFO,
     singleRun: true,
@@ -15,7 +15,7 @@ module.exports = function(config) {
     reporters: ['progress', 'junit'],
     // the default configuration
     junitReporter: {
-      outputDir: '', // results will be saved as $outputDir/$browserName.xml
+      outputDir: 'target', // results will be saved as $outputDir/$browserName.xml
       outputFile: 'results.xml', // if included, results will be saved as $outputDir/$browserName/$outputFile
       suite: '', // suite will become the package name attribute in xml testsuite element
       useBrowserName: true, // add browser name to report and classes names

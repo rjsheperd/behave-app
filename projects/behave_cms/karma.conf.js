@@ -5,10 +5,24 @@ module.exports = function(config) {
     basePath: 'out',
     files: ['karma-tests.js'],
     frameworks: ['cljs-test'],
-    plugins: ['karma-cljs-test', 'karma-chrome-launcher'],
+      plugins: ['karma-cljs-test', 'karma-chrome-launcher', 'karma-junit-reporter'],
     colors: true,
     logLevel: config.LOG_INFO,
-    // FIXME: do we need this?
-    client: {args: ["shadow.test.karma.init"], singleRun: true}
+    singleRun: true,
+    client: {args: ["shadow.test.karma.init"], singleRun: true},
+
+    // JUnit Report
+    reporters: ['progress', 'junit'],
+    // the default configuration
+    junitReporter: {
+      outputDir: '', // results will be saved as $outputDir/$browserName.xml
+      outputFile: 'results.xml', // if included, results will be saved as $outputDir/$browserName/$outputFile
+      suite: '', // suite will become the package name attribute in xml testsuite element
+      useBrowserName: true, // add browser name to report and classes names
+      // nameFormatter: undefined, // function (browser, result) to customize the name attribute in xml testcase element
+      // classNameFormatter: undefined, // function (browser, result) to customize the classname attribute in xml testcase element
+      properties: {}, // key value pair of properties to add to the <properties> section of the report
+      xmlVersion: 1 // use '1' if reporting to be per SonarQube 6.2 XML format
+    }
   })
 };

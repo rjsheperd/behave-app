@@ -4,13 +4,12 @@ stages:
 
 build-cms:
   stage: build
-  image: clojure:temurin-11-tools-deps-alpine
+  image: rjsheperd/clojure-bb-bun:latest
   script:
-    ## Build the Behave CMS
     - cd projects/behave_cms
-    - clojure -M:compile-cljs
-    # - clojure -T:build org.corfield.build/uber :lib sig-gis/behave-cms :main behave-cms.server
-    - clojure -X triangulum.packaging/build-uberjar :app-name behave-cms :main-ns behave-cms.server
+    - bun install --production
+    - bb build-js
+    - bb uber
 
   artifacts:
     paths:
@@ -18,11 +17,12 @@ build-cms:
 
 build-app:
   stage: build
-  image: temurin-11-tools-deps-alpine
+  image: rjsheperd/clojure-bb-bun:latest
   script:
-    - cd projects/behave
-    - clojure -M:compile-cljs
-    - clojure -T:build org.corfield.build/uber :lib sig-gis/behave :main behave.core
+    - cd projects/behave_cms
+    - bun install --production
+    - bb build-js
+    - bb uber
   artifacts:
     paths:
       - "projects/behave/target/*.jar"

@@ -15,7 +15,7 @@
               (let [npx (if -bunx? "bunx" "npx")]
                 (shell (str npx " karma start"))))}
   build-js (clojure "-M:shadow-cljs release app")
-  uber     (clojure "-M:build-uberjar")
+  uber     (clojure "-X:build-uberjar")
   pull     (shell "git pull")
   restart  (do
              (run 'stop)
