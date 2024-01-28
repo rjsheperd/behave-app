@@ -139,7 +139,8 @@
 
   :poly
   {:extra-deps
-   {polylith/clj-poly {:mvn/version "0.2.17-alpha"}
+   {polylith/clj-poly
+    {:mvn/version "0.2.18"}
     polylith-kaocha.components/util
     {:git/url   "https://github.com/imrekoszo/polylith-kaocha"
      :git/tag   "v0.8.2"
