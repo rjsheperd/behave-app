@@ -11,7 +11,7 @@ test-cms:
     - bun install
     - bb test
 
-test-cms:
+test-app:
   stage: build
   image: rjsheperd/clojure-bb-bun-chrome:latest
   script:
@@ -22,6 +22,7 @@ test-cms:
 build-cms:
   stage: build
   image: rjsheperd/clojure-bb-bun:latest
+  needs: ["test-cms"]
   script:
     - cd projects/behave_cms
     - bun install --production
@@ -35,6 +36,7 @@ build-cms:
 build-app:
   stage: build
   image: rjsheperd/clojure-bb-bun:latest
+  needs: ["test-app"]
   script:
     - cd projects/behave
     - bun install --production
