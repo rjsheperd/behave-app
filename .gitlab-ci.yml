@@ -19,7 +19,7 @@ build-app:
   stage: build
   image: rjsheperd/clojure-bb-bun:latest
   script:
-    - cd projects/behave_cms
+    - cd projects/behave
     - bun install --production
     - bb build-js
     - bb uber
