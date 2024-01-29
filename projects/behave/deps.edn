@@ -55,6 +55,7 @@
              sig/string-utils              {:local/root "../../components/string_utils"}
              sig/transport                 {:local/root "../../components/transport"}
              sig/datom-compressor          {:local/root "../../components/datom_compressor"}
+             sig/test-resources            {:local/root "../../components/test-resources"}
 
              ;; Bases
              sig/behave-components         {:local/root "../../bases/behave_components" :exclusions [org.clojure/clojurescript
@@ -90,7 +91,8 @@
                                              thheller/shadow-cljs   {:mvn/version "2.26.0"}}
                                 :main-opts  ["-m" "shadow.cljs.devtools.cli"]}
              :test             {:extra-paths ["test/cljs" "test/resources"]
-                                :extra-deps {polylith-kaocha/kaocha-wrapper
+                                :extra-deps {lambdaisland/kaocha-junit-xml {:mvn/version "1.17.101"}
+                                             polylith-kaocha/kaocha-wrapper
                                              {:git/url   "https://github.com/imrekoszo/polylith-kaocha"
                                               :git/tag   "v0.8.2"
                                               :git/sha   "d1fcd40"

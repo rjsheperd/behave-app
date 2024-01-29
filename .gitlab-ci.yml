@@ -3,23 +3,49 @@ stages:
   - build
   - deploy
 
+test-poly:
+  stage: test
+  image: clojure:latest
+  script:
+    - clojure -M:poly test
+  artifacts:
+    when: always
+    paths:
+      - "target/junit.xml"
+    reports:
+      - "target/junit.xml"
+
 test-cms:
-  stage: build
+  stage: test
   image: rjsheperd/clojure-bb-bun-chrome:latest
+  needs: ["test-poly"]
   script:
     - cd projects/behave_cms
     - bun add --global phantomjs
     - bun install
     - bb test
+  artifacts:
+    when: always
+    paths:
+      - "projects/behave_cms/target/results.xml"
+    paths:
+      - "projects/behave_cms/target/results.xml"
 
 test-app:
-  stage: build
+  stage: test
   image: rjsheperd/clojure-bb-bun-chrome:latest
+  needs: ["test-poly"]
   script:
     - cd projects/behave
     - bun add --global phantomjs
     - bun install
     - bb test
+  artifacts:
+    when: always
+    paths:
+      - "projects/behave/target/results.xml"
+    paths:
+      - "projects/behave/target/results.xml"
 
 build-cms:
   stage: build
@@ -30,7 +56,6 @@ build-cms:
     - bun install --production
     - bb build-js
     - bb uber
-
   artifacts:
     paths:
       - "projects/behave_cms/target/*.jar"

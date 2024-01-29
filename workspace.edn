@@ -1,12 +1,13 @@
-{:top-namespace        "behave"
+;; https://github.com/polyfy/polylith/blob/master/doc/ws.md#settings
+{:vcs                  {:name "git" :auto-add false}
+ :top-namespace        "behave"
  :interface-ns         "interface"
  :default-profile-name "default"
  :compact-views        #{}
- :vcs                  {:name     "git"
-                        :auto-add false}
  :tag-patterns         {:stable  "stable-*"
                         :release "v[0-9]*"}
- :test                 {:create-test-runner polylith-kaocha.test-runner/create}
+ :test                 {:create-test-runner polylith-kaocha.test-runner/create
+                        :polylith-kaocha/config-resource "tests.edn"}
  :projects             {"development" {:alias "dev"}
-                        "app"         {:alias "behave/app"}
-                        "cms"         {:alias "behave/cms"}}}
+                        "behave"      {:alias "app"}
+                        "behave_cms"  {:alias "cms"}}}
