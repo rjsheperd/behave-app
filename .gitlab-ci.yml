@@ -24,6 +24,8 @@ test-cms:
     - bun add --global phantomjs
     - bun install
     - bb test
+    - ls target
+    - ls target/ChromeHeadlessNoSandbox/
   artifacts:
     when: always
     paths:
@@ -40,6 +42,8 @@ test-app:
     - bun add --global phantomjs
     - bun install
     - bb test
+    - ls target
+    - ls target/ChromeHeadlessNoSandbox/
   artifacts:
     when: always
     paths:
