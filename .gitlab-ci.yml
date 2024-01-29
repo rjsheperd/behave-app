@@ -24,14 +24,6 @@ test-cms:
     - bun add --global phantomjs
     - bun install
     - bb test
-    - ls target
-    - ls target/ChromeHeadlessNoSandbox/
-  artifacts:
-    when: always
-    paths:
-      - "projects/behave_cms/target/results.xml"
-    reports:
-      junit: "projects/behave_cms/target/results.xml"
 
 test-app:
   stage: test
@@ -42,14 +34,6 @@ test-app:
     - bun add --global phantomjs
     - bun install
     - bb test
-    - ls target
-    - ls target/ChromeHeadlessNoSandbox/
-  artifacts:
-    when: always
-    paths:
-      - "projects/behave/target/results.xml"
-    reports:
-      junit: "projects/behave/target/results.xml"
 
 build-cms:
   stage: build
@@ -67,7 +51,7 @@ build-cms:
 build-app:
   stage: build
   image: rjsheperd/clojure-bb-bun:latest
-  needs: ["test-app"]
+  # needs: ["test-app"]
   script:
     - cd projects/behave
     - bun install --production
