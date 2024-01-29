@@ -8,7 +8,7 @@ test-cms:
   image: rjsheperd/clojure-bb-bun-chrome:latest
   script:
     - cd projects/behave_cms
-    - bun install --production
+    - bun install
     - bb test
 
 test-cms:
@@ -16,7 +16,7 @@ test-cms:
   image: rjsheperd/clojure-bb-bun-chrome:latest
   script:
     - cd projects/behave
-    - bun install --production
+    - bun install
     - bb test
 
 build-cms:
