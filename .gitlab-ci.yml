@@ -1,6 +1,23 @@
 stages:
+  - test
   - build
   - deploy
+
+test-cms:
+  stage: build
+  image: rjsheperd/clojure-bb-bun-chrome:latest
+  script:
+    - cd projects/behave_cms
+    - bun install --production
+    - bb test
+
+test-cms:
+  stage: build
+  image: rjsheperd/clojure-bb-bun-chrome:latest
+  script:
+    - cd projects/behave
+    - bun install --production
+    - bb test
 
 build-cms:
   stage: build
