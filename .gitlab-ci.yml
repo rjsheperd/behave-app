@@ -13,7 +13,7 @@ test-poly:
     paths:
       - "target/junit.xml"
     reports:
-      - "target/junit.xml"
+      junit: "target/junit.xml"
 
 test-cms:
   stage: test
@@ -28,8 +28,8 @@ test-cms:
     when: always
     paths:
       - "projects/behave_cms/target/results.xml"
-    paths:
-      - "projects/behave_cms/target/results.xml"
+    reports:
+      junit: "projects/behave_cms/target/results.xml"
 
 test-app:
   stage: test
@@ -44,8 +44,8 @@ test-app:
     when: always
     paths:
       - "projects/behave/target/results.xml"
-    paths:
-      - "projects/behave/target/results.xml"
+    reports:
+      junit: "projects/behave/target/results.xml"
 
 build-cms:
   stage: build
