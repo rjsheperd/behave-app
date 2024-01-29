@@ -8,6 +8,7 @@ test-cms:
   image: rjsheperd/clojure-bb-bun-chrome:latest
   script:
     - cd projects/behave_cms
+    - bun add --global phantomjs
     - bun install
     - bb test
 
@@ -16,6 +17,7 @@ test-app:
   image: rjsheperd/clojure-bb-bun-chrome:latest
   script:
     - cd projects/behave
+    - bun add --global phantomjs
     - bun install
     - bb test
 
