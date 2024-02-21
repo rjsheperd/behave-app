@@ -74,15 +74,15 @@ var ensureCache = {
   temps: [], // extra allocations
   needed: 0, // the total size we need next time
 
-  prepare: function() {
+  prepare() {
     if (ensureCache.needed) {
       // clear the temps
       for (var i = 0; i < ensureCache.temps.length; i++) {
-        Module['_free'](ensureCache.temps[i]);
+        Module['_webidl_free'](ensureCache.temps[i]);
       }
       ensureCache.temps.length = 0;
       // prepare to allocate a bigger buffer
-      Module['_free'](ensureCache.buffer);
+      Module['_webidl_free'](ensureCache.buffer);
       ensureCache.buffer = 0;
       ensureCache.size += ensureCache.needed;
       // clean up
@@ -90,12 +90,12 @@ var ensureCache = {
     }
     if (!ensureCache.buffer) { // happens first time, or when we need to grow
       ensureCache.size += 128; // heuristic, avoid many small grow events
-      ensureCache.buffer = Module['_malloc'](ensureCache.size);
+      ensureCache.buffer = Module['_webidl_malloc'](ensureCache.size);
       assert(ensureCache.buffer);
     }
     ensureCache.pos = 0;
   },
-  alloc: function(array, view) {
+  alloc(array, view) {
     assert(ensureCache.buffer);
     var bytes = view.BYTES_PER_ELEMENT;
     var len = array.length * bytes;
@@ -105,7 +105,7 @@ var ensureCache = {
       // we failed to allocate in the buffer, ensureCache time around :(
       assert(len > 0); // null terminator, at least
       ensureCache.needed += len;
-      ret = Module['_malloc'](len);
+      ret = Module['_webidl_malloc'](len);
       ensureCache.temps.push(ret);
     } else {
       // we can allocate in the buffer
@@ -114,7 +114,7 @@ var ensureCache = {
     }
     return ret;
   },
-  copy: function(array, view, offset) {
+  copy(array, view, offset) {
     offset >>>= 0;
     var bytes = view.BYTES_PER_ELEMENT;
     switch (bytes) {
@@ -4411,8 +4411,7 @@ WindSpeedUtility.prototype['windSpeedAtTwentyFeetFromTenMeter'] = WindSpeedUtili
 (function() {
   function setupEnums() {
     
-
-    // AreaUnits_AreaUnitsEnum
+// $AreaUnits_AreaUnitsEnum
 
     Module['SquareFeet'] = _emscripten_enum_AreaUnits_AreaUnitsEnum_SquareFeet();
 
@@ -4427,24 +4426,21 @@ WindSpeedUtility.prototype['windSpeedAtTwentyFeetFromTenMeter'] = WindSpeedUtili
     Module['SquareKilometers'] = _emscripten_enum_AreaUnits_AreaUnitsEnum_SquareKilometers();
 
     
-
-    // BasalAreaUnits_BasalAreaUnitsEnum
+// $BasalAreaUnits_BasalAreaUnitsEnum
 
     Module['SquareFeetPerAcre'] = _emscripten_enum_BasalAreaUnits_BasalAreaUnitsEnum_SquareFeetPerAcre();
 
     Module['SquareMetersPerHectare'] = _emscripten_enum_BasalAreaUnits_BasalAreaUnitsEnum_SquareMetersPerHectare();
 
     
-
-    // CuringLevelUnits_CuringLevelEnum
+// $CuringLevelUnits_CuringLevelEnum
 
     Module['Fraction'] = _emscripten_enum_CuringLevelUnits_CuringLevelEnum_Fraction();
 
     Module['Percent'] = _emscripten_enum_CuringLevelUnits_CuringLevelEnum_Percent();
 
     
-
-    // LengthUnits_LengthUnitsEnum
+// $LengthUnits_LengthUnitsEnum
 
     Module['Feet'] = _emscripten_enum_LengthUnits_LengthUnitsEnum_Feet();
 
@@ -4463,8 +4459,7 @@ WindSpeedUtility.prototype['windSpeedAtTwentyFeetFromTenMeter'] = WindSpeedUtili
     Module['Kilometers'] = _emscripten_enum_LengthUnits_LengthUnitsEnum_Kilometers();
 
     
-
-    // LoadingUnits_LoadingUnitsEnum
+// $LoadingUnits_LoadingUnitsEnum
 
     Module['PoundsPerSquareFoot'] = _emscripten_enum_LoadingUnits_LoadingUnitsEnum_PoundsPerSquareFoot();
 
@@ -4475,8 +4470,7 @@ WindSpeedUtility.prototype['windSpeedAtTwentyFeetFromTenMeter'] = WindSpeedUtili
     Module['KilogramsPerSquareMeter'] = _emscripten_enum_LoadingUnits_LoadingUnitsEnum_KilogramsPerSquareMeter();
 
     
-
-    // SurfaceAreaToVolumeUnits_SurfaceAreaToVolumeUnitsEnum
+// $SurfaceAreaToVolumeUnits_SurfaceAreaToVolumeUnitsEnum
 
     Module['SquareFeetOverCubicFeet'] = _emscripten_enum_SurfaceAreaToVolumeUnits_SurfaceAreaToVolumeUnitsEnum_SquareFeetOverCubicFeet();
 
@@ -4487,16 +4481,14 @@ WindSpeedUtility.prototype['windSpeedAtTwentyFeetFromTenMeter'] = WindSpeedUtili
     Module['SquareCentimetersOverCubicCentimeters'] = _emscripten_enum_SurfaceAreaToVolumeUnits_SurfaceAreaToVolumeUnitsEnum_SquareCentimetersOverCubicCentimeters();
 
     
-
-    // CoverUnits_CoverUnitsEnum
+// $CoverUnits_CoverUnitsEnum
 
     Module['Fraction'] = _emscripten_enum_CoverUnits_CoverUnitsEnum_Fraction();
 
     Module['Percent'] = _emscripten_enum_CoverUnits_CoverUnitsEnum_Percent();
 
     
-
-    // SpeedUnits_SpeedUnitsEnum
+// $SpeedUnits_SpeedUnitsEnum
 
     Module['FeetPerMinute'] = _emscripten_enum_SpeedUnits_SpeedUnitsEnum_FeetPerMinute();
 
@@ -4511,56 +4503,49 @@ WindSpeedUtility.prototype['windSpeedAtTwentyFeetFromTenMeter'] = WindSpeedUtili
     Module['KilometersPerHour'] = _emscripten_enum_SpeedUnits_SpeedUnitsEnum_KilometersPerHour();
 
     
-
-    // ProbabilityUnits_ProbabilityUnitsEnum
+// $ProbabilityUnits_ProbabilityUnitsEnum
 
     Module['Fraction'] = _emscripten_enum_ProbabilityUnits_ProbabilityUnitsEnum_Fraction();
 
     Module['Percent'] = _emscripten_enum_ProbabilityUnits_ProbabilityUnitsEnum_Percent();
 
     
-
-    // MoistureUnits_MoistureUnitsEnum
+// $MoistureUnits_MoistureUnitsEnum
 
     Module['Fraction'] = _emscripten_enum_MoistureUnits_MoistureUnitsEnum_Fraction();
 
     Module['Percent'] = _emscripten_enum_MoistureUnits_MoistureUnitsEnum_Percent();
 
     
-
-    // SlopeUnits_SlopeUnitsEnum
+// $SlopeUnits_SlopeUnitsEnum
 
     Module['Degrees'] = _emscripten_enum_SlopeUnits_SlopeUnitsEnum_Degrees();
 
     Module['Percent'] = _emscripten_enum_SlopeUnits_SlopeUnitsEnum_Percent();
 
     
-
-    // DensityUnits_DensityUnitsEnum
+// $DensityUnits_DensityUnitsEnum
 
     Module['PoundsPerCubicFoot'] = _emscripten_enum_DensityUnits_DensityUnitsEnum_PoundsPerCubicFoot();
 
     Module['KilogramsPerCubicMeter'] = _emscripten_enum_DensityUnits_DensityUnitsEnum_KilogramsPerCubicMeter();
 
     
-
-    // HeatOfCombustionUnits_HeatOfCombustionUnitsEnum
+// $HeatOfCombustionUnits_HeatOfCombustionUnitsEnum
 
     Module['BtusPerPound'] = _emscripten_enum_HeatOfCombustionUnits_HeatOfCombustionUnitsEnum_BtusPerPound();
 
     Module['KilojoulesPerKilogram'] = _emscripten_enum_HeatOfCombustionUnits_HeatOfCombustionUnitsEnum_KilojoulesPerKilogram();
 
     
-
-    // HeatSinkUnits_HeatSinkUnitsEnum
+// $HeatSinkUnits_HeatSinkUnitsEnum
 
     Module['BtusPerCubicFoot'] = _emscripten_enum_HeatSinkUnits_HeatSinkUnitsEnum_BtusPerCubicFoot();
 
     Module['KilojoulesPerCubicMeter'] = _emscripten_enum_HeatSinkUnits_HeatSinkUnitsEnum_KilojoulesPerCubicMeter();
 
     
-
-    // HeatPerUnitAreaUnits_HeatPerUnitAreaUnitsEnum
+// $HeatPerUnitAreaUnits_HeatPerUnitAreaUnitsEnum
 
     Module['BtusPerSquareFoot'] = _emscripten_enum_HeatPerUnitAreaUnits_HeatPerUnitAreaUnitsEnum_BtusPerSquareFoot();
 
@@ -4569,8 +4554,7 @@ WindSpeedUtility.prototype['windSpeedAtTwentyFeetFromTenMeter'] = WindSpeedUtili
     Module['KilowattSecondsPerSquareMeter'] = _emscripten_enum_HeatPerUnitAreaUnits_HeatPerUnitAreaUnitsEnum_KilowattSecondsPerSquareMeter();
 
     
-
-    // HeatSourceAndReactionIntensityUnits_HeatSourceAndReactionIntensityUnitsEnum
+// $HeatSourceAndReactionIntensityUnits_HeatSourceAndReactionIntensityUnitsEnum
 
     Module['BtusPerSquareFootPerMinute'] = _emscripten_enum_HeatSourceAndReactionIntensityUnits_HeatSourceAndReactionIntensityUnitsEnum_BtusPerSquareFootPerMinute();
 
@@ -4583,8 +4567,7 @@ WindSpeedUtility.prototype['windSpeedAtTwentyFeetFromTenMeter'] = WindSpeedUtili
     Module['KilowattsPerSquareMeter'] = _emscripten_enum_HeatSourceAndReactionIntensityUnits_HeatSourceAndReactionIntensityUnitsEnum_KilowattsPerSquareMeter();
 
     
-
-    // FirelineIntensityUnits_FirelineIntensityUnitsEnum
+// $FirelineIntensityUnits_FirelineIntensityUnitsEnum
 
     Module['BtusPerFootPerSecond'] = _emscripten_enum_FirelineIntensityUnits_FirelineIntensityUnitsEnum_BtusPerFootPerSecond();
 
@@ -4597,8 +4580,7 @@ WindSpeedUtility.prototype['windSpeedAtTwentyFeetFromTenMeter'] = WindSpeedUtili
     Module['KilowattsPerMeter'] = _emscripten_enum_FirelineIntensityUnits_FirelineIntensityUnitsEnum_KilowattsPerMeter();
 
     
-
-    // TemperatureUnits_TemperatureUnitsEnum
+// $TemperatureUnits_TemperatureUnitsEnum
 
     Module['Fahrenheit'] = _emscripten_enum_TemperatureUnits_TemperatureUnitsEnum_Fahrenheit();
 
@@ -4607,8 +4589,7 @@ WindSpeedUtility.prototype['windSpeedAtTwentyFeetFromTenMeter'] = WindSpeedUtili
     Module['Kelvin'] = _emscripten_enum_TemperatureUnits_TemperatureUnitsEnum_Kelvin();
 
     
-
-    // TimeUnits_TimeUnitsEnum
+// $TimeUnits_TimeUnitsEnum
 
     Module['Minutes'] = _emscripten_enum_TimeUnits_TimeUnitsEnum_Minutes();
 
@@ -4617,16 +4598,14 @@ WindSpeedUtility.prototype['windSpeedAtTwentyFeetFromTenMeter'] = WindSpeedUtili
     Module['Hours'] = _emscripten_enum_TimeUnits_TimeUnitsEnum_Hours();
 
     
-
-    // ContainTactic_ContainTacticEnum
+// $ContainTactic_ContainTacticEnum
 
     Module['HeadAttack'] = _emscripten_enum_ContainTactic_ContainTacticEnum_HeadAttack();
 
     Module['RearAttack'] = _emscripten_enum_ContainTactic_ContainTacticEnum_RearAttack();
 
     
-
-    // ContainStatus_ContainStatusEnum
+// $ContainStatus_ContainStatusEnum
 
     Module['Unreported'] = _emscripten_enum_ContainStatus_ContainStatusEnum_Unreported();
 
@@ -4647,8 +4626,7 @@ WindSpeedUtility.prototype['windSpeedAtTwentyFeetFromTenMeter'] = WindSpeedUtili
     Module['TimeLimitExceeded'] = _emscripten_enum_ContainStatus_ContainStatusEnum_TimeLimitExceeded();
 
     
-
-    // ContainFlank_ContainFlankEnum
+// $ContainFlank_ContainFlankEnum
 
     Module['LeftFlank'] = _emscripten_enum_ContainFlank_ContainFlankEnum_LeftFlank();
 
@@ -4659,8 +4637,7 @@ WindSpeedUtility.prototype['windSpeedAtTwentyFeetFromTenMeter'] = WindSpeedUtili
     Module['NeitherFlank'] = _emscripten_enum_ContainFlank_ContainFlankEnum_NeitherFlank();
 
     
-
-    // IgnitionFuelBedType_IgnitionFuelBedTypeEnum
+// $IgnitionFuelBedType_IgnitionFuelBedTypeEnum
 
     Module['PonderosaPineLitter'] = _emscripten_enum_IgnitionFuelBedType_IgnitionFuelBedTypeEnum_PonderosaPineLitter();
 
@@ -4679,8 +4656,7 @@ WindSpeedUtility.prototype['windSpeedAtTwentyFeetFromTenMeter'] = WindSpeedUtili
     Module['PeatMoss'] = _emscripten_enum_IgnitionFuelBedType_IgnitionFuelBedTypeEnum_PeatMoss();
 
     
-
-    // LightningCharge_LightningChargeEnum
+// $LightningCharge_LightningChargeEnum
 
     Module['Negative'] = _emscripten_enum_LightningCharge_LightningChargeEnum_Negative();
 
@@ -4689,16 +4665,14 @@ WindSpeedUtility.prototype['windSpeedAtTwentyFeetFromTenMeter'] = WindSpeedUtili
     Module['Unknown'] = _emscripten_enum_LightningCharge_LightningChargeEnum_Unknown();
 
     
-
-    // SpotDownWindCanopyMode_SpotDownWindCanopyModeEnum
+// $SpotDownWindCanopyMode_SpotDownWindCanopyModeEnum
 
     Module['CLOSED'] = _emscripten_enum_SpotDownWindCanopyMode_SpotDownWindCanopyModeEnum_CLOSED();
 
     Module['OPEN'] = _emscripten_enum_SpotDownWindCanopyMode_SpotDownWindCanopyModeEnum_OPEN();
 
     
-
-    // SpotTreeSpecies_SpotTreeSpeciesEnum
+// $SpotTreeSpecies_SpotTreeSpeciesEnum
 
     Module['ENGELMANN_SPRUCE'] = _emscripten_enum_SpotTreeSpecies_SpotTreeSpeciesEnum_ENGELMANN_SPRUCE();
 
@@ -4729,8 +4703,7 @@ WindSpeedUtility.prototype['windSpeedAtTwentyFeetFromTenMeter'] = WindSpeedUtili
     Module['LOBLOLLY_PINE'] = _emscripten_enum_SpotTreeSpecies_SpotTreeSpeciesEnum_LOBLOLLY_PINE();
 
     
-
-    // SpotFireLocation_SpotFireLocationEnum
+// $SpotFireLocation_SpotFireLocationEnum
 
     Module['MIDSLOPE_WINDWARD'] = _emscripten_enum_SpotFireLocation_SpotFireLocationEnum_MIDSLOPE_WINDWARD();
 
@@ -4741,16 +4714,14 @@ WindSpeedUtility.prototype['windSpeedAtTwentyFeetFromTenMeter'] = WindSpeedUtili
     Module['RIDGE_TOP'] = _emscripten_enum_SpotFireLocation_SpotFireLocationEnum_RIDGE_TOP();
 
     
-
-    // FuelLifeState_FuelLifeStateEnum
+// $FuelLifeState_FuelLifeStateEnum
 
     Module['Dead'] = _emscripten_enum_FuelLifeState_FuelLifeStateEnum_Dead();
 
     Module['Live'] = _emscripten_enum_FuelLifeState_FuelLifeStateEnum_Live();
 
     
-
-    // FuelConstantsEnum_FuelConstantsEnum
+// $FuelConstantsEnum_FuelConstantsEnum
 
     Module['MaxLifeStates'] = _emscripten_enum_FuelConstantsEnum_FuelConstantsEnum_MaxLifeStates();
 
@@ -4765,16 +4736,14 @@ WindSpeedUtility.prototype['windSpeedAtTwentyFeetFromTenMeter'] = WindSpeedUtili
     Module['MaxFuelModels'] = _emscripten_enum_FuelConstantsEnum_FuelConstantsEnum_MaxFuelModels();
 
     
-
-    // AspenFireSeverity_AspenFireSeverityEnum
+// $AspenFireSeverity_AspenFireSeverityEnum
 
     Module['Low'] = _emscripten_enum_AspenFireSeverity_AspenFireSeverityEnum_Low();
 
     Module['Moderate'] = _emscripten_enum_AspenFireSeverity_AspenFireSeverityEnum_Moderate();
 
     
-
-    // ChaparralFuelType_ChaparralFuelTypeEnum
+// $ChaparralFuelType_ChaparralFuelTypeEnum
 
     Module['NotSet'] = _emscripten_enum_ChaparralFuelType_ChaparralFuelTypeEnum_NotSet();
 
@@ -4783,16 +4752,14 @@ WindSpeedUtility.prototype['windSpeedAtTwentyFeetFromTenMeter'] = WindSpeedUtili
     Module['MixedBrush'] = _emscripten_enum_ChaparralFuelType_ChaparralFuelTypeEnum_MixedBrush();
 
     
-
-    // ChaparralFuelLoadInputMode_ChaparralFuelInputLoadModeEnum
+// $ChaparralFuelLoadInputMode_ChaparralFuelInputLoadModeEnum
 
     Module['DirectFuelLoad'] = _emscripten_enum_ChaparralFuelLoadInputMode_ChaparralFuelInputLoadModeEnum_DirectFuelLoad();
 
     Module['FuelLoadFromDepthAndChaparralType'] = _emscripten_enum_ChaparralFuelLoadInputMode_ChaparralFuelInputLoadModeEnum_FuelLoadFromDepthAndChaparralType();
 
     
-
-    // MoistureInputMode_MoistureInputModeEnum
+// $MoistureInputMode_MoistureInputModeEnum
 
     Module['BySizeClass'] = _emscripten_enum_MoistureInputMode_MoistureInputModeEnum_BySizeClass();
 
@@ -4805,8 +4772,7 @@ WindSpeedUtility.prototype['windSpeedAtTwentyFeetFromTenMeter'] = WindSpeedUtili
     Module['MoistureScenario'] = _emscripten_enum_MoistureInputMode_MoistureInputModeEnum_MoistureScenario();
 
     
-
-    // MoistureClassInput_MoistureClassInputEnum
+// $MoistureClassInput_MoistureClassInputEnum
 
     Module['OneHour'] = _emscripten_enum_MoistureClassInput_MoistureClassInputEnum_OneHour();
 
@@ -4823,16 +4789,14 @@ WindSpeedUtility.prototype['windSpeedAtTwentyFeetFromTenMeter'] = WindSpeedUtili
     Module['LiveAggregate'] = _emscripten_enum_MoistureClassInput_MoistureClassInputEnum_LiveAggregate();
 
     
-
-    // SurfaceFireSpreadDirectionMode_SurfaceFireSpreadDirectionModeEnum
+// $SurfaceFireSpreadDirectionMode_SurfaceFireSpreadDirectionModeEnum
 
     Module['FromIgnitionPoint'] = _emscripten_enum_SurfaceFireSpreadDirectionMode_SurfaceFireSpreadDirectionModeEnum_FromIgnitionPoint();
 
     Module['FromPerimeter'] = _emscripten_enum_SurfaceFireSpreadDirectionMode_SurfaceFireSpreadDirectionModeEnum_FromPerimeter();
 
     
-
-    // TwoFuelModelsMethod_TwoFuelModelsMethodEnum
+// $TwoFuelModelsMethod_TwoFuelModelsMethodEnum
 
     Module['NoMethod'] = _emscripten_enum_TwoFuelModelsMethod_TwoFuelModelsMethodEnum_NoMethod();
 
@@ -4843,16 +4807,14 @@ WindSpeedUtility.prototype['windSpeedAtTwentyFeetFromTenMeter'] = WindSpeedUtili
     Module['TwoDimensional'] = _emscripten_enum_TwoFuelModelsMethod_TwoFuelModelsMethodEnum_TwoDimensional();
 
     
-
-    // WindAdjustmentFactorShelterMethod_WindAdjustmentFactorShelterMethodEnum
+// $WindAdjustmentFactorShelterMethod_WindAdjustmentFactorShelterMethodEnum
 
     Module['Unsheltered'] = _emscripten_enum_WindAdjustmentFactorShelterMethod_WindAdjustmentFactorShelterMethodEnum_Unsheltered();
 
     Module['Sheltered'] = _emscripten_enum_WindAdjustmentFactorShelterMethod_WindAdjustmentFactorShelterMethodEnum_Sheltered();
 
     
-
-    // WindAdjustmentFactorCalculationMethod_WindAdjustmentFactorCalculationMethodEnum
+// $WindAdjustmentFactorCalculationMethod_WindAdjustmentFactorCalculationMethodEnum
 
     Module['UserInput'] = _emscripten_enum_WindAdjustmentFactorCalculationMethod_WindAdjustmentFactorCalculationMethodEnum_UserInput();
 
@@ -4861,16 +4823,14 @@ WindSpeedUtility.prototype['windSpeedAtTwentyFeetFromTenMeter'] = WindSpeedUtili
     Module['DontUseCrownRatio'] = _emscripten_enum_WindAdjustmentFactorCalculationMethod_WindAdjustmentFactorCalculationMethodEnum_DontUseCrownRatio();
 
     
-
-    // WindAndSpreadOrientationMode_WindAndSpreadOrientationModeEnum
+// $WindAndSpreadOrientationMode_WindAndSpreadOrientationModeEnum
 
     Module['RelativeToUpslope'] = _emscripten_enum_WindAndSpreadOrientationMode_WindAndSpreadOrientationModeEnum_RelativeToUpslope();
 
     Module['RelativeToNorth'] = _emscripten_enum_WindAndSpreadOrientationMode_WindAndSpreadOrientationModeEnum_RelativeToNorth();
 
     
-
-    // WindHeightInputMode_WindHeightInputModeEnum
+// $WindHeightInputMode_WindHeightInputModeEnum
 
     Module['DirectMidflame'] = _emscripten_enum_WindHeightInputMode_WindHeightInputModeEnum_DirectMidflame();
 
@@ -4879,24 +4839,21 @@ WindSpeedUtility.prototype['windSpeedAtTwentyFeetFromTenMeter'] = WindSpeedUtili
     Module['TenMeter'] = _emscripten_enum_WindHeightInputMode_WindHeightInputModeEnum_TenMeter();
 
     
-
-    // WindUpslopeAlignmentMode
+// $WindUpslopeAlignmentMode
 
     Module['NotAligned'] = _emscripten_enum_WindUpslopeAlignmentMode_NotAligned();
 
     Module['Aligned'] = _emscripten_enum_WindUpslopeAlignmentMode_Aligned();
 
     
-
-    // SurfaceRunInDirectionOf
+// $SurfaceRunInDirectionOf
 
     Module['MaxSpread'] = _emscripten_enum_SurfaceRunInDirectionOf_MaxSpread();
 
     Module['DirectionOfInterest'] = _emscripten_enum_SurfaceRunInDirectionOf_DirectionOfInterest();
 
     
-
-    // FireType_FireTypeEnum
+// $FireType_FireTypeEnum
 
     Module['Surface'] = _emscripten_enum_FireType_FireTypeEnum_Surface();
 
@@ -4907,8 +4864,7 @@ WindSpeedUtility.prototype['windSpeedAtTwentyFeetFromTenMeter'] = WindSpeedUtili
     Module['Crowning'] = _emscripten_enum_FireType_FireTypeEnum_Crowning();
 
     
-
-    // BeetleDamage
+// $BeetleDamage
 
     Module['not_set'] = _emscripten_enum_BeetleDamage_not_set();
 
@@ -4917,16 +4873,14 @@ WindSpeedUtility.prototype['windSpeedAtTwentyFeetFromTenMeter'] = WindSpeedUtili
     Module['yes'] = _emscripten_enum_BeetleDamage_yes();
 
     
-
-    // CrownFireCalculationMethod
+// $CrownFireCalculationMethod
 
     Module['rothermel'] = _emscripten_enum_CrownFireCalculationMethod_rothermel();
 
     Module['scott_and_reinhardt'] = _emscripten_enum_CrownFireCalculationMethod_scott_and_reinhardt();
 
     
-
-    // CrownDamageEquationCode
+// $CrownDamageEquationCode
 
     Module['not_set'] = _emscripten_enum_CrownDamageEquationCode_not_set();
 
@@ -4953,8 +4907,7 @@ WindSpeedUtility.prototype['windSpeedAtTwentyFeetFromTenMeter'] = WindSpeedUtili
     Module['douglas_fir'] = _emscripten_enum_CrownDamageEquationCode_douglas_fir();
 
     
-
-    // CrownDamageType
+// $CrownDamageType
 
     Module['not_set'] = _emscripten_enum_CrownDamageType_not_set();
 
@@ -4965,8 +4918,7 @@ WindSpeedUtility.prototype['windSpeedAtTwentyFeetFromTenMeter'] = WindSpeedUtili
     Module['crown_kill'] = _emscripten_enum_CrownDamageType_crown_kill();
 
     
-
-    // EquationType
+// $EquationType
 
     Module['not_set'] = _emscripten_enum_EquationType_not_set();
 
@@ -4977,8 +4929,7 @@ WindSpeedUtility.prototype['windSpeedAtTwentyFeetFromTenMeter'] = WindSpeedUtili
     Module['crown_damage'] = _emscripten_enum_EquationType_crown_damage();
 
     
-
-    // FireSeverity
+// $FireSeverity
 
     Module['not_set'] = _emscripten_enum_FireSeverity_not_set();
 
@@ -4987,24 +4938,21 @@ WindSpeedUtility.prototype['windSpeedAtTwentyFeetFromTenMeter'] = WindSpeedUtili
     Module['low'] = _emscripten_enum_FireSeverity_low();
 
     
-
-    // FlameLengthOrScorchHeightSwitch
+// $FlameLengthOrScorchHeightSwitch
 
     Module['flame_length'] = _emscripten_enum_FlameLengthOrScorchHeightSwitch_flame_length();
 
     Module['scorch_height'] = _emscripten_enum_FlameLengthOrScorchHeightSwitch_scorch_height();
 
     
-
-    // MortalityRateUnits_MortalityRateUnitsEnum
+// $MortalityRateUnits_MortalityRateUnitsEnum
 
     Module['Fraction'] = _emscripten_enum_MortalityRateUnits_MortalityRateUnitsEnum_Fraction();
 
     Module['Percent'] = _emscripten_enum_MortalityRateUnits_MortalityRateUnitsEnum_Percent();
 
     
-
-    // RegionCode
+// $RegionCode
 
     Module['interior_west'] = _emscripten_enum_RegionCode_interior_west();
 
@@ -5015,8 +4963,7 @@ WindSpeedUtility.prototype['windSpeedAtTwentyFeetFromTenMeter'] = WindSpeedUtili
     Module['south_east'] = _emscripten_enum_RegionCode_south_east();
 
     
-
-    // RequiredFieldNames
+// $RequiredFieldNames
 
     Module['region'] = _emscripten_enum_RequiredFieldNames_region();
 
