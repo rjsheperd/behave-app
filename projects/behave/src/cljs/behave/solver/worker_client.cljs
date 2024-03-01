@@ -1,12 +1,24 @@
 (ns behave.solver.worker-client)
 
-(defn register-service-worker []
-  (if (.-serviceWorker js/navigator)
-    (-> (js/navigator.serviceWorker.register "/js-worker/service-worker.js")
-        (.then #(.log js/console (str "Service worker registered " %)) )
-        (.catch #(.log js/console (str "Service worker failed " %))))
-    (prn "service worker not supported")))
+(defonce worker (atom nil))
 
-(register-service-worker)
+(defn on-message [e]
+  (js/console.log e))
 
-(.log js/console "demo webworker")
+(defn post-message [m]
+  (.postMessage @worker m))
+
+(defn register-worker []
+  (if (.-Worker js/window)
+    (do 
+      (reset! worker (js/Worker. "/cljs-worker/worker.js"))
+      (.addEventListener @worker "message" on-message))
+    (prn "worker not supported")))
+
+(comment 
+  (register-worker)
+  @worker
+  (post-message "ping")
+  )
+
+

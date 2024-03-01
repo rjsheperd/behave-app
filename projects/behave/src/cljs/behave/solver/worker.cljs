@@ -1,3 +1,7 @@
 (ns behave.solver.worker)
 
-(.addEventListener js/self "install" (fn [event] (prn (str "service worker installed"))))
+(set!
+ (.-onmessage js/self) 
+ (fn [event]
+   (js/console.log event)
+   (.postMessage js/self "pong!")))
