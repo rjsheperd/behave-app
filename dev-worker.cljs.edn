@@ -1,0 +1,5 @@
+{:output-to     "resources/public/js-worker/service-worker.js"
+ :optimizations :whitespace
+ :pretty-print  true
+ :target        :webworker
+ :main          behave.solver.worker}
