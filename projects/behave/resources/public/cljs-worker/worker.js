@@ -39280,5 +39280,7 @@ goog.provide("behave.solver.worker");
 goog.require("cljs.core");
 self.onmessage = function(event) {
   console.log(event);
+  console.log(new Module.SIGContain());
   return self.postMessage("pong!");
 };
+importScripts("/js/behave-min.js");

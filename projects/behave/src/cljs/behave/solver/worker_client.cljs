@@ -20,5 +20,3 @@
   @worker
   (post-message "ping")
   )
-
-

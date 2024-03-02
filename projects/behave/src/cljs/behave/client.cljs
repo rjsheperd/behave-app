@@ -20,7 +20,8 @@
                                                independent-worksheet-page]]
             [behave.events]
             [behave.subs]
-            [day8.re-frame.http-fx]))
+            [day8.re-frame.http-fx]
+            [behave.solver.worker-client]))
 
 (def ^:private CANCEL-TIMEOUT-MS 4000)
 
