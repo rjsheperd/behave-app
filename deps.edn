@@ -63,9 +63,10 @@
 
                 ;; Clojure Common
                 bidi/bidi                      {:mvn/version "2.1.6"}
-                datascript/datascript          {:mvn/version "1.5.3"}
                 cljs-ajax/cljs-ajax            {:mvn/version "0.8.4"}
                 com.github.rosejn/msgpack-cljc {:mvn/version "2.0.359"}
+                datascript/datascript          {:mvn/version "1.5.3"}
+                nano-id/nano-id                {:mvn/version "1.1.0"}
                 sig-gis/triangulum             {:git/url "https://github.com/sig-gis/triangulum"
                                                 :sha     "3d41dab63e1bc8ebe046f64db44ae3df986f5bdf"}
 
@@ -85,7 +86,6 @@
                 cljsjs/vega-embed                  {:mvn/version "6.0.0-0"}
                 cljsjs/vega-lite                   {:mvn/version "5.1.1-0"}
                 day8.re-frame/test                 {:mvn/version "0.1.5"}
-                austinbirch/reactive-entity        {:mvn/version "0.2.0"}
 
                 ;; Behave CMS
                 applied-science/js-interop {:mvn/version "0.3.3"}
