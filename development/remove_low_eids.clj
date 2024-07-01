@@ -60,7 +60,8 @@
   "Given a map index of `{old-eid {:bp/nid ...}}`,
    create a tx that remaps `old-eid` to the new `:bp/nid`."
   [old-eid-idx [e a v]]
-  [:db/add e a [:bp/nid (get-in old-eid-idx [v :bp/nid])]])
+  (when-let [nid (get-in old-eid-idx [v :bp/nid])]
+    [:db/add e a [:bp/nid nid]]))
 
 ;;;; Queries
 
@@ -211,7 +212,10 @@
   (d/transact conn (vals old-eid-map))
 
   ;; Remap parents
-  (d/transact conn (map (partial remap-tx old-eid-map) parent-eav-refs)))
+  (->> parent-eav-refs
+       (filter (set (keys old-eid-map)))
+       (map (partial remap-tx old-eid-map))
+       (d/transact conn)))
 
 #_{:clj-kondo/ignore [:missing-docstring]}
 (do
@@ -223,9 +227,24 @@
   (def conn @ds/datomic-conn)
   (def db (d/db conn))
 
+  ;;;; Remove bad refs
+  (def bad-ref-eids
+    (->> (d/q '[:find [?v ...]
+                :in $ [?a ...]
+                :where [_ ?a ?v]]
+              db ref-attrs)
+         (d/pull-many db '[*])
+         (filter #(= 1 (count (keys %))))
+         (map :db/id)
+         (set)))
+
+  (d/transact conn (map remove-tx bad-ref-eids))
+
   ;;;; 1. Conditionals
-  (def db-1 db)
+
+  (def db-1 (d/db conn))
   (def cond-refs (q-refs-low-eids db-1 cond-ref-attrs))
+
   (def new-conds
     (old-eids->new-entities db-1
                             (map last cond-refs)
@@ -359,5 +378,4 @@
   (empty? (concat (q-high-refs-low-eids db-8 ref-attrs)
                   (q-low-refs-low-eids db-8 ref-attrs)
                   (q-low-eids db-8 all-attrs)))
-
   )
