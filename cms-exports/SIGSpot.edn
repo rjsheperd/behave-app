@@ -285,4 +285,25 @@
    {:type "double",
     :id "getRidgeToValleyElevation",
     :parameters
-    [{:id "elevationUnits", :type "LengthUnits::LengthUnitsEnum"}]}}}}
+    [{:id "elevationUnits", :type "LengthUnits::LengthUnitsEnum"}]}
+   :setWindSpeedAndWindHeightInputMode
+   {:type       "void",
+    :id         "setWindSpeedAndWindHeightInputMode",
+    :parameters [{:id   "windwindSpeed",
+                  :type "double"}
+                 {:id   "windSpeedUnits",
+                  :type "SpeedUnits::SpeedUnitsEnum"}
+                 {:id   "windHeightInputMode",
+                  :type "WindHeightInputMode_WindHeightInputModeEnum"}]},
+   :setWindSpeed
+   {:type       "void",
+    :id         "setWindSpeed",
+    :parameters [{:id   "windSpeed",
+                  :type "double"}
+                 {:id   "windSpeedUnits",
+                  :type "SpeedUnits::SpeedUnitsEnum"}]},
+   :setWindHeightInputMode
+   {:type       "void",
+    :id         "setWindHeightInputMode",
+    :parameters [{:id   "windHeightInputMode",
+                  :type "WindHeightInputMode::WindHeightInputModeEnum"}]}}}}
