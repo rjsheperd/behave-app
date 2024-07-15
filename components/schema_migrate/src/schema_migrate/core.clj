@@ -63,3 +63,32 @@
                        (map #(do [(if (:added %) :db/retract :db/add) (:e %) (:a %) (:v %)]))
                        reverse)] ; reverse order of inverted datoms.
       (ds/transact conn newdata))))
+
+(def ^{:doc "Generate random UUID as a string."}
+  rand-uuid (comp str d/squuid))
+
+(defn uuid->id
+  "Convert a UUID to an entity ID."
+  [db uuid]
+  (d/q '[:find ?e .
+         :in $ ?uuid
+         :where [?e :bp/uuid ?uuid]]
+       db uuid))
+
+(defn nid->id
+  "Convert a Nano-ID to an entity ID."
+  [db nid]
+  (d/q '[:find ?e .
+         :in $ ?nid
+         :where [?e :bp/nid ?nid]]
+       db nid))
+
+(defn nid->uuid
+  "Convert a Nano-ID to an entity's UUID."
+  [db nid]
+  (d/q '[:find ?uuid .
+         :in $ ?nid
+         :where
+         [?e :bp/nid ?nid]
+         [?e :bp/uuid ?uuid]]
+       db nid))
