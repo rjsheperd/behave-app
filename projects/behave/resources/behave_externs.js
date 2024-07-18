@@ -524,6 +524,7 @@ Module.SIGSpot = class {
   calculateSpottingDistanceFromSurfaceFire() {}
   calculateSpottingDistanceFromTorchingTrees() {}
   initializeMembers() {}
+  setActiveCrownFlameLength() {}
   setBurningPileFlameHeight() {}
   setDBH() {}
   setDownwindCanopyMode() {}
