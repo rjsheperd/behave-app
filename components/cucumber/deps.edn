@@ -1,3 +1,4 @@
-{:paths ["src" "resources"]
- :deps {}
- :aliases {:test {:extra-paths ["test"]}}}
+{:paths   ["src" "resources"]
+ :deps    {org.seleniumhq.selenium/selenium-java {:mvn/version "4.23.0"}}
+ :aliases {:cucumber {:main-opts ["-m" "cucumber.core"]}
+           :test     {:extra-paths ["test"]}}}

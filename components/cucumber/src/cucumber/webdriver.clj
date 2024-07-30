@@ -3,9 +3,11 @@
   (:import [org.openqa.selenium By WebDriver]
            [org.openqa.selenium.safari SafariDriver]
            [org.openqa.selenium.chrome ChromeDriver]
+           [org.openqa.selenium.chromium ChromiumDriver]
            [org.openqa.selenium.firefox FirefoxDriver]
-           ;;[org.openqa.selenium JavascriptExecutor]
-           [org.openqa.selenium.support.ui WebDriverWait ExpectedConditions]))
+           [org.openqa.selenium JavascriptExecutor]
+           [org.openqa.selenium.support.ui WebDriverWait ExpectedConditions]
+           [java.time Duration]))
 
 (defn goto
   "Navigate to url."
@@ -31,6 +33,19 @@
   "Wait for a given duration."
   [^WebDriver driver duration]
   (WebDriverWait. driver duration))
+
+(defn ready?
+  "Returns true if the document is ready."
+  [^JavascriptExecutor driver]
+  (= "complete" (.executeScript driver "return document.readyState" (into-array []))))
+
+(defn wait-until-page-load
+  "Waits until JS returns"
+  [^WebDriver driver timeout-ms]
+  (.until (WebDriverWait. driver (Duration/ofMillis timeout-ms))
+          (reify java.util.function.Function
+            (apply [_ web-driver]
+              (ready? web-driver)))))
 
 (defn delete-cookies
   "Deletes all cookies."
