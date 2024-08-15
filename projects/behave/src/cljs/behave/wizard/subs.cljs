@@ -231,7 +231,7 @@
                              [?gv :db/id [:bp/uuid ?gv-uuid]]
                              [?v :variable/group-variables ?gv]
                              [?v :variable/native-unit-uuid ?unit-uuid]
-                             [?u :db/id [:bp/uuid ?unit-uuid]]
+                             [?u :bp/uuid ?unit-uuid]
                              [?u :unit/short-code ?unit-short-code]]
                 gv-uuid])))
 
@@ -373,10 +373,7 @@
              ttype               :conditional/type
              op                  :conditional/operator
              values              :conditional/values}]
-           (let [{:keys [group-uuid io]} (-> (subscribe [:wizard/conditional-io+group-uuid
-                                                         group-variable-uuid])
-                                             deref
-                                             first)
+           (let [{:keys [group-uuid io]} (subscribe [:wizard/conditional-io+group-uuid group-variable-uuid])
                  conditional-values-set  (set values)
                  worksheet-value         (cond
                                            (= ttype :module)
