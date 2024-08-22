@@ -76,7 +76,7 @@
                    :icon-position "right"
                    :size          "small"
                    :flat-edge     "right"
-                   :on-click      #(dispatch [:state/update [:help-area :hidden?] (partial not)])}]]
+                   :on-click      #(dispatch [:help/toggle])}]]
        [:div
         {:class     ["help-area"
                      (when @(subscribe [:state [:sidebar :hidden?]]) "help-area--sidebar-hidden")]
@@ -92,7 +92,7 @@
          [:div.help-area__close
           [:div.container__close
            [c/button {:icon-name "close"
-                      :on-click  #(dispatch [:state/update [:help-area :hidden?] (partial not)])
+                      :on-click  #(dispatch [:help/toggle])
                       :size      "small"
                       :variant   "secondary"}]]]]
         (cond

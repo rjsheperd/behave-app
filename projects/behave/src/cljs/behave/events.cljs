@@ -1,5 +1,6 @@
 (ns behave.events
-  (:require [browser-utils.core :refer [add-script
+  (:require [clojure.string :as str]
+            [browser-utils.core :refer [add-script
                                         script-exist?
                                         scroll-top!
                                         set-local-storage!
@@ -160,6 +161,14 @@
  :browser/scroll-top
  (fn [_ _]
    (scroll-top!)))
+
+(rf/reg-event-fx
+ :browser/resize
+ (fn [_ _]
+   (let [url (.. js/window -location -href)]
+     (when (or (str/includes? url "input")
+               (str/includes? url "output"))
+       {:fx [[:dispatch [:wizard/recalculate-tabs]]]}))))
 
 ;;; Translations
 

@@ -173,3 +173,14 @@
 
 ;; Usage
 ;; (format-intl-number "en-US" 0.09393923 2) ; => 0.09
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Selectors
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn $ [q]
+  (.querySelector js/document q))
+
+(defn $$ [q]
+  (into [] (.from js/Array (.querySelectorAll js/document q))))

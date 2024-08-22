@@ -93,7 +93,8 @@
                 :on-click      #(dispatch [:wizard/toggle-show-notes])}]]))
 
 (defn- wizard-header [{:keys [ws-uuid io submodule module] :as params} modules]
-  (let [*show-notes? (subscribe [:wizard/show-notes?])]
+  (let [*show-notes?   (subscribe [:wizard/show-notes?])
+        *tab-overflow? (subscribe [:state [:wizard :tab-overflow?]])]
     [:div.wizard-header
      [io-tabs params]
      [:div.wizard-header__banner
@@ -104,6 +105,7 @@
       [:div.wizard-header__banner__notes-button
        (show-or-close-notes-button @*show-notes?)]]
      [:div.wizard-header__submodules
+      {:class [(when @*tab-overflow? "wizard-header__submodules--overflow")]}
       (for [m     modules
             :let  [submodules (if (= io :output)
                                 (->> @(subscribe [:wizard/submodules-io-output-only (:db/id m)])

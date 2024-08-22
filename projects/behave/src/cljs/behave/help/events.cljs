@@ -2,6 +2,13 @@
   (:require [re-frame.core :as rf]))
 
 (rf/reg-event-fx
+ :help/toggle
+ (fn [_]
+   {:fx
+    [[:dispatch [:wizard/recalculate-tabs]]
+     [:dispatch [:state/update [:help-area :hidden?] not]]]}))
+
+(rf/reg-event-fx
  :help/highlight-section
  (fn [_ [_ help-key]]
    {:fx                    [[:dispatch [:state/set :help-current-highlighted-key help-key]]]

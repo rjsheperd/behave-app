@@ -7,8 +7,16 @@
             [clojure.walk                  :refer [postwalk]]
             [datascript.core               :as d]
             [re-frame.core                 :as rf]
+            [browser-utils.core            :refer [$ $$]]
             [string-utils.interface        :refer [->str]]
             [vimsical.re-frame.cofx.inject :as inject]))
+
+;;; Helpers
+
+(defn- el-width [el]
+  (if el (.-clientWidth el) 0))
+
+;;; Events
 
 (rf/reg-event-fx
  :wizard/select-tab
@@ -21,6 +29,25 @@
                         :submodule submodule)]
      {:fx              [[:dispatch [:navigate path]]]
       :help/scroll-top nil})))
+
+(rf/reg-event-db
+ :wizard/recalculate-tabs
+ (rf/path :state)
+ (fn [db _]
+   ;; TODO: think of another method for calculating tab width
+   (let [$body             ($ "body")
+         $help-area        ($ ".help-area")
+         $sidebar          ($ ".sidebar-container")
+         $submodule-groups ($$ ".wizard-header__submodules__group")
+
+         tab-overflow?
+         (neg? (- (el-width $body)
+                  60
+                  (el-width $help-area)
+                  (el-width $sidebar)
+                  (apply + (map el-width $submodule-groups))))]
+
+     (assoc-in db [:wizard :tab-overflow?] tab-overflow?))))
 
 (rf/reg-event-fx
  :wizard/back

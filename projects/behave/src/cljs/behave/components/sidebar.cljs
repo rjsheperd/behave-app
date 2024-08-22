@@ -29,6 +29,10 @@
      ^{:key (:label module)}
      [sidebar-module module])])
 
+(defn- toggle! []
+  (rf/dispatch [:state/update [:sidebar :hidden?] not])
+  (rf/dispatch [:wizard/recalculate-tabs]))
+
 (defn sidebar
   "A component for displaying a sidebar with two sections. One for a a list of active modules, and another for settings."
   [{:keys [ws-uuid]}]
@@ -43,7 +47,7 @@
                   :icon-position "right"
                   :size          "large"
                   :flat-edge     "left"
-                  :on-click      #(rf/dispatch [:state/update [:sidebar :hidden?] (partial not)])}]]
+                  :on-click      toggle!}]]
       [:div.sidebar-container
        [sidebar-group {:title   @(<t (bp "modules"))
                        :modules (if @*sidebar-modules
@@ -95,6 +99,6 @@
        [:div.sidebar-close
         [:div.container__close
          [c/button {:icon-name "close"
-                    :on-click  #(rf/dispatch [:state/update [:sidebar :hidden?] (partial not)])
+                    :on-click  toggle!
                     :size      "small"
                     :variant   "secondary"}]]]])))

@@ -20,6 +20,7 @@
                                                independent-worksheet-page]]
             [behave.events]
             [behave.subs]
+            [browser-utils.interface :refer [debounce]]
             [day8.re-frame.http-fx]))
 
 (def ^:private CANCEL-TIMEOUT-MS 4000)
@@ -60,6 +61,9 @@
 (defn add-before-unload-event! [{:keys [mode]}]
   (when (= mode "prod")
     (.addEventListener js/window "beforeunload" before-unload-fn)))
+
+(defn add-on-resize-event! []
+  (.addEventListener js/window "resize" (debounce #(rf/dispatch [:browser/resize]) 1000)))
 
 (defn app-shell [params]
   (let [route              (rf/subscribe [:handler])
@@ -112,6 +116,7 @@
     (load-store!)
     (load-scripts! params)
     (add-before-unload-event! params)
+    (add-on-resize-event!)
     (render [app-shell params] (.getElementById js/document "app"))))
 
 (defn- ^:after-load mount-root!
