@@ -19,6 +19,74 @@ Feature: Surface Only Worksheets
       # - Wind and Slope > Wind measured at: @kenny this fails because Wind measured at: has a
       # - trailing space in the dom and (extract-submodule-groups) trims this.
 
+
+  # BHP1-977
+  Scenario: Fire Size > Fire Perimeter Output Selected
+    Given I have started a Surface Worksheet
+    When I select these outputs Submodule > Group > Output:
+      """
+      - Size > Surface - Fire Size > Fire Perimeter
+      """
+    Then the following input Submodule > Groups are displayed:
+      """
+      - Fuel Model > Standard > Fuel Model
+      - Fuel Moisture > Moisture Input Mode
+      - Wind and Slope > Wind Speed
+      - Wind and Slope > Wind and slope are
+      - Wind and Slope > Slope
+      - Size > Elapsed Time
+      """
+
+  # BHP1-977
+  Scenario: Fire Size > Fire Area Output Selected
+    Given I have started a Surface Worksheet
+    When I select these outputs Submodule > Group > Output:
+      """
+      - Size > Surface - Fire Size > Fire Area
+      """
+    Then the following input Submodule > Groups are displayed:
+      """
+      - Fuel Model > Standard > Fuel Model
+      - Fuel Moisture > Moisture Input Mode
+      - Wind and Slope > Wind Speed
+      - Wind and Slope > Wind and slope are
+      - Wind and Slope > Slope
+      - Size > Elapsed Time
+      """
+
+  # BHP1-977
+  Scenario: Fire Size > Spread Distance Output Selected
+    Given I have started a Surface Worksheet
+    When I select these outputs Submodule > Group > Output:
+      """
+      - Size > Surface - Fire Size > Spread Distance
+      """
+    Then the following input Submodule > Groups are displayed:
+      """
+      - Fuel Model > Standard > Fuel Model
+      - Fuel Moisture > Moisture Input Mode
+      - Wind and Slope > Wind Speed
+      - Wind and Slope > Wind and slope are
+      - Wind and Slope > Slope
+      - Size > Elapsed Time
+      """
+
+  # BHP1-978
+  Scenario: Fire Size > Length-to-Width Ratio Selected
+    Given I have started a Surface Worksheet
+    When I select these outputs Submodule > Group > Output:
+      """
+      - Size > Surface - Fire Size > Length-to-Width Ratio
+      """
+    Then the following input Submodule > Groups are displayed:
+      """
+      - Fuel Model > Standard > Fuel Model
+      - Fuel Moisture > Moisture Input Mode
+      - Wind and Slope > Wind Speed
+      - Wind and Slope > Wind and slope are
+      - Wind and Slope > Slope
+      """
+
 # Feature: Mortality Only
 #   Scenario: Mortality Only Test
 #     Given I have started a Mortality Worksheet
