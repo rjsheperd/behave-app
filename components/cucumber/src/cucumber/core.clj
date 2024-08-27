@@ -10,20 +10,24 @@
    :browsers #{"android" "chrome" "edge" "firefox" "ie" "ipad" "iphone" "opera" "safari"}})
 
 (def ^:private cli-options
-  [["-s" "--steps" "Path to steps directory."
+  [["-s" "--steps STEPS" "Path to steps directory."
     :id :steps
-    :validate #(-> (io/file %) (.exists))]
-   ["-f" "--features" "Path to features directory."
+    :validate [#(-> (io/file %) (.exists)) "Must be a directory that exists"]]
+   ["-f" "--features FEATURES" "Path to features directory."
     :id :features
-    :validate #(-> (io/file %) (.exists))]
+    :validate [#(-> (io/file %) (.exists)) "Must be a directory that exists"]]
    ["-b" "--browser BROWSER" "Browser to test, default: 'chrome'"
     :id :browser
     :default "chrome"
     :parse-fn #(s/lower-case %)
     :validate [#(contains? (:browsers valid-options) %) (str "Must be one of: " (:browsers valid-options))]]
-   [nil "--url" "URL to run the tests on."
+   [nil "--url URL" "URL to run the tests on."
     :id :url
-    :validate [#(string? %) "Must be a string"]]
+    :validate [string? "Must be a string"]]
+   ["-d" "--debug DEBUG" "Whether to run in debug mode."
+    :id :debug
+    :default false
+    :parse-fn boolean]
    [nil "--browser-path" "Path to the browser executable (e.g. '/usr/bin/google-chrome')"
     :id :browser-path]
    ["-r" "--remote" "Run using a remote driver"]
@@ -31,7 +35,7 @@
     :id :browser-version
     :default "88.0"
     :validate [string? "Must be a string"]]
-   ["-o" "--os OPERATING SYSTEM" "System to use in Remote Driver (-r), defaults to 'windows'"
+   [nil "--os OPERATING SYSTEM" "System to use in Remote Driver (-r), defaults to 'windows'"
     :id :os
     :default "Windows"
     :validate [#(contains? (:systems valid-options) %) (str "Must be one of: " (:systems valid-options))]]
@@ -69,11 +73,20 @@
 
 (defn- validate-args [args]
   (let [{:keys [options summary errors]} (parse-opts args cli-options)]
+
+    (println options summary errors)
     (cond
-      (:help options) {:exit-message (usage summary) :ok? true}
-      errors {:exit-message (error-msg errors)}
-      (< 0 (count options)) {:options options}
-      :else {:exit-message (usage summary)})))
+      (:help options)
+      {:exit-message (usage summary) :ok? true}
+
+      errors
+      {:exit-message (error-msg errors)}
+
+      (pos? (count options))
+      {:options options}
+
+      :else
+      {:exit-message (usage summary)})))
 
 (defn- exit [status msg]
   (println msg)
