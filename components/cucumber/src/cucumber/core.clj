@@ -25,23 +25,20 @@
     :id :url
     :validate [string? "Must be a string"]]
    ["-d" "--debug DEBUG" "Whether to run in debug mode."
-    :id :debug
+    :id :debug?
     :default false
     :parse-fn boolean]
    [nil "--browser-path" "Path to the browser executable (e.g. '/usr/bin/google-chrome')"
     :id :browser-path]
    ["-r" "--remote" "Run using a remote driver"]
-   [nil "--browser-version BROWSER VERSION" "Browser version to test in Remote Driver (-r), defaults to '88.0'"
+   [nil "--browser-version BROWSER VERSION" "Browser version to test in Remote Driver (-r)"
     :id :browser-version
-    :default "88.0"
     :validate [string? "Must be a string"]]
    [nil "--os OPERATING SYSTEM" "System to use in Remote Driver (-r), defaults to 'windows'"
     :id :os
-    :default "Windows"
     :validate [#(contains? (:systems valid-options) %) (str "Must be one of: " (:systems valid-options))]]
-   [nil "--os-version SYSTEM VERSION" "System Version to use in Remote Driver (-r), defaults to 10"
+   [nil "--os-version SYSTEM VERSION" "System Version to use in Remote Driver (-r)"
     :id :os-version
-    :default "10"
     :validate [#(string? %) "Must be a string"]]
    ["-t" "--test-name TEST NAME" "Browserstack test name to use in Remote Driver (-r)"
     :id :test-name
@@ -55,8 +52,7 @@
     :parse-fn #(or % (System/getenv "BS_API_KEY"))
     :validate [#(string? %) "Must be a string"]]
    ["-o" "--output-dir DIR" "Output directory for log files. When a directory is not provided, output will be to stdout."
-    :id :output
-    :default ""]
+    :id :output]
    ["-h" "--help"]])
 
 (defn- usage [options-summary]
@@ -74,7 +70,6 @@
 (defn- validate-args [args]
   (let [{:keys [options summary errors]} (parse-opts args cli-options)]
 
-    (println options summary errors)
     (cond
       (:help options)
       {:exit-message (usage summary) :ok? true}

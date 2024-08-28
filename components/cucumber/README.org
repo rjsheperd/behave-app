@@ -1,0 +1,115 @@
+#+TITLE: Cucumber Testing
+#+AUTHOR: RJ Sheperd
+
+* Purpose
+Enables to testing of applications following [[https://cucumber.io/docs/bdd/][Behavior-Driven
+Development]] patterns. Using the [[https://cucumber.io/docs/gherkin/reference/][Gherkin syntax]], features of a
+particular application are defined in a common language that clients
+and non-technical stakeholders can understand, while also providing
+developers a [[https://www.scrum.org/resources/what-definition-done]["definition of done"]] that removes ambiguity.
+
+
+* Setup
+
+** Prequisites
++ [[https://adoptium.net/temurin/releases/][OpenJDK (17+)]]
++ [[https://github.com/babashka/babashka#installation][Babashka]]
++ [[https://clojure.org/guides/install_clojure][Clojure]]
+
+** Install a Supported Browser
+
+*** [[https://www.google.com/chrome/][Chrome (Recommended)]]
+
+**** Mac
+#+BEGIN_SRC bash
+  brew install --cask google-chrome
+#+END_SRC
+
+*** [[https://www.mozilla.org/en-US/firefox/new/][Firefox]]
+
+https://www.google.com/chrome/
+
+**** Mac
+#+BEGIN_SRC bash
+  brew install --cask firefox
+#+END_SRC
+
+https://github.com/SeleniumHQ/selenium/wiki/ChromeDriver/01fde32d0ed245141e24151f83b7c2db31d596a4
+
+** Install the Webdriver
+
+*** Chrome (Recommended)
+
+1. Create a =~/tools= directory: =mkdir -p ~/tools=
+2. Download the latest Chromedriver for your OS here: https://googlechromelabs.github.io/chrome-for-testing/#stable
+3. Unzip to your =tools= directory: =mv chromedriver-*.zip ~/tools && unzip chromedriver-*.zip=
+4. Symlink chromedriver: =ln -s $HOME/tools/chromedriver-$OS-$AARCH/chromedriver /usr/local/bin/chromedriver=
+
+**** Mac
+#+BEGIN_SRC bash
+  brew install chromedriver
+#+END_SRC
+
+*** Firefox
+
+**** Mac
+#+BEGIN_SRC bash
+  brew install geckodriver
+#+END_SRC
+
+** Add Browser executable to your PATH
+
+*** Chrome
+
+**** Mac
+#+BEGIN_SRC bash
+ln -s /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome /usr/local/bin/chrome
+#+END_SRC
+
+
+* Running
+
+** CLI
+
+The command line interface to cucumber looks like:
+
+#+BEGIN_SRC 
+$ clj -M:cucumber
+  
+Runs automated BDD-style tests in the browser
+
+Usage: clj -M:cucumber [options]
+
+Options:
+  -s, --steps STEPS                              Path to steps directory.
+  -f, --features FEATURES                        Path to features directory.
+  -b, --browser BROWSER                  chrome  Browser to test, default: 'chrome'
+      --url URL                                  URL to run the tests on.
+  -d, --debug DEBUG                      false   Whether to run in debug mode.
+      --browser-path                             Path to the browser executable (e.g. '/usr/bin/google-chrome')
+  -r, --remote                                   Run using a remote driver
+      --browser-version BROWSER VERSION          Browser version to test in Remote Driver (-r)
+      --os OPERATING SYSTEM                      System to use in Remote Driver (-r), defaults to 'windows'
+      --os-version SYSTEM VERSION                System Version to use in Remote Driver (-r)
+  -t, --test-name TEST NAME                      Browserstack test name to use in Remote Driver (-r)
+  -u, --username USERNAME                        Browserstack Username to use in Remote Driver (-r), defaults to environment variable 'BS_USERNAME'
+  -p, --api-key API KEY                          Browserstack API Key to use in Remote Driver (-r), defaults to environment variable 'BS_API_KEY'
+  -o, --output-dir DIR                           Output directory for log files. When a directory is not provided, output will be to stdout.
+  -h, --help
+#+END_SRC
+
+** Aliases
+
+To ease testing on various environments for the Behave project, you
+can use the following =bb= aliases:
+
+#+BEGIN_SRC bash
+  # Local (http://localhost:8081/worksheets)
+  bb local
+
+  # Dev (http://behave-dev.sig-gis.com)
+  bb dev
+
+  # Prod (http://behave.sig-gis.com)
+  bb prod
+#+END_SRC

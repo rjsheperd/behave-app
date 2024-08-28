@@ -34,6 +34,7 @@
                                       native-unit-uuid  :variable/native-unit-uuid
                                       english-unit-uuid :variable/english-unit-uuid
                                       metric-unit-uuid  :variable/metric-unit-uuid
+                                      v-t-key           :group-variable/translation-key
                                       help-key          :group-variable/help-key}
                                      ws-uuid
                                      group-uuid
@@ -57,6 +58,7 @@
                         :label        (if repeat-group?
                                         @(rf/subscribe [:wizard/gv-uuid->default-variable-name gv-uuid])
                                         "Values:")
+                        :data-test    v-t-key
                         :placeholder  (when repeat-group? "Values")
                         :value-atom   value-atom
                         :required?    true
@@ -103,8 +105,9 @@
 
 (defmethod wizard-input :discrete [variable ws-uuid group-uuid repeat-id repeat-group?]
   (r/with-let [{gv-uuid  :bp/uuid
+                v-t-key  :group-variable/translation-key
                 help-key :group-variable/help-key
-                list     :variable/list} variable
+                v-list   :variable/list} variable
                selected                  (rf/subscribe [:worksheet/input-value ws-uuid group-uuid repeat-id gv-uuid])
                default-option            (rf/subscribe [:wizard/default-option ws-uuid gv-uuid])
                disabled-options          (rf/subscribe [:wizard/disabled-options ws-uuid gv-uuid])
@@ -112,7 +115,7 @@
                on-change                 #(upsert-input ws-uuid group-uuid repeat-id gv-uuid (input-value %))
                _                         (when (and (nil? @selected) @default-option)
                                            (upsert-input ws-uuid group-uuid repeat-id gv-uuid @default-option))
-               options                   (sort-by :list-option/order (filter #(not (:list-option/hide? %)) (:list/options list)))
+               options                   (sort-by :list-option/order (filter #(not (:list-option/hide? %)) (:list/options v-list)))
                num-options               (count options)
                ->option                  (fn [{value :list-option/value t-key :list-option/translation-key default? :list-option/default}]
                                            {:value     value
@@ -129,13 +132,15 @@
       :on-focus on-focus-click}
      (if (>= 4 num-options)
        [c/radio-group
-        {:id      (str repeat-id "-" gv-uuid)
-         :label   (when repeat-group? var-name)
-         :name    (->kebab var-name)
-         :options (doall (map ->option options))}]
+        {:id        (str repeat-id "-" gv-uuid)
+         :label     (when repeat-group? var-name)
+         :data-test v-t-key
+         :name      (->kebab var-name)
+         :options   (doall (map ->option options))}]
        [c/dropdown
         {:id        (str repeat-id "-" gv-uuid)
          :label     (when repeat-group? var-name)
+         :data-test v-t-key
          :on-change on-change
          :name      (->kebab var-name)
          :options   (concat [{:label "Select..." :value "nil"}]
@@ -144,6 +149,7 @@
 (defmethod wizard-input :multi-discrete [variable ws-uuid group-uuid repeat-id _repeat-group?]
   (r/with-let [{gv-uuid  :bp/uuid
                 llist    :variable/list
+                v-t-key  :group-variable/translation-key
                 help-key :group-variable/help-key} variable
                on-focus-click            (partial highlight-help-section help-key)
                options                   (sort-by :list-option/order
@@ -160,6 +166,7 @@
                                                t-key :list-option/translation-key}]
                                            {:value       value
                                             :label       @(<t t-key)
+                                            :data-test   t-key
                                             :on-select   on-select
                                             :on-deselect on-deselect
                                             :selected?   (contains? ws-input-values value)})]
@@ -168,9 +175,11 @@
       :on-focus on-focus-click}
      [c/multi-select-input
       {:input-label @(rf/subscribe [:wizard/gv-uuid->default-variable-name gv-uuid])
+       :data-test   v-t-key
        :options     (doall (map ->option options))}]]))
 
 (defmethod wizard-input :text [{gv-uuid  :bp/uuid
+                                v-t-key  :group-variable/translation-key
                                 help-key :group-variable/help-key}
                                ws-uuid
                                group-uuid
@@ -186,6 +195,7 @@
                     :label         (if repeat-group?
                                      @(rf/subscribe [:wizard/gv-uuid->default-variable-name gv-uuid])
                                      "Values:")
+                    :data-test     v-t-key
                     :placeholder   (when repeat-group? "Value")
                     :default-value (first @value)
                     :on-change     #(reset! value-atom (input-value %))

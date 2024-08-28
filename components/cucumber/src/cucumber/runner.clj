@@ -30,7 +30,6 @@
          (catch Exception e
            (println (format "Unable to load namespace: %s \n %s" step-file (.getMessage e)))))))))
 
-
 (defn run-cucumber-tests
   "Runs cucumber tests "
   [{:keys [features steps url debug?] :as opts}]
@@ -39,7 +38,6 @@
     (load-steps! (io/file steps)))
 
   (let [driver (get-driver opts)]
-    (println [:WEBDRIVER ]driver)
     (run (load-feature-files (io/file features))
       @registry
       {}

@@ -19,7 +19,7 @@
 (defn css-value
   "Get an element's CSS Value."
   [^WebElement e k]
-  (.getAttribute e k))
+  (.getCSSValue e k))
 
 (defn displayed?
   "Get whether element is displayed."

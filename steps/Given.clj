@@ -7,16 +7,15 @@
 
 (def ^:private worksheet-modules
   {[:surface]            "Surface Only"
-   [:surface :contain]   "Surface and Contain"
-   [:surface :crown]     "Surface and Crown"
-   [:surface :mortality] "Surface and Mortality"
+   [:surface :contain]   "Surface & Contain"
+   [:surface :crown]     "Surface & Crown"
+   [:surface :mortality] "Surface & Mortality"
    [:mortality]          "Mortality Only"})
 
 (defn- select-independent-worksheet
   [modules {:keys [driver url]}]
-  (w/maximize driver)
 
-  (if (= "https://behave-dev.sig-gis.com" (w/execute-script! driver "window.location.href"))
+  (if (= url (w/execute-script! driver "window.location.href"))
     (w/execute-script! driver "window.location.href = window.location.href")
     (w/goto driver url))
 

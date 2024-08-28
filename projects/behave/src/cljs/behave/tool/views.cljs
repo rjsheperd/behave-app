@@ -11,7 +11,8 @@
   "A Modal used for selecting a tool"
   []
   (let [tools @(rf/subscribe [:tool/all-tools])]
-    [c/modal {:title          "Select Tools"
+    [c/modal {:title          @(<t (bp "select_tools"))
+              :data-test      (bp "select_tools")
               :close-on-click #(rf/dispatch [:tool/close-tool-selector])
               :content        [c/card-group {:on-select      #(rf/dispatch [:tool/select-tool (:uuid %)])
                                              :flex-direction "column"
@@ -37,6 +38,7 @@
          native-unit-uuid  :variable/native-unit-uuid
          english-unit-uuid :variable/english-unit-uuid
          metric-unit-uuid  :variable/metric-unit-uuid
+         translation-key   :subtool-variable/translation-key
          help-key          :subtool-variable/help-key} variable
 
         *domain               (rf/subscribe [:vms/entity-from-uuid domain-uuid])
@@ -47,7 +49,8 @@
      [:div.tool-input__input
       {:on-mouse-over #(rf/dispatch [:help/highlight-section help-key])}
       [c/number-input {:id         sv-uuid
-                       :label      var-name
+                       :label      (or @(<t translation-key) var-name)
+                       :data-test  translation-key
                        :value-atom value-atom
                        :required?  true
                        :on-change  #(reset! value-atom (input-value %))
@@ -76,6 +79,7 @@
   [{:keys [variable tool-uuid subtool-uuid auto-compute?]}]
   (let [{sv-uuid  :bp/uuid
          var-name :variable/name
+         v-t-key  :subtool-variable/translation-key
          help-key :subtool-variable/help-key
          v-list   :variable/list} variable
         selected                  (rf/subscribe [:tool/input-value
@@ -110,13 +114,15 @@
      {:on-mouse-over #(rf/dispatch [:help/highlight-section help-key])}
      (if (< num-options 3)
        [c/radio-group
-        {:id      uuid
-         :label   var-name
-         :name    (->kebab var-name)
-         :options (doall (map ->option options))}]
+        {:id        uuid
+         :label     @(<t (bp v-t-key))
+         :data-test v-t-key
+         :name      (->kebab var-name)
+         :options   (doall (map ->option options))}]
        [c/dropdown
         {:id        uuid
-         :label     var-name
+         :label     @(<t (bp v-t-key))
+         :data-test v-t-key
          :on-change on-change
          :name      (->kebab var-name)
          :options   (concat [{:label "Select..." :value "nil"}]
@@ -130,6 +136,7 @@
     native-unit-uuid  :variable/native-unit-uuid
     english-unit-uuid :variable/english-unit-uuid
     metric-unit-uuid  :variable/metric-unit-uuid
+    v-t-key           :subtool-variable/translation-key
     help-key          :subtool-variable/help-key}
    tool-uuid
    subtool-uuid]
@@ -141,7 +148,8 @@
       {:on-mouse-over #(prn [:help/highlight-section help-key])}
       [c/text-input {:id        sv-uuid
                      :disabled? true
-                     :label     var-name
+                     :label     (or @(<t v-t-key) var-name)
+                     :data-test v-t-key
                      :value     (or @value "")}]]
      [unit-display
       domain-uuid

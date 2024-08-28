@@ -21,22 +21,26 @@
       (e/find-el (by/attr= :text submodule))
       (e/click!)))
 
-(defn- find-groups [driver groups]
-  (doseq [group groups]
-    (-> (e/find-el driver (by/css ".wizard-group__header"))
-        (e/find-el (by/attr= :text group)))))
+(defn- find-group [driver group]
+  (->> (e/find-els driver (by/css ".wizard-group__header"))
+       (filter #(= group (.getText %)))
+       (first)))
 
-(defn- select-output [driver output]
-  (-> (e/find-el driver (by/css ".wizard-group__outputs"))
-      (e/find-el (by/attr= :text output))
+(defn- select-output! [driver output]
+  (-> (e/find-el driver (by/xpath ".."))
+      (e/find-els (by/css ".wizard-group__outputs .input-checkbox__label"))
+      (->> (filter #(= output (.getText %))))
+      (first)
       (e/click!)))
 
 (defn- select-submodule-and-output [driver [submodule & groups]]
   (select-submodule driver submodule)
-  (let [wait (w/wait driver 5000)]
-    (.until wait (w/presence-of (by/css ".wizard"))))
-  (find-groups driver (butlast groups))
-  (select-output driver (last groups)))
+  (let [wait   (w/wait driver 5000)
+        output (last groups)
+        groups (butlast groups)]
+    (.until wait (w/presence-of (by/css ".wizard")))
+    (-> (find-group driver (first groups))
+          (select-output! output))))
 
 (defn- select-submodule-and-outputs
   [{:keys [driver]} submodule-groups]
@@ -54,10 +58,12 @@
     (require '[cucumber.runner :as r]
              '[cucumber.webdriver :as w])
 
-    (let [d r/driver-atom]
-      (select-submodule @d "Fire Behavior"))
+    (def d @r/driver-atom)
+    (def driver @r/driver-atom)
 
-    (let [d r/driver-atom]
-      (select-submodule-and-output
-       @d
-       ["Fire Behavior" "Direction Mode" "Heading"]))))
+    (select-submodule-and-output d ["Fire Behavior" "Fire Perimeter" "Fire Perimeter"])
+    (select-submodule-and-output d ["Size" "Fire Perimeter" "Fire Perimeter"])
+    (select-submodule-and-output d ["Size" "Fire Area" "Fire Area"])
+    (select-submodule-and-output d ["Size" "Spread Distance" "Spread Distance"])
+
+      ))
