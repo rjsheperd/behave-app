@@ -21,6 +21,8 @@ struct CrownTestInputs {
   SpeedUnits::SpeedUnitsEnum windSpeedUnits = SpeedUnits::MilesPerHour;
   double windDirection = 0.0;
   WindAndSpreadOrientationMode::WindAndSpreadOrientationModeEnum windAndSpreadOrientationMode = WindAndSpreadOrientationMode::RelativeToNorth;
+  double windAdjustmentFactor = 1.0;
+  WindAdjustmentFactorCalculationMethod::WindAdjustmentFactorCalculationMethodEnum windAdjustmentFactorCalculationMethod = WindAdjustmentFactorCalculationMethod::UserInput;
   double slope = 0.0;
   SlopeUnits::SlopeUnitsEnum slopeUnits = SlopeUnits::Percent;
   double aspect = 0.0;
@@ -36,9 +38,9 @@ struct CrownTestInputs {
 
 struct CrownTestOutputs {
   double lengthToWidthRatio = 0.00;
-  double crownFireSpreadRate = 0.00;
-  double crownFlameLength = 0.00;
-  double crownFirelineIntensity = 0.00;
+  double fireSpreadRate = 0.00;
+  double flameLength = 0.00;
+  double firelineIntensity = 0.00;
   int fireType = -1;
 };
 
@@ -109,6 +111,12 @@ int main(int argc, char * argv[])
     {"RelativeToNorth", WindAndSpreadOrientationMode::RelativeToNorth}
   };
 
+  std::map<std::string, WindAdjustmentFactorCalculationMethod::WindAdjustmentFactorCalculationMethodEnum> windAdjustmentFactorCalculationMethod{
+    {"UserInput", WindAdjustmentFactorCalculationMethod::UserInput},
+    {"UseCrownRatio", WindAdjustmentFactorCalculationMethod::UseCrownRatio},
+    {"DontUseCrownRatio", WindAdjustmentFactorCalculationMethod::DontUseCrownRatio}
+  };
+
   std::map<std::string, FireType::FireTypeEnum> fireType{
     {"Surface", FireType::Surface},
     {"Torching", FireType::Torching},
@@ -150,6 +158,8 @@ int main(int argc, char * argv[])
     crownInputs.windHeightInputMode = windHeightInputMode[stringRow["windHeightInputMode"]];
     crownInputs.windDirection = doubleRow["windDirection"];
     crownInputs.windAndSpreadOrientationMode = windAndSpreadOrientationMode[stringRow["windAndSpreadOrientationMode"]];
+    crownInputs.windAdjustmentFactor = doubleRow["windAdjFactor"];
+    crownInputs.windAdjustmentFactorCalculationMethod = windAdjustmentFactorCalculationMethod[stringRow["windAdjFactorCalcMethod"]];
     crownInputs.slope = doubleRow["slope"];
     crownInputs.slopeUnits = slopeUnits[stringRow["slopeUnits"]];
     crownInputs.aspect = doubleRow["aspect"];
@@ -164,9 +174,9 @@ int main(int argc, char * argv[])
 
     // Set up Outputs
     crownOutputs.lengthToWidthRatio = doubleRow["lengthToWidthRatio"];
-    crownOutputs.crownFireSpreadRate = doubleRow["crownFireSpreadRate"];
-    crownOutputs.crownFlameLength = doubleRow["crownFlameLength"];
-    crownOutputs.crownFirelineIntensity = doubleRow["crownFirelineIntensity"];
+    crownOutputs.fireSpreadRate = doubleRow["fireSpreadRate"];
+    crownOutputs.flameLength = doubleRow["flameLength"];
+    crownOutputs.firelineIntensity = doubleRow["firelineIntensity"];
     crownOutputs.fireType = fireType[stringRow["fireType"]];
 
     // Run test
@@ -199,7 +209,6 @@ void testCrownModule(int row, struct TestInfo& testInfo, CrownTestInputs& inputs
   int observedFireType = (int)FireType::Surface;
 
   // Set up inputs
-
   behaveRun.crown.updateCrownInputs(inputs.fuelModelNumber,
                                     inputs.moistureOneHour,
                                     inputs.moistureTenHour,
@@ -226,6 +235,10 @@ void testCrownModule(int row, struct TestInfo& testInfo, CrownTestInputs& inputs
                                     inputs.canopyBulkDensity,
                                     inputs.canopyBulkDensityUnits);
 
+  // Wind Adjustment Factor
+  behaveRun.crown.setUserProvidedWindAdjustmentFactor(inputs.windAdjustmentFactor);
+  behaveRun.crown.setWindAdjustmentFactorCalculationMethod(inputs.windAdjustmentFactorCalculationMethod);
+
   // Perform Run
   behaveRun.crown.doCrownRunRothermel();
 
@@ -236,22 +249,22 @@ void testCrownModule(int row, struct TestInfo& testInfo, CrownTestInputs& inputs
     reportTestResult(row, testInfo, testName, observedLengthToWidthRatio, expected.lengthToWidthRatio, error_tolerance);
   }
 
-  if (expected.crownFireSpreadRate != 0) {
+  if (expected.fireSpreadRate != 0) {
     testName = "Test fire spread rate";
-    observedSpreadRate = behaveRun.crown.getCrownFireSpreadRate(SpeedUnits::ChainsPerHour);
-    reportTestResult(row, testInfo, testName, observedSpreadRate, expected.crownFireSpreadRate, error_tolerance);
+    observedSpreadRate = behaveRun.crown.getFinalSpreadRate(SpeedUnits::ChainsPerHour);
+    reportTestResult(row, testInfo, testName, observedSpreadRate, expected.fireSpreadRate, error_tolerance);
   }
 
-  if (expected.crownFlameLength != 0) {
+  if (expected.flameLength != 0) {
     testName = "Test flame length";
-    observedFlameLength = behaveRun.crown.getCrownFlameLength(LengthUnits::Feet);
-    reportTestResult(row, testInfo, testName, observedFlameLength, expected.crownFlameLength, error_tolerance);
+    observedFlameLength = behaveRun.crown.getFinalFlameLength(LengthUnits::Feet);
+    reportTestResult(row, testInfo, testName, observedFlameLength, expected.flameLength, error_tolerance);
   }
 
-  if (expected.crownFirelineIntensity != 0) {
+  if (expected.firelineIntensity != 0) {
     testName = "Test fireline intensity";
-    observedFirelineIntensity = behaveRun.crown.getCrownFirelineIntensity(FirelineIntensityUnits::BtusPerFootPerSecond);
-    reportTestResult(row, testInfo, testName, observedFirelineIntensity, expected.crownFirelineIntensity, error_tolerance);
+    observedFirelineIntensity = behaveRun.crown.getFinalFirelineIntesity(FirelineIntensityUnits::BtusPerFootPerSecond);
+    reportTestResult(row, testInfo, testName, observedFirelineIntensity, expected.firelineIntensity, error_tolerance);
   }
 
   if (expected.fireType != -1) {
