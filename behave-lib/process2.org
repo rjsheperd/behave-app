@@ -1,0 +1,2655 @@
+#+TITLE: Process
+#+AUTHOR: RJ Sheperd
+
+* Tests
+** SimpleVector Example
+:PROPERTIES:
+:header-args:cpp: :flags -I ./behave-mirror/src/behave -I ./include/cpp/sig-adapters :includes '(<iostream> <vector> "SIGCollections.h" "behaveUnits.cpp")
+:END:
+#+BEGIN_SRC cpp 
+
+  std::vector<LengthUnits::LengthUnitsEnum> lengths = { LengthUnits::Meters };
+  std::cout << lengths.at(0) << std::endl;
+
+  SimpleVector<LengthUnits::LengthUnitsEnum> simpleLengths(lengths);
+
+  std::cout << simpleLengths.get(0) << std::endl;
+#+END_SRC
+
+#+RESULTS:
+| 4 |
+| 4 |
+
+** JSON2 Test
+:PROPERTIES:
+:header-args:cpp: :flags -I include/cpp/ :includes '(<iostream> <string> <nlohmann/json.hpp>)
+:END:
+#+BEGIN_SRC cpp 
+  using json = nlohmann::json;
+
+  // Using (raw) string literals and json::parse
+  json ex1 = json::parse(R"(
+      {
+        "pi": 3.141,
+        "happy": true,
+        "arr": [1, 2, 3]
+      }
+    )");
+  std::cout << ex1["happy"] << " " << ex1["pi"] << " " << ex1["arr"][0] << std::endl;
+
+  // Using initializer lists
+  json ex2 = {
+    {"happy", true},
+    {"pi", 3.141},
+  };
+  std::cout << ex2["happy"] << " " << ex2["pi"] << std::endl;
+#+END_SRC
+
+#+RESULTS:
+| true | 3.141 | 1 |
+| true | 3.141 |   |
+
+** JSON Test
+#+BEGIN_SRC cpp :flags -I include/cpp/ :includes '(<iostream> <string> <nlohmann/json.hpp>)
+  using json = nlohmann::json;
+
+  // Using (raw) string literals and json::parse
+  json ex1 = json::parse(R"(
+      {
+        "pi": 3.141,
+        "happy": true,
+        "arr": [1, 2, 3]
+      }
+    )");
+  std::cout << ex1["happy"] << " " << ex1["pi"] << " " << ex1["arr"][0] << std::endl;
+
+  // Using initializer lists
+  json ex2 = {
+    {"happy", true},
+    {"pi", 3.141},
+  };
+  std::cout << ex2["happy"] << " " << ex2["pi"] << std::endl;
+#+END_SRC
+
+#+RESULTS[1a08313acf4cc0d9c62d3fde993a83e2a36fe725]:
+: true 3.141 1
+: true 3.141
+
+** Dispatch on Types
+#+BEGIN_SRC cpp :includes '(<iostream> <iomanip> <string> <any> <typeinfo>)
+
+  // Forward declaration for printing class names
+  class MyClass {};
+
+  enum Color { red, blue };
+  enum Size { small, medium, large };
+
+  // Helper function to shorten strings with ellipses
+  std::string shortenString(const std::string& str, int maxLength = 20) {
+      if (str.size() <= maxLength) {
+          return str;
+      } else {
+          return str.substr(0, maxLength - 3) + "...";
+      }
+  }
+
+  // Generic print function using std::any
+  void my_print(const std::any& value) {
+      // Check if the value holds a number
+      if (value.type() == typeid(int) || value.type() == typeid(float) ||
+          value.type() == typeid(double)) {
+          std::cout << std::fixed << std::setprecision(2) << std::any_cast<double>(value);
+      }
+      // Check if the value holds a string
+      else if (value.type() == typeid(std::string)) {
+          std::cout << shortenString(std::any_cast<std::string>(value));
+      }
+      // Check if the value holds an enum or class
+      else if (value.type() == typeid(Color)) {
+          std::cout << std::any_cast<Color>(value);
+      }
+  }
+
+  int main() {
+      std::any num = 3.14159;
+      std::any str = std::string("This is a long string that needs to be shortened");
+      std::any myColor = Color::red;
+
+      my_print(num);        // Output: 3.14
+      my_print(str);        // Output: This is a long st...
+      my_print(myColor);    // Output: 0
+      return 0;
+  }
+
+#+END_SRC
+
+#+RESULTS:
+: 3.14This is a long st...0
+
+** Member Function Params Info
+
+#+BEGIN_SRC cpp :includes '(<iostream> <functional> <typeinfo> <vector>)
+// #include <iostream>
+// #include <functional>
+// #include <typeinfo>
+// #include <vector>
+
+template <typename Class, typename ReturnType, typename... Args>
+std::pair<int, std::vector<const std::type_info*>> getParameterTypes(ReturnType(Class::*func)(Args...))
+{
+    std::vector<const std::type_info*> types = {&typeid(Args)...};
+    return {sizeof...(Args), types};
+}
+
+class MyClass
+{
+public:
+    void foo(int a, double b) {}
+};
+
+int main()
+{
+    auto memberFuncPtr = &MyClass::foo;
+    auto result = getParameterTypes(memberFuncPtr);
+
+    std::cout << "Num parameters: " << result.first << std::endl;
+    std::cout << "Parameter types: ";
+    for (const auto* type : result.second)
+    {
+        std::cout << type->name() << ", ";
+    }
+    std::cout << std::endl;
+
+    return 0;
+}
+#+END_SRC
+
+#+RESULTS:
+| Num parameters: 2  |   |   |
+| Parameter types: i | d |   |
+
+** Parse params from strings
+
+#+BEGIN_SRC cpp :includes '(<iostream> <sstream> <functional>)
+  // #include <iostream>
+  // #include <sstream>
+  // #include <functional>
+
+  template <typename ReturnType, typename Func, typename... Args>
+  ReturnType callFunctionFromString(ReturnType (*func)(Args ...), const std::string& paramStr)
+  {
+      std::istringstream paramStream(paramStr);
+      std::tuple<Args...> tupleParams;
+
+      // Parse parameters from string and store in tuple
+      std::tuple<std::decay_t<Args>...> params;
+      std::apply([&paramStream](auto&&... args) { ((paramStream >> args), ...); }, params);
+
+      // Call the function with the parsed parameters
+      return std::apply(func, params);
+  }
+
+  int sum(int a, int b)
+  {
+      return a + b;
+  }
+
+  int main()
+  {
+      std::string paramStr = "4 5";
+
+      std::cout << "Params: " << paramStr << std::endl;
+
+      int result = callFunctionFromString<int, int, int>(sum, paramStr);
+      std::cout << "Result: " << result << std::endl;
+
+      return 0;
+  }
+#+END_SRC
+
+#+RESULTS:
+| Params: | 4 | 5 |
+| Result: | 9 |   |
+
+** Public Member Fns Using Reflection
+#+BEGIN_SRC cpp :includes '(<iostream> <iomanip> <string> <any> <typeinfo> <type_traits> <vector>)
+
+// #include <iostream>
+// #include <string>
+// #include <type_traits>
+// #include <vector>
+
+// Helper function to check if a member is a public member function pointer
+template <typename T, typename = void>
+struct is_public_member_function : std::false_type {};
+
+template <typename T>
+struct is_public_member_function<T, std::void_t<decltype(&T::operator())>> :
+    std::bool_constant<std::is_function_v<decltype(&T::operator())>> {};
+
+// Function template to retrieve the names of public methods for a class
+template <typename T>
+std::vector<std::string> GetPublicMethods() {
+    std::vector<std::string> methods;
+
+    // Loop through all members of the class
+    // Check if the member is a public member function
+    // Add the name of the member to the list of methods
+    // Exclude the special case of the constructor (if applicable)
+    for_each_member<T>([&methods](auto member) {
+        if constexpr (!std::is_constructor_v<decltype(member)>) {
+            if constexpr (is_public_member_function<decltype(member)>::value) {
+                methods.push_back(member.name);
+            }
+        }
+    });
+
+    return methods;
+}
+
+// Usage example
+class MyClass {
+public:
+    void publicMethod1() {}
+    void publicMethod2() {}
+private:
+    void privateMethod() {}
+};
+
+int main() {
+    std::vector<std::string> methods = GetPublicMethods<MyClass>();
+
+    for (const auto& method : methods) {
+        std::cout << method << std::endl;
+    }
+
+    return 0;
+}
+#+END_SRC
+
+#+RESULTS:
+
+** Templated Functors
+
+#+BEGIN_SRC cpp :includes '(<iostream> <string> <vector> <functional> <memory> <random>)
+  class A
+  {
+  public:
+    void setB(int b) {
+      _b = b;
+    }
+
+    int getB() {
+      return _b;
+    }
+
+  private:
+    int _b;
+  };
+
+  int main()
+  {
+    A a;
+    a.setB(100);
+    std::cout << "Got: " << a.getB() << std::endl;
+  }
+#+END_SRC
+
+#+RESULTS:
+: Got: 100
+
+#+BEGIN_SRC cpp :includes '(<iostream> <string> <vector> <functional> <memory> <random>)
+class A
+{
+public:
+  void setB(int b) {
+    _b = b;
+  }
+
+  int getB() {
+    return _b;
+  }
+
+private:
+  int _b;
+};
+
+template <typename T, typename MemberFunc>
+class Functor
+{
+public:
+  Functor(T* object_ptr, MemberFunc member_func) : _object_ptr(object_ptr), _member_func(member_func) {}
+
+  void operator()(int value) const {
+    (_object_ptr->*_member_func)(value);
+  }
+
+  int operator()() const {
+    return (_object_ptr->*_member_func)();
+  }
+
+private:
+  T* _object_ptr;
+  MemberFunc _member_func;
+};
+
+int main()
+{
+  A a;
+  Functor<A, void (A::*)(int)> setBFunctor(&a, &A::setB);
+  Functor<A, int(A::*)()> getBFunctor(&a, &A::getB);
+  
+  setBFunctor(100);
+  std::cout << "Got: " << getBFunctor() << std::endl;
+
+  return 0;
+}
+
+#+END_SRC
+
+#+RESULTS:
+: Got: 100
+
+#+BEGIN_SRC cpp :includes '(<iostream> <string> <vector> <functional> <memory> <random>)
+class A
+{
+public:
+  void setB(int b) {
+    _b = b;
+  }
+
+  int getB() {
+    return _b;
+  }
+
+private:
+  int _b;
+};
+
+template <typename Callable>
+class Functor
+{
+public:
+  Functor(Callable&& callable) : _callable(std::forward<Callable>(callable)) {}
+
+  template <typename... Args>
+  auto operator()(Args&&... args) const {
+    return std::invoke(_callable, std::forward<Args>(args)...);
+  }
+
+private:
+  Callable _callable;
+};
+
+int main()
+{
+  A a;
+  Functor<void(int)> setBFunctor(std::bind(&A::setB, std::ref(a), std::placeholders::_1));
+  Functor<int()> getBFunctor(std::bind(&A::getB, std::ref(a)));
+  
+  setBFunctor(100);
+  std::cout << "Got: " << getBFunctor() << std::endl;
+
+  return 0;
+}
+
+#+END_SRC
+
+#+BEGIN_SRC cpp :includes '(<iostream> <string> <vector> <functional> <memory> <random>)
+  class A
+  {
+  public:
+    void setB(int b) {
+      _b = b;
+    }
+
+    int getB() {
+      return _b;
+    }
+
+  private:
+    int _b;
+  };
+
+  int main()
+  {
+    A a;
+    auto setBFunctor = ([&a](int value){ a.setB(value); });
+    auto getBFunctor = ([&a](){ return a.getB(); });
+  
+    setBFunctor(100);
+    std::cout << "Got: " << getBFunctor() << std::endl;
+
+    return 0;
+  }
+
+#+END_SRC
+
+#+RESULTS:
+: Got: 100
+
+#+BEGIN_SRC cpp :includes '(<iostream> <string> <vector> <functional> <memory> <random>)
+  struct A
+  {
+    template<typename T>
+    operator T*(); // conversion to pointer to any type
+  };
+ 
+  // out-of-class definition
+  template<typename T>
+  A::operator T*() { return nullptr; }
+ 
+  // explicit specialization for char*
+  template<>
+  A::operator char*() { return nullptr; }
+ 
+  // explicit instantiation
+  template A::operator void*();
+ 
+  int main()
+  {
+    A a;
+    int* ip = a.operator int*(); // explicit call to A::operator int*()
+  }
+#+END_SRC
+
+#+RESULTS:
+
+** Lambda Getters/Setters
+
+#+BEGIN_SRC cpp :flags -I ./behave-mirror/src/behave -I ./include/cpp/sig-adapters :includes '(<iostream> <functional> <unordered_map> <iostream> <vector> <map> <fstream> <tuple> <sstream> <iomanip> <cctype> <cmath> <string> <vector> <map> <type_traits> "behaveUnits.cpp")
+
+  
+  enum Color { red, blue };
+  enum Size { small, medium, large };
+
+  union Property {
+    Color color;
+    Size  size;
+  };
+
+  class Ball {
+  public:
+    void setColor(Color color) { color_ = color; };
+    void setSize(Size size) { size_ = size; };
+
+    Color getColor() { return color_; };
+    Size getSize() { return size_; };
+
+  private:
+    Color color_;
+    Size size_;
+  };
+
+  template<typename T, typename Func>
+  class SetterCallable {
+  public:
+    SetterCallable(T& obj, Func&& func) : obj(obj), func(std::forward<Func>(func)) {}
+    SetterCallable(T& obj, Func& func) : obj(obj), func(std::forward<Func>(func)) {}
+
+    template<typename U>
+    auto operator() (Property property) const {
+      if (std::is_same<U, Color>::value) {
+        (obj.*func)(property.color);
+      } else if (std::is_same<U, Size>::value) {
+        (obj.*func)(property.size);
+      } else {
+        return;
+      }
+    }
+
+  private:
+    T& obj;
+    Func func;
+  };
+
+  typedef SetterCallable<Ball, std::function<void(Ball&, Property)>> PropertyCallable;
+
+  int main() {
+
+    Ball ball;
+    Property prop;
+    prop.color = Color::red;
+    prop.size = Size::small;
+
+    // PropertyCallable<Ball, > setBallColor(ball, &Ball::setColor);
+    PropertyCallable setBallSize(ball, &Ball::setSize);
+
+    // std::cout << sameEnums << std::endl;
+  }
+
+
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC cpp :flags -I ./behave-mirror/src/behave -I ./include/cpp/sig-adapters :includes '(<iostream> <functional> <unordered_map> <iostream> <vector> <map> <fstream> <sstream> <cstdarg> <iomanip> <cctype> <cmath> <string> <vector> <map> <type_traits> "behaveUnits.cpp")
+  template<typename Func>
+  class Callable {
+  public:
+    Callable(Func&& func) : func(std::forward<Func>(func)) {}
+    Callable(Func& func) : func(std::forward<Func>(func)) {}
+
+    template<typename... Args>
+    auto operator()(Args&&... args) const {
+      return func(std::forward<Args>(args)...);
+    }
+
+  private:
+    Func func;
+  };
+
+  template<typename T, typename Func>
+  class MemberCallable {
+  public:
+    MemberCallable(T& obj, Func&& func) : obj(obj), func(std::forward<Func>(func)) {}
+    MemberCallable(T& obj, Func& func) : obj(obj), func(std::forward<Func>(func)) {}
+
+    template<typename... Args>
+    auto operator()(Args&&... args) const {
+      return (obj.*func)(std::forward<Args>(args)...);
+    }
+
+  private:
+    T& obj;
+    Func func;
+  };
+
+  template<typename T, typename Func>
+  class SetterCallable {
+  public:
+    MemberCallable(T& obj, Func&& func) : obj(obj), func(std::forward<Func>(func)) {}
+    MemberCallable(T& obj, Func& func) : obj(obj), func(std::forward<Func>(func)) {}
+
+    template<typename... Args>
+    auto operator()(Args&&... args) const {
+      if (is_same(T, ))
+      return (obj.*func)(std::forward<Args>(args)...);
+    }
+
+  private:
+    T& obj;
+    Func func;
+  };
+
+  template <typename T>
+  using MemberSetterFn = MemberCallable<T, std::function<void(T&, double, BehaveUnits)>>;
+
+  template <typename T>
+  struct SetterBuilder {
+    typedef MemberCallable<T, std::function<void(T&, double, BehaveUnits)>>
+  };
+
+  union BehaveUnits {
+    AreaUnits::AreaUnitsEnum areaUnits;
+    BasalAreaUnits::BasalAreaUnitsEnum basalAreaUnits;
+    CoverUnits::CoverUnitsEnum coverUnits;
+    CuringLevelUnits::CuringLevelEnum curingLevelUnits;
+    DensityUnits::DensityUnitsEnum densityUnits;
+    FirelineIntensityUnits::FirelineIntensityUnitsEnum firelineIntensityUnits;
+    HeatOfCombustionUnits::HeatOfCombustionUnitsEnum heatOfCombustionUnits;
+    HeatPerUnitAreaUnits::HeatPerUnitAreaUnitsEnum heatPerUnitAreaUnits;
+    HeatSinkUnits::HeatSinkUnitsEnum heatSinkUnits;
+    HeatSourceAndReactionIntensityUnits::HeatSourceAndReactionIntensityUnitsEnum heatSourceAndReactionIntensityUnits;
+    LengthUnits::LengthUnitsEnum lengthUnits;
+    LoadingUnits::LoadingUnitsEnum loadingUnits;
+    MoistureUnits::MoistureUnitsEnum moistureUnits;
+    MortalityRateUnits::MortalityRateUnitsEnum mortalityRateUnits;
+    ProbabilityUnits::ProbabilityUnitsEnum probabilityUnits;
+    SlopeUnits::SlopeUnitsEnum slopeUnits;
+    SpeedUnits::SpeedUnitsEnum speedUnits;
+    SurfaceAreaToVolumeUnits::SurfaceAreaToVolumeUnitsEnum surfaceAreaToVolumeUnits;
+    TemperatureUnits::TemperatureUnitsEnum temperatureUnits;
+    TimeUnits::TimeUnitsEnum timeUnits;
+  };
+
+  class SIGTestClass {
+  public:
+    void setHeight(double height, LengthUnits::LengthUnitsEnum units) {
+      height_ = LengthUnits::toBaseUnits(height, units);
+    };
+
+    double getHeight(LengthUnits::LengthUnitsEnum units) {
+      return LengthUnits::fromBaseUnits(height_, units);
+    };
+
+    void setWidth(double width, LengthUnits::LengthUnitsEnum units) {
+      width_ = LengthUnits::toBaseUnits(width, units);
+    };
+
+    double getWidth(LengthUnits::LengthUnitsEnum units) {
+      return LengthUnits::fromBaseUnits(width_, units);
+    };
+
+  private:
+    double height_;
+    double width_;
+  };
+
+
+  void testMemberCallable() {
+    SIGTestClass s;
+
+    auto setter = &SIGTestClass::setHeight;
+    auto getter = &SIGTestClass::getHeight;
+
+    // std::unordered_map<std::string, Callable<A, std::function<void(A&, int)>>> setters;
+    std::unordered_map<std::string, Callable<A, std::any>> setters;
+
+    hashmap["setter"] = MemberCallable<SIGTestClass, std::function<void(SIGTestClass&, double, BehaveUnits)>>(s, &SIGTestClass::setHeight);
+    hashmap["getter"] = MemberCallable<SIGTestClass, std::function<double(SIGTestClass&, BehaveUnits)>>(s, &SIGTestClass::getHeight);
+
+    double value = 6.0;
+    BehaveUnits units;
+    units.lengthUnits = LengthUnits::Meters;
+    setter(6.0, units);
+
+    BehaveUnits newUnits;
+    newUnits.lengthUnits = LengthUnits::Feet;
+    std::cout << "SIGTestClass::getHeight - " << getter(newUnits) << std::endl;
+
+  }
+
+  void testMemberLambda() {
+    SIGTestClass s;
+
+    auto setter = [&s](double value, BehaveUnits behaveUnits) {
+      s.setHeight(value, behaveUnits.lengthUnits);
+    };
+
+    auto getter = [&s](BehaveUnits behaveUnits) {
+      return s.getHeight(behaveUnits.lengthUnits);
+    };
+
+    double value = 6.0;
+    BehaveUnits units;
+    units.lengthUnits = LengthUnits::Meters;
+    setter(value, units);
+
+    BehaveUnits newUnits;
+    newUnits.lengthUnits = LengthUnits::Feet;
+    std::cout << "SIGTestClass::getHeight - " << getter(newUnits) << std::endl;
+  };
+
+  void testMemberLambda_2() {
+    SIGTestClass s;
+
+    std::function<void(double, BehaveUnits)> setHeight = [&s](double value, BehaveUnits behaveUnits) {s.setHeight(value, behaveUnits.lengthUnits);};
+    std::function<void(double, BehaveUnits)> setWidth = [&s](double value, BehaveUnits behaveUnits) {s.setWidth(value, behaveUnits.lengthUnits);};
+
+    std::function<double(BehaveUnits)> getWidth = [&s](BehaveUnits behaveUnits) {return s.getWidth(behaveUnits.lengthUnits);};
+    std::function<double(BehaveUnits)> getHeight = [&s](BehaveUnits behaveUnits) {return s.getHeight(behaveUnits.lengthUnits);};
+
+    std::unordered_map<std::string, std::function<void(double, BehaveUnits)>*> setters;
+    setters["setHeight"] = &setHeight;
+    setters["setWidth"] = &setWidth;
+
+    std::unordered_map<std::string, std::function<double(BehaveUnits)>*> getters;
+    getters["getHeight"] = &getHeight;
+    getters["getWidth"] = &getWidth;
+
+    double value = 6.0;
+    BehaveUnits units;
+    units.lengthUnits = LengthUnits::Meters;
+    (*setters["setHeight"])(value, units);
+    (*setters["setWidth"])(30.0, units);
+
+    BehaveUnits newUnits;
+    newUnits.lengthUnits = LengthUnits::Feet;
+    std::cout << "SIGTestClass::getHeight - " << (*getters["getHeight"])(newUnits) << std::endl;
+    std::cout << "SIGTestClass::getWidth - " << (*getters["getWidth"])(newUnits) << std::endl;
+    std::cout << "SIGTestClass::getWidth - " << getters["getWidth"] << std::endl;
+  };
+
+  void testLambda() {
+
+    auto lambda = [](int a, float b, const std::string& c) {
+      return a + b + std::stoi(c);
+    };
+
+    Callable<decltype(lambda)> callable(lambda);
+    int result = callable(1, 2.5, "3"); // Calls the lambda function with arguments
+    std::cout << result << std::endl; // Prints: 6
+
+    // Test adding to hashmap
+    // std::unordered_map<std::string, Callable<std::function<void()>> *> hashmap;
+
+    // Lambda function that prints a message
+    auto printMessage = [](std::string_view name) {
+      std::cout << "Hello, " << name << "!" << std::endl;
+    };
+
+    std::unordered_map<std::string, Callable<decltype(printMessage)>*> hashmap;
+    Callable<decltype(printMessage)> callable_printMessage(printMessage);
+
+    callable_printMessage("RJ");
+
+    // Insert the lambda into the hashmap with std::function<void()>
+    hashmap["print"] = &callable_printMessage;
+
+    (*hashmap["print"])("RJ");
+  };
+
+  int main() {
+    // testLambda();
+    // testMemberCallable();
+    // testMemberLambda();
+    testMemberLambda_2();
+
+    return 0;
+  }
+
+#+END_SRC
+
+#+RESULTS:
+
+** Templated Class
+
+#+BEGIN_SRC cpp :includes '(<iostream> <string> <vector> <unordered_map> <functional>)
+
+  // Callable
+  template<typename ReturnType, typename... Args>
+  class Callable {
+  private:
+    using FunctionType = std::function<ReturnType(Args...)>;
+    using FunctionMap = std::unordered_map<std::string, FunctionType>;
+
+    template<typename Func>
+    struct FunctionWrapper;
+
+    template<typename R, typename... A>
+    struct FunctionWrapper<R(A...)> {
+      static ReturnType call(const std::function<R(A...)>& func, Args&&... args) {
+        return func(std::forward<Args>(args)...);
+      }
+    };
+
+    std::unordered_map<std::string, FunctionType> funcs;
+
+  public:
+    template<typename Func>
+    void addFunction(const std::string& name, Func&& func) {
+      FunctionType wrapper = std::function<ReturnType(Args...)>(std::forward<Func>(func));
+      funcs[name] = wrapper;
+    }
+
+    ReturnType call(const std::string& name, Args&&... args) {
+      auto it = funcs.find(name);
+      if (it != funcs.end()) {
+        FunctionType& func = it->second;
+        return FunctionWrapper<FunctionType>::call(func, std::forward<Args>(args)...);
+      }
+      return ReturnType{}; // default value if function not found
+    }
+  };
+
+  // Ball
+  enum Color { red, blue };
+  enum Size { small, medium, large };
+
+  class Ball {
+  public:
+    void setColor(Color color) { color_ = color; };
+    void setSize(Size size) { size_ = size; };
+
+    Color getColor() { return color_; };
+    Size getSize() { return size_; };
+
+  private:
+    Color color_;
+    Size size_;
+  };
+
+  // Main
+  int main() {
+    Ball ball;
+
+    Callable<void, Color> callable;
+    callable.addFunction("SetColor", [&ball](Color color) { ball.setColor(color); });
+
+    // Callable<void, Size> callable2;
+    // callable2.addFunction("SetSize", [&ball](Size size) { ball.setSize(size); });
+
+    // Callable<Color> callable3;
+    // callable3.addFunction("GetColor", [&ball]() { return ball.getColor(); });
+
+    // Callable<Size> callable4;
+    // callable4.addFunction("GetSize", [&ball]() { return ball.getSize(); });
+
+    callable.call("SetColor", Color::red);
+    // callable2.call("SetSize", Size::medium);
+    // Color color = callable3.call("GetColor");
+    // Size size = callable4.call("GetSize");
+
+    return 0;
+  }
+#+END_SRC
+
+
+#+RESULTS:
+
+** EnumsResolver
+#+BEGIN_SRC cpp :includes '(<iostream> <string> <vector> <unordered_map> <functional>)
+
+enum LengthUnits {
+  Feet, Meters
+};
+
+enum SpeedUnits {
+  MetersPerHour, FeetPerHour
+};
+
+class ShortcodeResolver {
+public:
+  void addShortcode(const std::string& shortcode, LengthUnits value) {
+    lengthShortcodes_[shortcode] = value;
+  }
+
+  void addShortcode(const std::string& shortcode, SpeedUnits value) {
+    speedShortcodes_[shortcode] = value;
+  }
+
+  template <typename T>
+  T resolveShortcode(const std::string& shortcode) {
+    if constexpr (std::is_same_v<T, LengthUnits>) {
+      return lengthShortcodes_[shortcode];
+    } else if constexpr (std::is_same_v<T, SpeedUnits>) {
+      return speedShortcodes_[shortcode];
+    } else {
+      // Handle error or unsupported shortcode
+      throw std::runtime_error("Unsupported shortcode");
+    }
+  }
+
+private:
+  std::unordered_map<std::string, LengthUnits> lengthShortcodes_;
+  std::unordered_map<std::string, SpeedUnits> speedShortcodes_;
+};
+
+int main() {
+  ShortcodeResolver resolver;
+
+  resolver.addShortcode("ft", LengthUnits::Feet);
+  resolver.addShortcode("m", LengthUnits::Meters);
+  resolver.addShortcode("ft/hr", SpeedUnits::FeetPerHour);
+  resolver.addShortcode("m/hr", SpeedUnits::MetersPerHour);
+
+  auto lengthUnit = resolver.resolveShortcode<LengthUnits>("ft");
+  std::cout << "Length unit: " << lengthUnit << std::endl;
+
+  auto speedUnit = resolver.resolveShortcode<SpeedUnits>("m/hr");
+  std::cout << "Speed unit: " << speedUnit << std::endl;
+
+  return 0;
+}
+#+END_SRC
+
+#+RESULTS:
+| Length | unit: | 0 |
+| Speed  | unit: | 0 |
+
+** to_underlying
+#+BEGIN_SRC cpp :includes '(<iostream> <string> <vector> <type_traits>)
+
+  enum Color { red, blue };
+  enum Size { small, medium, large };
+
+  template <typename E>
+  constexpr auto to_underlying(E e) noexcept
+  {
+      return static_cast<std::underlying_type_t<E>>(e);
+  };
+
+  int main() {
+
+    std::cout << to_underlying(Color::blue);
+
+  };
+#+END_SRC
+
+#+RESULTS:
+: 1
+
+** SIGString
+
+#+BEGIN_SRC cpp :includes '(<iostream> <string> <vector>)
+      class SIGString
+      {
+      public:
+        static char* str2charptr(std::string str) {
+          char* c_str = new char[str.length() + 1];
+          std::strcpy(c_str, str.c_str());
+          return c_str;
+        };
+        static std::string charptr2str(char* c_str) {
+          std::string str(c_str);
+          return str;
+        };
+      };
+
+      int main() {
+        std::string hello("Hello World");
+        char * derp = "DERP";
+        std::cout << hello << std::endl;
+
+        std::cout << SIGString::str2charptr(hello) << std::endl;
+        std::cout << SIGString::charptr2str(derp) << std::endl;
+        std::cout << std::string(derp) << std::endl;
+
+        std::vector<bool> myVector = {true, false, true};
+
+        bool* boolPtr = myVector.data();
+        // The pointer `boolPtr` now points to the underlying data of `myVector`
+
+        std::cout << *boolPtr << std::endl;
+
+        return 0;
+    }
+      }
+#+END_SRC
+
+#+RESULTS:
+| Hello | World |
+| Hello | World |
+| DERP  |       |
+| DERP  |       |
+
+** Pointer Examples
+Generate an example in C++ class with a static member variable (which
+is itself a pointer to a class), and a function that can then access
+the member functions of that static member variable.
+
+
+#+begin_src cpp
+class MyClass {
+public:
+    void myFunction() {
+        // Implement your function here
+    }
+};
+
+class Example {
+public:
+    static MyClass* myStaticMember;
+
+    static void accessStaticMember() {
+        if (myStaticMember != nullptr) {
+            myStaticMember->myFunction();
+        }
+    }
+};
+
+MyClass* Example::myStaticMember = nullptr;
+#+end_src
+
+Expand on this example with a ~main~ function outside of the two
+classes that calls ~myStaticMember::myFunction~
+
+
+#+begin_src cpp
+  #include <iostream>
+
+  class MyClass {
+  public:
+    void myFunction() {
+      std::cout << "Calling myFunction() from MyClass" << std::endl;
+    }
+  };
+
+  class Example {
+  public:
+    static MyClass* myStaticMember;
+
+    static void accessStaticMember() {
+      if (myStaticMember != nullptr) {
+        myStaticMember->myFunction();
+      }
+    }
+  };
+
+  MyClass* Example::myStaticMember = nullptr;
+
+  int main() {
+    Example::myStaticMember = new MyClass();
+
+      
+    (*Example::myStaticMember).myFunction();
+
+
+    delete Example::myStaticMember;
+    return 0;
+  }
+#+end_src
+
+#+RESULTS:
+: Calling myFunction() from MyClass
+
+Can I call the function ~MyClass::myFunction~ inside of ~main~ using a
+pointer dereference?
+
+
+Yes, you can call the function =MyClass::myFunction= inside of =main= using a pointer dereference. For example:
+
+#+begin_src 
+MyClass myInstance;
+MyClass* myPointer = &myInstance;
+myPointer->myFunction();
+#+end_src
+
+Can you simplify this to a one-liner?
+
+
+Certainly! Here is a one-liner to call the function =MyClass::myFunction= using a pointer dereference inside =main=:
+
+#+begin_src cpp
+MyClass myInstance; myInstance.myFunction();
+#+end_src
+
+*** Modifying a class with a pointer function argument
+Generate an example in C++ of passing in a class as a pointer to a function that then modifies the class
+
+
+Sure! Here is an example in C++:
+
+#+begin_src cpp
+#include <iostream>
+
+class MyClass {
+public:
+    int value;
+
+    MyClass(int val) : value(val) {}
+};
+
+void modifyClass(MyClass* obj) {
+    obj->value = 100;
+}
+
+int main() {
+    MyClass myObj(50);
+    std::cout << "Before modification: " << myObj.value << std::endl;
+
+    modifyClass(&myObj);
+
+    std::cout << "After modification: " << myObj.value << std::endl;
+
+    return 0;
+}
+#+end_src
+
+#+RESULTS:
+| Before | modification: |  50 |
+| After  | modification: | 100 |
+
+In this example, the =modifyClass= function takes a pointer to a =MyClass= object and modifies its =value= attribute.
+
+** BOOST Example
+
+Generate an example in C++ of using Boost unit tests inside of Org-Babel
+
+#+name: boost_example
+#+begin_src cpp cpp :includes '(<boost/test/included/unit_test.hpp>) :flags -I /opt/homebrew/include :main no
+  #define BOOST_TEST_MODULE test_inside_babel
+  int add(int a, int b) { return a + b; }
+
+  BOOST_AUTO_TEST_CASE(test_addition)
+  {
+      BOOST_TEST(add(2, 3) == 5);
+  }
+#+end_src
+
+#+RESULTS: boost_example
+
+
+* Boost Tests
+:PROPERTIES:
+:header-args:cpp:  :flags -I include/cpp/ -I behave-mirror/src/behave -I test/cpp/ -I /opt/homebrew/include
+:header-args:cpp+: :includes '(<iostream> <sstream> <vector> <tuple> <utility> "behaveUnits.cpp" "fuelModels.h" "surfaceInputEnums.h" "testUtils.cpp")
+:END:
+
+#+BEGIN_SRC cpp
+
+  CSVData * csvData = new CSVData();
+
+  int result = parseCSVFile("test/csv/crown.csv", csvData);
+
+  std::cout << result;
+
+#+END_SRC
+
+#+RESULTS:
+: 0
+
+#+BEGIN_SRC cpp
+
+  struct FireType
+  {
+    enum FireTypeEnum
+      {
+        Surface = 0,    // surface fire with no torching or crown fire spread.
+        Torching = 1,   // surface fire with torching.
+        ConditionalCrownFire = 2, // active crown fire possible if the fire transitions to the overstory        
+        Crowning = 3    // active crown fire, fire is spreading through the canopy.
+      };
+  };
+
+  struct CrownTestInputs {
+    std::string testID = "";
+    int fuelModelNumber = 0.0;
+    double moistureOneHour = 0.0;
+    double moistureTenHour = 0.0;
+    double moistureHundredHour = 0.0;
+    double moistureLiveHerbaceous = 0.0;
+    double moistureLiveWoody = 0.0;
+    double moistureFoliar = 0.0;
+    FractionUnits::FractionUnitsEnum moistureUnits = FractionUnits::Percent;
+    double windSpeed = 0.0;
+    WindHeightInputMode::WindHeightInputModeEnum windHeightInputMode = WindHeightInputMode::TwentyFoot;
+    SpeedUnits::SpeedUnitsEnum windSpeedUnits = SpeedUnits::MilesPerHour;
+    double windDirection = 0.0;
+    WindAndSpreadOrientationMode::WindAndSpreadOrientationModeEnum windAndSpreadOrientationMode = WindAndSpreadOrientationMode::RelativeToNorth;
+    double windAdjustmentFactor = 1.0;
+    WindAdjustmentFactorCalculationMethod::WindAdjustmentFactorCalculationMethodEnum windAdjustmentFactorCalculationMethod = WindAdjustmentFactorCalculationMethod::UserInput;
+    double slope = 0.0;
+    SlopeUnits::SlopeUnitsEnum slopeUnits = SlopeUnits::Percent;
+    double aspect = 0.0;
+    double canopyCover = 0.0;
+    FractionUnits::FractionUnitsEnum coverUnits = FractionUnits::Percent;
+    double canopyHeight = 0.0;
+    LengthUnits::LengthUnitsEnum canopyHeightUnits = LengthUnits::Feet;
+    double crownRatio = 0.0;
+    double canopyBaseHeight = 0.0;
+    double canopyBulkDensity = 0.0;
+    DensityUnits::DensityUnitsEnum canopyBulkDensityUnits = DensityUnits::PoundsPerCubicFoot;
+  };
+
+  struct CrownTestOutputs {
+    double lengthToWidthRatio = 0.00;
+    double fireSpreadRate = 0.00;
+    double flameLength = 0.00;
+    double firelineIntensity = 0.00;
+    int fireType = -1;
+  };
+
+  typedef std::tuple<int, CrownTestInputs, CrownTestOutputs> TestTuple;
+          
+  void convertCSVDataToCrownIO(CSVData * csvData, std::vector<TestTuple> * allCrownIO) {
+
+    /* Units/Enum Maps */
+    std::map<std::string, LengthUnits::LengthUnitsEnum> lengthUnits{
+      {"Feet", LengthUnits::Feet},
+      {"Inches", LengthUnits::Inches},
+      {"Millimeters", LengthUnits::Millimeters},
+      {"Centimeters", LengthUnits::Centimeters},
+      {"Meters", LengthUnits::Meters},
+      {"Chains", LengthUnits::Chains},
+      {"Miles", LengthUnits::Miles},
+      {"Kilometers", LengthUnits::Kilometers}
+    };
+
+    std::map<std::string, SlopeUnits::SlopeUnitsEnum> slopeUnits{
+      {"Degrees", SlopeUnits::Degrees},
+      {"Percent", SlopeUnits::Percent}};
+
+    std::map<std::string, SpeedUnits::SpeedUnitsEnum> speedUnits{
+      {"FeetPerMinute", SpeedUnits::FeetPerMinute},
+      {"ChainsPerHour", SpeedUnits::ChainsPerHour},
+      {"MetersPerSecond", SpeedUnits::MetersPerSecond},
+      {"MetersPerMinute", SpeedUnits::MetersPerMinute},
+      {"MetersPerHour", SpeedUnits::MetersPerHour},
+      {"MilesPerHour", SpeedUnits::MilesPerHour},
+      {"KilometersPerHour", SpeedUnits::KilometersPerHour}
+    };
+
+    std::map<std::string, FractionUnits::FractionUnitsEnum> coverUnits{
+      {"Fraction", FractionUnits::Fraction},
+      {"Percent", FractionUnits::Percent}};
+
+    std::map<std::string, FractionUnits::FractionUnitsEnum> moistureUnits{
+      {"Fraction", FractionUnits::Fraction},
+      {"Percent", FractionUnits::Percent}};
+
+    std::map<std::string, DensityUnits::DensityUnitsEnum> densityUnits{
+      {"PoundsPerCubicFoot", DensityUnits::PoundsPerCubicFoot},
+      {"KilogramsPerCubicMeter", DensityUnits::KilogramsPerCubicMeter}};
+
+    std::map<std::string, WindHeightInputMode::WindHeightInputModeEnum> windHeightInputMode{
+      {"DirectMidflame", WindHeightInputMode::DirectMidflame},
+      {"TwentyFoot", WindHeightInputMode::TwentyFoot},
+      {"TenMeter", WindHeightInputMode::TenMeter}};
+
+    std::map<std::string, WindAndSpreadOrientationMode::WindAndSpreadOrientationModeEnum> windAndSpreadOrientationMode{
+      {"RelativeToUpslope", WindAndSpreadOrientationMode::RelativeToUpslope},
+      {"RelativeToNorth", WindAndSpreadOrientationMode::RelativeToNorth}
+    };
+
+    std::map<std::string, WindAdjustmentFactorCalculationMethod::WindAdjustmentFactorCalculationMethodEnum> windAdjustmentFactorCalculationMethod{
+      {"UserInput", WindAdjustmentFactorCalculationMethod::UserInput},
+      {"UseCrownRatio", WindAdjustmentFactorCalculationMethod::UseCrownRatio},
+      {"DontUseCrownRatio", WindAdjustmentFactorCalculationMethod::DontUseCrownRatio}
+    };
+
+    std::map<std::string, FireType::FireTypeEnum> fireType{
+      {"Surface", FireType::Surface},
+      {"Torching", FireType::Torching},
+      {"ConditionalCrownFire", FireType::ConditionalCrownFire},
+      {"Crowning", FireType::Crowning}
+    };
+
+    // Perform Tests using CSV Inputs
+    for (int i = 0; i < csvData->csvStringRows.size(); i++) {
+
+      // Init structs
+      CrownTestInputs crownInputs;
+      CrownTestOutputs crownOutputs;
+
+      // Set up Inputs
+      crownInputs.testID = csvData->csvStringRows[i]["testID"];
+      crownInputs.fuelModelNumber = csvData->csvDoubleRows[i]["fuelModelNumber"];
+      crownInputs.moistureOneHour = csvData->csvDoubleRows[i]["moistureOneHour"];
+      crownInputs.moistureTenHour = csvData->csvDoubleRows[i]["moistureTenHour"];
+      crownInputs.moistureHundredHour = csvData->csvDoubleRows[i]["moistureHundredHour"];
+      crownInputs.moistureLiveHerbaceous = csvData->csvDoubleRows[i]["moistureLiveHerbaceous"];
+      crownInputs.moistureLiveWoody = csvData->csvDoubleRows[i]["moistureLiveWoody"];
+      crownInputs.moistureFoliar = csvData->csvDoubleRows[i]["moistureFoliar"];
+      crownInputs.moistureUnits = moistureUnits[csvData->csvStringRows[i]["moistureUnits"]];
+      crownInputs.windSpeed = csvData->csvDoubleRows[i]["windSpeed"];
+      crownInputs.windSpeedUnits = speedUnits[csvData->csvStringRows[i]["windSpeedUnits"]];
+      crownInputs.windHeightInputMode = windHeightInputMode[csvData->csvStringRows[i]["windHeightInputMode"]];
+      crownInputs.windDirection = csvData->csvDoubleRows[i]["windDirection"];
+      crownInputs.windAndSpreadOrientationMode = windAndSpreadOrientationMode[csvData->csvStringRows[i]["windAndSpreadOrientationMode"]];
+      crownInputs.windAdjustmentFactor = csvData->csvDoubleRows[i]["windAdjFactor"];
+      crownInputs.windAdjustmentFactorCalculationMethod = windAdjustmentFactorCalculationMethod[csvData->csvStringRows[i]["windAdjFactorCalcMethod"]];
+      crownInputs.slope = csvData->csvDoubleRows[i]["slope"];
+      crownInputs.slopeUnits = slopeUnits[csvData->csvStringRows[i]["slopeUnits"]];
+      crownInputs.aspect = csvData->csvDoubleRows[i]["aspect"];
+      crownInputs.canopyCover = csvData->csvDoubleRows[i]["canopyCover"];
+      crownInputs.coverUnits = coverUnits[csvData->csvStringRows[i]["coverUnits"]];
+      crownInputs.canopyHeight = csvData->csvDoubleRows[i]["canopyHeight"];
+      crownInputs.canopyBaseHeight = csvData->csvDoubleRows[i]["canopyBaseHeight"];
+      crownInputs.canopyHeightUnits = lengthUnits[csvData->csvStringRows[i]["canopyHeightUnits"]];
+      crownInputs.crownRatio = csvData->csvDoubleRows[i]["crownRatio"];
+      crownInputs.canopyBulkDensity = csvData->csvDoubleRows[i]["canopyBulkDensity"];
+      crownInputs.canopyBulkDensityUnits = densityUnits[csvData->csvStringRows[i]["canopyBulkDensityUnits"]];
+
+      // Set up Outputs
+      crownOutputs.lengthToWidthRatio = csvData->csvDoubleRows[i]["lengthToWidthRatio"];
+      crownOutputs.fireSpreadRate = csvData->csvDoubleRows[i]["fireSpreadRate"];
+      crownOutputs.flameLength = csvData->csvDoubleRows[i]["flameLength"];
+      crownOutputs.firelineIntensity = csvData->csvDoubleRows[i]["firelineIntensity"];
+      crownOutputs.fireType = fireType[csvData->csvStringRows[i]["fireType"]];
+
+      // Add to results
+      TestTuple newIO(i, crownInputs, crownOutputs);
+      allCrownIO->push_back(newIO);
+    }
+  }
+
+  int main() {
+    CSVData * csvData = CSVData::factory("test/csv/crown.csv");
+
+    std::vector<TestTuple> * allCrownIO = new std::vector<TestTuple>();
+
+    convertCSVDataToCrownIO(csvData, allCrownIO);
+
+    // std::cout << csvData->csvHeaders.size();
+    std::cout << allCrownIO->size();
+  }
+#+END_SRC
+
+#+RESULTS:
+: 14
+
+In C++, write an exmample of how you construct a tuple?
+
+In C++, can you construct a tuple using a custom class?
+
+
+Yes, in C++, you can construct a tuple using a custom class by providing appropriate conversions or overloads for the desired type.
+
+Here is an example of how you can construct a tuple in C++:
+
+#+begin_src cpp
+#include <iostream>
+#include <tuple>
+#include <string>
+
+int main() {
+    std::tuple<int, double, std::string> myTuple(10, 3.14, "Hello");
+
+    // Access tuple elements
+    std::cout << std::get<0>(myTuple) << std::endl; // Output: 10
+    std::cout << std::get<1>(myTuple) << std::endl; // Output: 3.14
+    std::cout << std::get<2>(myTuple) << std::endl; // Output: Hello
+
+    return 0;
+}
+#+end_src
+
+#+RESULTS:
+|    10 |
+|  3.14 |
+| Hello |
+
+In C++, you can construct a tuple using the =std::make_tuple= function or by directly initializing a tuple.
+
+
+You can call =push_back= on a =std::vector= using the pointer with the arrow operator (=->=). For example: =myVectorPointer->push_back(value)= where =myVectorPointer= is a pointer to a =std::vector=.#+RESULTS:
+
+* CPP Automated Testing
+:PROPERTIES:
+:header-args:cpp:  :flags -I include/cpp/ -I ./behave-mirror/src/behave 
+:header-args:cpp+: :includes '(<iostream> <functional> <variant> <fstream> <type_traits> <typeinfo> <typeindex> "behaveUnits.cpp" "vaporPressureDeficitCalculator.cpp")
+:header-args:cpp+: :main no 
+:header-args:cpp+: :cmdline "-ni -nc -nv"
+:END:
+
+** VPD
+
+#+BEGIN_SRC cpp
+  // Convert temperature to Kelvin
+  int main() {
+
+    VaporPressureDeficitCalculator vpd;
+
+    for (double rh = 100.0; rh -= 10.0; rh >= 0) {
+      vpd.setTemperature(50.0, TemperatureUnits::Fahrenheit);
+      vpd.setRelativeHumidity(rh, FractionUnits::Percent);
+
+      vpd.runCalculation();
+
+      std::cout << "RH:" << rh << " ";
+      std::cout << vpd.getSaturatedVaporPressure(PressureUnits::HectoPascal) << " ";
+      std::cout << vpd.getActualVaporPressure(PressureUnits::HectoPascal) << " ";
+      std::cout << vpd.getVaporPressureDeficit(PressureUnits::HectoPascal) << " ";
+
+      std::cout << (vpd.getSaturatedVaporPressure(PressureUnits::HectoPascal) - vpd.getActualVaporPressure(PressureUnits::HectoPascal)) << std::endl;
+    }
+    //  double temperatureKelvin = temperatureCelsius + 273.15;
+
+    //  // Calculate saturation vapor pressure
+    //  double saturationVaporPressure =
+    //    6.1078 * std::exp((17.269 * temperatureCelsius) / temperatureKelvin);
+
+    //  // Calculate actual vapor pressure
+    //  double actualVaporPressure = relativeHumidity_ * saturationVaporPressure;
+
+    //  // Calculate vapor pressure deficit
+    //  vaporPressureDeficit_ = saturationVaporPressure - actualVaporPressure;
+
+    //  // Store in base units (kPa -> Pa)
+    //  vaporPressureDeficit_ = PressureUnits::toBaseUnits(vaporPressureDeficit_, PressureUnits::KiloPascal);
+  }
+#+END_SRC
+
+#+RESULTS:
+| RH:90 | 12.2833 |  11.055 | 1.22833 | 1.22833 |
+| RH:80 | 12.2833 | 9.82667 | 2.45667 | 2.45667 |
+| RH:70 | 12.2833 | 8.59834 |   3.685 |   3.685 |
+| RH:60 | 12.2833 | 7.37001 | 4.91334 | 4.91334 |
+| RH:50 | 12.2833 | 6.14167 | 6.14167 | 6.14167 |
+| RH:40 | 12.2833 | 4.91334 | 7.37001 | 7.37001 |
+| RH:30 | 12.2833 |   3.685 | 8.59834 | 8.59834 |
+| RH:20 | 12.2833 | 2.45667 | 9.82667 | 9.82667 |
+| RH:10 | 12.2833 | 1.22833 |  11.055 |  11.055 |
+
+** Units
+#+NAME unit_resolver
+#+BEGIN_SRC cpp :tangle unit_resolver.cpp
+  class UnitResolver {
+  public:
+    void addUnit(const std::string& unit, int value) {
+      units_[unit] = value;
+    }
+
+    template<typename Enum>
+    int resolveUnit(const std::string& unit) {
+      return static_cast<Enum>(units_[unit]);
+    }
+
+  private:
+    std::unordered_map<std::string, int> units_;
+  };
+
+  void addUnits(UnitResolver &unitResolver) {
+
+    unitResolver.addUnit("%", CoverUnits::Percent);
+    unitResolver.addUnit("deg", SlopeUnits::Degrees);
+    unitResolver.addUnit("fraction", CoverUnits::Fraction);
+    // unitResolver.addUnit("points"); // FIXME Contain Fire Points
+    // unitResolver.addUnit("ratio"); // FIXME
+    unitResolver.addUnit("Btu/ft/s", FirelineIntensityUnits::BtusPerFootPerSecond);
+    unitResolver.addUnit("Btu/ft/min", FirelineIntensityUnits::BtusPerFootPerMinute);
+    unitResolver.addUnit("Btu/ft2", HeatPerUnitAreaUnits::BtusPerSquareFoot);
+    unitResolver.addUnit("Btu/ft2/min", HeatSourceAndReactionIntensityUnits::BtusPerSquareFootPerMinute);
+    unitResolver.addUnit("Btu/ft2/sec", HeatSourceAndReactionIntensityUnits::BtusPerSquareFootPerSecond);
+    unitResolver.addUnit("Btu/ft3", HeatSinkUnits::BtusPerCubicFoot);
+    unitResolver.addUnit("Btu/lb", HeatOfCombustionUnits::BtusPerPound);
+    unitResolver.addUnit("ac", AreaUnits::Acres);
+    unitResolver.addUnit("ch", LengthUnits::Chains);
+    unitResolver.addUnit("ch/h", SpeedUnits::ChainsPerHour);
+    unitResolver.addUnit("ft", LengthUnits::Feet);
+    // unitResolver.addUnit("ft-lb/s/ft2"); // FIXME Power Units
+    unitResolver.addUnit("ft/min", SpeedUnits::FeetPerMinute);
+    unitResolver.addUnit("ft2", AreaUnits::SquareFeet);
+    // unitResolver.addUnit("ft2/ac"); // FIXME Basal Area Units
+    unitResolver.addUnit("ft2/ft3", SurfaceAreaToVolumeUnits::SquareFeetOverCubicFeet);
+    unitResolver.addUnit("in", LengthUnits::Inches);
+    unitResolver.addUnit("lb/ft3", DensityUnits::PoundsPerCubicFoot);
+    unitResolver.addUnit("lbs/ft3", DensityUnits::PoundsPerCubicFoot);
+    unitResolver.addUnit("mi", LengthUnits::Miles);
+    unitResolver.addUnit("mi/h", SpeedUnits::MilesPerHour);
+    // unitResolver.addUnit("ms"); // FIXME
+    unitResolver.addUnit("oF", TemperatureUnits::Fahrenheit);
+    // unitResolver.addUnit("per, ac"); // FIXME Tree Count
+    unitResolver.addUnit("ton/ac", LoadingUnits::TonsPerAcre);
+    unitResolver.addUnit("cm", LengthUnits::Centimeters);
+    unitResolver.addUnit("ha", AreaUnits::Hectares);
+    unitResolver.addUnit("kJ/kg", HeatOfCombustionUnits::KilojoulesPerKilogram);
+    unitResolver.addUnit("kJ/m2", HeatPerUnitAreaUnits::KilojoulesPerSquareMeter);
+    unitResolver.addUnit("kJ/m3", HeatSinkUnits::KilojoulesPerCubicMeter);
+    unitResolver.addUnit("kW/m", FirelineIntensityUnits::KilowattsPerMeter);
+    unitResolver.addUnit("kW/m2", HeatSourceAndReactionIntensityUnits::KilowattsPerSquareMeter);
+    unitResolver.addUnit("kg/m3", DensityUnits::KilogramsPerCubicMeter);
+    unitResolver.addUnit("km", LengthUnits::Kilometers);
+    unitResolver.addUnit("km/h", SpeedUnits::KilometersPerHour);
+    unitResolver.addUnit("m", LengthUnits::Meters);
+    unitResolver.addUnit("m/h", SpeedUnits::MetersPerHour); // FIXME
+    unitResolver.addUnit("m/min", SpeedUnits::MetersPerMinute);
+    unitResolver.addUnit("m2", AreaUnits::SquareMeters);
+    // unitResolver.addUnit("m2/ha"); // FIXME Basal Area
+    unitResolver.addUnit("m2/m3", SurfaceAreaToVolumeUnits::SquareMetersOverCubicMeters);
+    unitResolver.addUnit("mm", LengthUnits::Millimeters);
+    unitResolver.addUnit("oC", TemperatureUnits::Celsius);
+    // unitResolver.addUnit("per, ha"); // FIXME Tree Density
+    unitResolver.addUnit("tonne/ha", LoadingUnits::TonnesPerHectare);
+    unitResolver.addUnit("s", TimeUnits::Seconds);
+    unitResolver.addUnit("min", TimeUnits::Minutes);
+    unitResolver.addUnit("h", TimeUnits::Hours);
+    unitResolver.addUnit("days", TimeUnits::Days);
+    unitResolver.addUnit("years", TimeUnits::Years);
+  }
+#+END_SRC
+
+** Enum Storage
+#+BEGIN_SRC cpp
+  // Define the UnitResolver class
+  class UnitResolver {
+  private:
+    std::unordered_map<std::string, std::unordered_map<std::string, int>> unitTypes_;
+
+  public:
+    template<typename Unit>
+    void registerEnum() {
+      unitTypes_[typeid(Unit).name()] = std::unordered_map<std::string, int>();
+    }
+
+    template<typename Unit>
+    void addUnit(const std::string& shortcode, const Unit& unit) {
+      auto unitType = unitTypes_[typeid(Unit).name()];
+      unitType[shortcode] = unit;
+    }
+
+    template<typename Unit>
+    Unit getUnit(const std::string& shortcode) {
+      auto unitPtr = unitTypes_[shortcode];
+      return *static_cast<Unit*>(unitPtr);
+    }
+  };
+
+  int main() {
+    // Create an instance of UnitResolver
+    UnitResolver unitResolver;
+
+    // Register the enum types
+    unitResolver.registerEnum<FractionUnits>();
+    unitResolver.registerEnum<LengthUnits>();
+
+    // Add units
+    unitResolver.addUnit("%", FractionUnits::Percent);
+    unitResolver.addUnit("m", LengthUnits::Meters);
+
+    // Retrieve the units
+    FractionUnits result1 = unitResolver.getUnit<FractionUnits>("%");
+    LengthUnits result2 = unitResolver.getUnit<LengthUnits>("m");
+
+    return 0;
+  }
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC cpp
+  // Get the first value of the enum
+  template<typename Enum>
+  auto getValue(std::string enumName) {
+    if (enumName == typeid(Enum).name()) {
+      return static_cast<Enum>(0);
+    }
+    // Handle error case when enumName does not match
+    // any known enums
+    throw std::runtime_error("Unknown enumName");
+  }
+
+
+  int main() {
+    std::string enumName = typeid(LengthUnits::LengthUnitsEnum).name();
+
+    std::cout << enumName << std::endl;
+
+    std::cout << getFirstValue<LengthUnits::LengthUnitsEnum>(enumName);
+
+    return 0;
+  }
+#+END_SRC
+
+#+BEGIN_SRC cpp
+
+template<typename T>
+struct remove_cvref {
+    using type = std::remove_cv_t<std::remove_reference_t<T>>;
+};
+
+template<typename T>
+using remove_cvref_t = typename remove_cvref<T>::type;
+
+template<typename T>
+const std::string& getTypeName() {
+    static const std::string name = typeid(remove_cvref_t<T>).name();
+    return name;
+}
+
+int main() {
+    int x = 42;
+    const auto& typeName = getTypeName<decltype(x)>();
+    std::cout << typeName << std::endl;
+
+    return 0;
+}
+#+END_SRC
+
+#+RESULTS:
+
+: i
+
+** Arity 
+#+BEGIN_SRC cpp :tangle include/cpp/unitResolver.cpp
+  // Helper struct to store the number of arguments as a non-type template parameter
+  template <typename Func>
+  struct Arity;
+
+  // Specialization of Arity for functions with non-void return type
+  template <typename R, typename... Args>
+  struct Arity<R(Args...)> {
+      static constexpr std::size_t value = sizeof...(Args);
+  };
+
+  // Specialization of Arity for functions with void return type
+  template <typename... Args>
+  struct Arity<void(Args...)> {
+      static constexpr std::size_t value = sizeof...(Args);
+  };
+
+  // Helper function to simplify the usage of getArity
+  template <typename Func>
+  constexpr std::size_t getArity(const Func&) {
+      return Arity<Func>::value;
+  }
+
+  int main() {
+    getArity(&SIGContainAdapter::get)
+
+  
+  }
+#+END_SRC
+
+** std::variant
+
+#+BEGIN_SRC cpp
+  using Number = std::variant<int, double>;
+
+  // Helper struct to store the number of arguments as a non-type template parameter
+  template <typename Func>
+  struct Arity;
+
+  // Specialization for non-void member function pointers
+  template <typename R, typename Class, typename... Args>
+  struct Arity<R (Class::*)(Args...)> {
+    static constexpr std::size_t value = sizeof...(Args);
+  };
+
+  // Specialization for void member function pointers
+  template <typename Class, typename... Args>
+  struct Arity<void (Class::*)(Args...)> {
+    static constexpr std::size_t value = sizeof...(Args);
+  };
+
+  // Helper function to simplify the usage of getArity
+  template <typename Func>
+  constexpr std::size_t getArity(const Func&) {
+    return Arity<Func>::value;
+  }
+
+  class MyClass {
+  public:
+    double myFunction_0() const {
+      // code here
+      return 3.14;
+    }
+    double myFunction_1(int level) const {
+      // code here
+      return 12.3 * double(level);
+    }
+  };
+
+  template<typename ObjType>
+  std::function<double(void*)> convertGetter_0(double(ObjType::*func)()) {
+    return [=](void* obj) {
+      return wrapperGetter(static_cast<ObjType*>(obj), func);
+    };
+  };
+
+  template<typename ObjType>
+  std::function<double(void*, std::string)> convertGetter_1(double (ObjType::*func)(EnumType)) {
+    return [=](void* obj, std::string str) {
+      int value = std::stoi(str);
+      return wrapperGetter(static_cast<ObjType*>(obj), func, value);
+    };
+  };
+
+  int main()
+  {
+
+    // Number v = 0.03;
+
+    // std::cout << "v.index " << v.index() << " " << std::get<double>(v) << '\n';
+
+    // v = 3; 
+
+    // std::cout << "v.index " << v.index() << " " << std::get<int>(v) << '\n';
+
+
+    auto fn_0 = convertGetter_0(&MyClass::myFunction_0);
+    auto fn_1 = convertGetter_1(&MyClass::myFunction_1);
+
+  };
+
+#+END_SRC
+
+** variant matching
+#+BEGIN_SRC cpp
+  namespace {
+    template <typename... Functors>
+    struct overload_set : Functors...
+    {
+      using Functors::operator()...;
+    };
+
+    template <typename... Ts>
+    overload_set(Ts...) -> overload_set<Ts...>;
+
+  }
+
+  template <typename Variant>
+  class match
+  {
+  public:
+    constexpr explicit match(const Variant& variant) : d_variant(variant) {}
+
+    template<typename... Fs>
+    constexpr auto on(Fs... fs)
+    {
+      return std::visit(overload_set<Fs...> { std::forward<Fs>(fs)... }, d_variant);
+    }
+
+  private:
+    Variant d_variant;
+  };
+
+  // Examples
+  class MyClass {
+  private:
+    double _size;
+  public:
+    void setSize(double size) { _size = size; };
+    double getSize() { return _size; };
+  };
+
+  using Getter0 = std::function<double(void*)>;
+  using Getter1 = std::function<double(void*, int)>;
+  using SetString = std::function<void(void*, std::string)>;
+  using SetDouble1 = std::function<void(void*, double)>;
+  using SetDouble2 = std::function<void(void*, double, int)>;
+
+  int main() {
+    std::variant<Getter0, Getter1, SetString, SetDouble1, SetDouble2> fns;
+
+    fns = [](void* obj, double size) {
+      std::invoke(&MyClass::setSize, static_cast<MyClass*>(obj), size);
+    };
+
+    //fns = [](void* obj) -> double {
+    //  std::invoke(&MyClass::getSize, static_cast<MyClass*>(obj));
+    //};
+
+    std::cout << fns.index() << std::endl;
+
+    MyClass* myClass = new MyClass();
+    match(fns).on(
+                  [=](Getter0 f) { std::cout << "Value: " << std::invoke(f, myClass) << std::endl; },
+                  [=](SetDouble1 f) { std::invoke(f, myClass, 30); },
+                  [](auto y) { std::cout << "The value was something else!" << std::endl; });
+
+    std::cout << "Value:" << myClass->getSize();
+
+
+  };
+#+END_SRC
+
+
+
+#+RESULTS:
+|        3 |
+| Value:30 |
+
+** Calling Member Funcs
+
+### Update this example to allow callMemberFunction to be passed the
+class to operate on
+
+#+BEGIN_SRC cpp
+
+  //template <typename T>
+  //double callMemberFunction(const T& obj, double(T::memberFunc*)()) {
+  //    return memberFunc(obj);
+  //};
+
+  using Number = std::variant<int, double>;
+
+  class MyClass {
+  private:
+    double myNumber = 3.14;
+
+  public:
+    void setMyNumber(double newNumber) {
+      myNumber = newNumber;
+    }
+
+    double getMyNumber() const {
+      return myNumber;
+    }
+
+    double getAnotherNumber() {
+      return 30.0;
+    }
+  };
+
+  // template<typename T>
+  // std::function<int(void*, Number)> wrapSetter(void (T::*func)(int)) {
+  //   return [=](void* obj, Number n) {
+  //     Number result = std::invoke(func, static_cast<const T*>(obj), std::get<int>(n));
+  //     return result;
+  //   };
+  // }
+
+  // template<typename T>
+  // std::function<double(void*, Number)> wrapSetter(void (T::*func)(double)) {
+  //   return [=](void* obj, Number n) {
+  //     double result = std::invoke(func, static_cast<const T*>(obj), std::get<double>(n));
+
+  //     return result;
+  //   };
+  // }
+
+  template<typename T>
+  std::function<double(void*)> wrap(double (T::*func)()) {
+    return [=](void* obj) {
+      return std::invoke(func, static_cast<T*>(obj));
+    };
+  }
+
+  template<typename T>
+  std::function<double(void*)> wrap(double (T::*func)() const) {
+    return [=](void* obj) {
+      return std::invoke(func, static_cast<const T*>(obj));
+    };
+  }
+
+  template<typename T>
+  void processFunctionResult(double (T::*fn)()) {
+    T myObject;
+    // double result = (myObject.*fn)();
+    double result = std::invoke(fn, myObject);
+    std::cout << "Result: " << result << std::endl;
+  }
+
+  template<typename T>
+  void processFunctionResult(double (T::*fn)() const) {
+    T myObject;
+    // double result = (myObject.*fn)();
+    double result = std::invoke(fn, myObject);
+    std::cout << "Result: " << result << std::endl;
+  }
+
+  int main() {
+    // MyClass myObject;
+    // auto fn = &MyClass::getAnotherNumber;
+    // double result = std::invoke(fn, myObject);
+    // std::cout << "Result: " << result << std::endl;
+
+    MyClass* myObject = new MyClass();
+    void* voidObj = reinterpret_cast<void*>(myObject);
+
+    auto fn_1 = wrap(&MyClass::getMyNumber);
+    auto fn_2 = wrap(&MyClass::getAnotherNumber);
+
+    std::cout << "My#" << std::invoke(fn_1, voidObj) << std::endl
+	      << "Another#" << std::invoke(fn_2, voidObj) << std::endl;
+
+    auto set = wrapSetter(&MyClass::setMyNumber);
+
+    // processFunctionResult(&MyClass::getMyNumber);
+    // processFunctionResult(&MyClass::getAnotherNumber);
+    return 0;
+  }
+
+  //int main() {
+  //  MyClass myObject;
+
+  //  // Fix this to allow myObject to be called with fn
+  //  // auto fn = &MyClass::getMyNumber;
+  //  double (MyClass::*fn)() const = &MyClass::getMyNumber;
+  //  double result = (myObject.*fn)();
+
+  //  std::cout << "Result: " << result << std::endl;
+
+  //  return 0;
+  //};
+#+END_SRC
+
+#+RESULTS:
+
+** Class Resolver
+#+BEGIN_SRC cpp
+  class ClassResolver {
+  private:
+    std::unordered_map<std::string, std::function<void*()>> classMap;
+
+  public:
+    // Add a class type to the resolver
+    template<typename C>
+    void addClass(const std::string& name) {
+      classMap[name] = []() -> void* { return static_cast<void*>(new C()); };
+      // classMap[name] = []() -> void* { return new C(); };
+    }
+
+    // Resolve the string to a class type
+    void* resolve(const std::string& name) {
+      auto it = classMap.find(name);
+      if (it != classMap.end()) {
+	return (it->second)();
+      }
+      return nullptr;
+    }
+  };
+
+  class A {
+  private:
+    int herp;
+
+  public:
+    void setHerp(int _herp) { herp = _herp; };
+    int getHerp() { return herp; };
+  };
+
+  class B {
+  private:
+    int derp;
+
+  public:
+    void setDerp(int _derp) { derp = _derp; };
+    int getDerp() { return derp; };
+  };
+
+  int main() {
+
+    ClassResolver classResolver;
+
+    classResolver.addClass<A>("A");
+    auto obj = classResolver.resolve("A");
+
+    &A::
+
+    // Write a lambda expression that constructs a new instance of class A
+    // auto a = []() -> void* { return static_cast<void*>(new A()); };
+
+    // Write a lambda expression that constructs a new instance of class B
+    // auto b = []() -> std::variant<A, B> { return B(); };
+  }
+
+  // template<typename... T>
+  // class ClassResolver {
+  // private:
+  //   std::unordered_map<std::string, std::function<void*()> classMap;
+
+  // public:
+  //   // Define a type alias for the variant
+  //   using Type = std::variant<T...>;
+
+  //   // Define a type alias for the function pointer type
+  //   using FunctionPtr = Type(*)(void);
+
+  //   // Add a class type to the resolver
+  //   template<typename C>
+  //   void addClass(const std::string& name) {
+  //     classMap[name] = []() -> void* { return new C(); };
+  //   }
+
+  //   // Resolve the string to a class type
+  //   void* resolve(const std::string& name) {
+  //     auto it = classMap.find(name);
+  //     if (it != classMap.end()) {
+  // 	return (it->second)();
+  //     }
+  //     return Type(nullptr);
+  //   }
+
+  // };
+
+#+END_SRC
+
+#+RESULTS:
+
+** Macros
+
+#+BEGIN_SRC cpp
+
+  #define GREETING_true_true(name) "Ciao, " #name
+  #define GREETING_true_false(name) "Hello, " #name
+  #define GREETING_false_true(name) "Fangul, " #name
+  #define GREETING_false_false(name) "Meh, " #name
+  #define GREETING_true(name, italian) GREETING_true_##italian(name)
+  #define GREETING_false(name, italian) GREETING_false_##italian(name)
+  #define GREETING(name, friendly, italian) GREETING_##friendly(name, italian)
+
+  int main() {
+    std::cout << GREETING(RJ, false, false);
+  }
+#+END_SRC
+
+#+RESULTS:
+| Meh | RJ |
+
+** Multi-input conversion
+
+*** Testing Unpack
+
+#+BEGIN_SRC cpp
+  class Business {
+  private:
+    std::string _name;
+    int _num_employees;
+    double _profit;
+    bool _online_only;
+
+  public:
+    void updateBusiness(const std::string& name, int num_employees, double profit, bool online_only) {
+      _name = name;
+      _num_employees = num_employees;
+      _profit = profit;
+      _online_only = online_only;
+    }
+  };
+
+
+  template <typename T>
+  T convert(const std::string& val);
+
+  template <>
+  int convert<int>(const std::string& val) {
+    std::cout << "CONVERT TO INT: " << val << std::endl;
+    return std::stoi(val);
+  }
+
+  template <>
+  double convert<double>(const std::string& val) {
+    std::cout << "CONVERT TO DOUBLE: " << val << std::endl;
+    if (!val.empty()) {
+      return 10;
+    } else {
+      return 0;
+    }
+  }
+
+  template <>
+  bool convert<bool>(const std::string& val) {
+    std::cout << "CONVERT TO BOOL: " << val << std::endl;
+    return val == "true" || val == "1";
+  }
+
+  template <>
+  std::string convert<std::string>(const std::string& val) {
+    std::cout << "CONVERT TO STRING: " << val << std::endl;
+    return val;
+  }
+
+  // std::tuple<> unpackAndApply() {
+  //   return {};
+  // }
+
+  template<typename... Args>
+  auto count(Args&&...)
+  {
+    return sizeof...(Args);
+  }
+
+  // template <typename... T>
+  // std::tuple<T...> unpackAndApply(initializer_list<std::string> l) {
+  //   std::cout << "# Args:" << l.size();
+
+  //   return {convert<T>(l)};
+  //   // auto head = convert<T>(param);
+  //   // std::tuple<Ts...> remainder = unpackAndApply<Ts...>(rest);
+  //   // return std::tuple_cat(make_tuple(head), remainder);
+  // }
+
+  template <typename... Args>
+  std::tuple<Args...> returnTuple(std::initializer_list<std::string> vals) {
+      std::tuple<Args...> args;
+      // Assuming convert is a function that convert string to a required type
+      auto it = std::begin(vals);
+      auto apply = [&](auto& arg) {
+	  arg = convert<decltype(arg)>(*it++);
+      };
+      std::apply([&](auto&... args) { (..., apply(args)); }, args);
+      return args;
+  }
+
+  // template <typename... T>
+  // std::tuple<T...> unpackAndApply(const std::string& param ...) {
+  //   return {convert<T>(param)...};
+  // }
+
+  template <typename... Args>
+  auto make_lambda(void (Business::*mem_fun)(Args...)) {
+    return [mem_fun](Business& b, const std::vector<std::string>& vals) {
+      std::tuple<Args...> args;
+      unpackAndApply<Args...>(vals, 0, args);
+      std::apply([&](auto&&... args) { (b.*mem_fun)(std::forward<decltype(args)>(args)...); }, args);
+    };
+  }
+
+  int main() {
+    // Business b;
+
+    // auto fn = make_lambda(&Business::updateBusiness);
+
+    std::cout << convert<double>("250.0");
+
+    // Complete the function 
+    auto my_tuple = unpackAndApply<std::string, bool, double>("Brick and Mortar Co.", "true", "250.0");
+
+    std::cout << std::get<0>(my_tuple)  << " " << std::get<1>(my_tuple);
+
+    return 0;
+  }
+#+END_SRC
+
+#+RESULTS:
+
+*** Simple Unpack
+
+#+BEGIN_SRC cpp
+
+  template <typename... T>
+  std::tuple<T...> unpackAndApply(const std::string param ...) {
+    return {convert<T>(param)...};
+  }
+
+  int main() {
+
+    std::cout << unpackAndApply<int>();
+
+    return 0;
+  }
+#+END_SRC
+
+
+*** Recursive Variadic Templates
+
+#+BEGIN_SRC cpp
+
+  // base case
+  template<typename T>
+  T add(T v) {
+    return v;
+  }
+
+  // recursive case
+  template<typename T, typename... Args>
+  T add(T first, Args... args) {
+    return first + add(args...);
+  }
+
+
+
+  //// base case
+  //template<typename T>
+  //std::tuple<T> toTuple(T v) {
+  //  return std::make_tuple(v);
+  //}
+
+  //// recursive case
+  //template<typename T, typename... Args>
+  //std::tuple<T, Args...> toTuple(T first, Args... args) {
+  //  return std::tuple_cat(toTuple(first), toTuple(args...));
+  //}
+
+  // template<typename T>
+  // std::tuple<T> toTupleImpl(int index, std::vector<std::string> args) {
+  //   if (index < args.size()) {
+  //     return std::make_tuple(convert<T>(args.at(index)));
+  //   } else {
+  //     return {};
+  //   }
+  // }
+
+  //template<typename T, typename std::enable_if_t<std::is_fundamental_v<T>>>
+  //std::tuple<T> toTupleImpl(int index, std::vector<std::string> args) {
+  //  return { convert<T>(args.at(index)) };
+  //} 
+
+  //template<typename T, typename... Args, typename std::enable_if_t<sizeof...(Args) == 0>>
+  //std::tuple<T> toTupleImpl(int index, std::vector<std::string> args) {
+  //  return { convert<T>(args.at(index)) };
+  //} 
+  template <typename T>
+  T convert(const std::string& val);
+
+  template <>
+  int convert<int>(const std::string& val) {
+    return std::stoi(val);
+  }
+
+  template <>
+  double convert<double>(const std::string& val) {
+    return std::stod(val);
+  }
+
+  template <>
+  bool convert<bool>(const std::string& val) {
+    return val == "true" || val == "1";
+  }
+
+  template <>
+  std::string convert<std::string>(const std::string& val) {
+    return val;
+  }
+
+  //// Original
+  //template<>
+  //std::tuple<> toTupleImpl(int index, std::vector<std::string> args) {
+  //  return {};
+  //}
+  //
+  //template<typename T, typename... Args>
+  //std::tuple<T, Args...> toTupleImpl(int index, std::vector<std::string> args) {
+  //  if (index < args.size()) {
+  //    return std::tuple_cat(std::make_tuple(convert<T>(args.at(index))), toTupleImpl<Args...>(index + 1, args));
+  //  } else {
+  //    return {};
+  //  }
+  //} 
+
+  // GPT
+  // base case
+  // template<>
+  // std::tuple<> toTupleImpl<>(int, std::vector<std::string>&) {
+  //   return std::tuple<>();
+  // }
+
+  template<typename T>
+  std::tuple<T> toTupleImpl(int index, const std::vector<std::string>& args) {
+    return { convert<T>(args.at(index)) };
+  }
+
+  // recursive case
+  template<typename T, typename... Args>
+  std::tuple<T, Args...> toTupleImpl(int index, std::vector<std::string>& args) {
+    if ((index > 0) && ((index + 1) == args.size())) {
+      return { convert<T>(args.at(index)) };
+    } else if (index < args.size()) {
+      return std::tuple_cat(std::make_tuple(convert<T>(args.at(index))), toTupleImpl<Args...>(index + 1, args));
+    } else {
+      return std::tuple<Args...>();
+    }
+  }
+
+  // recursive case
+  template<typename... Args>
+  std::tuple<Args...> toTuple(std::vector<std::string> args) {
+    return toTupleImpl<Args...>(0, args);
+  }
+
+  int main()
+  {
+    toTuple<std::string, int, double>(std::vector<std::string>({"test", "1", "2.0"}));
+
+    return 0;
+  }
+
+#+END_SRC
+
+#+RESULTS:
+
+*** Tuple Write
+#+BEGIN_SRC cpp
+  // From https://stackoverflow.com/a/21675677/763738
+  template<typename Tuple, std::size_t remaining>
+  struct write_tuple
+  {
+    static void execute(Tuple const & t)
+    {
+      std::cout << std::get<std::tuple_size<Tuple>::value - remaining>(t) << std::endl;
+      write_tuple<Tuple, remaining - 1>::execute(t);
+    }
+  };
+
+  template<typename Tuple>
+  struct write_tuple<Tuple, 0>
+  {
+    static void execute(Tuple const & t) {};
+  };
+
+  template<typename Tuple>
+  void write(Tuple const & t)
+  {
+    write_tuple<Tuple, std::tuple_size<Tuple>::value>::execute(t);
+  }
+
+  // array length template
+  template <typename T, size_t n>
+  constexpr size_t array_size(const T (&)[n]) { return n; }
+
+  // Convert
+  template <typename T>
+  T convert(const std::string& val);
+
+  template <>
+  int convert<int>(const std::string& val) {
+    return std::stoi(val);
+  }
+
+  template <>
+  double convert<double>(const std::string& val) {
+    return std::stod(val);
+  }
+
+  template <>
+  bool convert<bool>(const std::string& val) {
+    return val == "true" || val == "1";
+  }
+
+  template <>
+  std::string convert<std::string>(const std::string& val) {
+    return val;
+  }
+
+  template<std::size_t N, std::size_t remaining, typename T, typename ... Ts>
+  struct pack_tuple
+  {
+    static std::tuple<T, Ts...> execute(std::array<std::string, N> v) {
+
+      std::tuple head = { convert<T>(v.at(N - remaining)) };
+      return std::tuple_cat(head, pack_tuple<N, remaining - 1, Ts...>::execute(v));
+
+    };
+  };
+
+  template<std::size_t N, typename T>
+  struct pack_tuple<N, 1, T>
+  {
+    static std::tuple<T> execute(std::array<std::string, N> v) {
+      return { convert<T>(v.at(N - 1)) };
+    };
+  };
+
+  template<size_t N, typename ... Ts>
+  void pack(std::tuple<Ts...> & out, std::array<std::string, N> v)
+  {
+    auto result = pack_tuple<N, N, Ts...>::execute(v);
+    out.swap(result);
+  }
+
+  int main() {
+    std::array<std::string, 4> my_array = {"test", "1", "2.0", "true"};
+    std::tuple<std::string, int, double, bool> my_tuple;
+    pack(my_tuple, my_array);
+    write(my_tuple);
+  }
+#+END_SRC
+
+#+RESULTS:
+| test |
+|    1 |
+|    2 |
+|    1 |
+
+** Enum to Integer (and back)
+#+BEGIN_SRC cpp :tangle include/cpp/unitResolver.cpp
+  class UnitResolver {
+  private:
+    std::unordered_map<std::string, int> units_;
+  public:
+    UnitResolver() {
+      addUnit(AreaUnits::Acres, "ac");
+      addUnit(AreaUnits::Hectares, "ha");
+      addUnit(AreaUnits::SquareFeet, "ft2");
+      addUnit(AreaUnits::SquareMeters, "m2");
+
+      addUnit(DensityUnits::KilogramsPerCubicMeter, "kg/m3");
+      addUnit(DensityUnits::PoundsPerCubicFoot, "lb/ft3");
+      addUnit(DensityUnits::PoundsPerCubicFoot, "lbs/ft3");
+
+      addUnit(FirelineIntensityUnits::BtusPerFootPerMinute, "Btu/ft/min");
+      addUnit(FirelineIntensityUnits::BtusPerFootPerSecond, "Btu/ft/s");
+      addUnit(FirelineIntensityUnits::KilowattsPerMeter, "kW/m");
+
+      addUnit(FractionUnits::Fraction, "fraction");
+      addUnit(FractionUnits::Percent, "%");
+
+      addUnit(HeatOfCombustionUnits::BtusPerPound, "Btu/lb");
+      addUnit(HeatOfCombustionUnits::KilojoulesPerKilogram, "kJ/kg");
+
+      addUnit(HeatPerUnitAreaUnits::BtusPerSquareFoot, "Btu/ft2");
+      addUnit(HeatPerUnitAreaUnits::KilojoulesPerSquareMeter, "kJ/m2");
+
+      addUnit(HeatSinkUnits::BtusPerCubicFoot, "Btu/ft3");
+      addUnit(HeatSinkUnits::KilojoulesPerCubicMeter, "kJ/m3");
+
+      addUnit(HeatSourceAndReactionIntensityUnits::BtusPerSquareFootPerMinute, "Btu/ft2/min");
+      addUnit(HeatSourceAndReactionIntensityUnits::BtusPerSquareFootPerSecond, "Btu/ft2/sec");
+      addUnit(HeatSourceAndReactionIntensityUnits::KilowattsPerSquareMeter, "kW/m2");
+
+      addUnit(LengthUnits::Centimeters, "cm");
+      addUnit(LengthUnits::Chains, "ch");
+      addUnit(LengthUnits::Feet, "ft");
+      addUnit(LengthUnits::Inches, "in");
+      addUnit(LengthUnits::Kilometers, "km");
+      addUnit(LengthUnits::Meters, "m");
+      addUnit(LengthUnits::Miles, "mi");
+      addUnit(LengthUnits::Millimeters, "mm");
+
+      addUnit(LoadingUnits::TonnesPerHectare, "tonne/ha");
+      addUnit(LoadingUnits::TonsPerAcre, "ton/ac");
+
+      addUnit(SlopeUnits::Degrees, "deg");
+
+      addUnit(SpeedUnits::ChainsPerHour, "ch/h");
+      addUnit(SpeedUnits::FeetPerMinute, "ft/min");
+      addUnit(SpeedUnits::KilometersPerHour, "km/h");
+      addUnit(SpeedUnits::MetersPerHour, "m/h"); // FIXME
+      addUnit(SpeedUnits::MetersPerMinute, "m/min");
+      addUnit(SpeedUnits::MilesPerHour, "mi/h");
+
+      addUnit(SurfaceAreaToVolumeUnits::SquareFeetOverCubicFeet, "ft2/ft3");
+      addUnit(SurfaceAreaToVolumeUnits::SquareMetersOverCubicMeters, "m2/m3");
+
+      addUnit(TemperatureUnits::Celsius, "oC");
+      addUnit(TemperatureUnits::Fahrenheit, "oF");
+
+      addUnit(TimeUnits::Days, "days");
+      addUnit(TimeUnits::Hours, "h");
+      addUnit(TimeUnits::Minutes, "min");
+      addUnit(TimeUnits::Seconds, "s");
+      addUnit(TimeUnits::Years, "years");
+    }
+
+    void addUnit(int value, const std::string& unit) {
+      units_[unit] = value;
+    }
+
+    template<typename Enum>
+    Enum resolveUnit(const std::string& unit) {
+      return static_cast<Enum>(units_[unit]);
+    }
+  };
+
+  class FuncConverter {
+  private:
+    UnitResolver _unitResolver;
+  public:
+    FuncConverter(UnitResolver &unitResolver) : _unitResolver(unitResolver) {}
+
+    // Discrete Setter
+    template<typename ObjType, typename EnumType>
+    void wrapperDiscreteSetter(ObjType* obj, void (ObjType::*func)(EnumType), std::string str) {
+      // Convert the input string to the desired EnumType
+      EnumType enumValue = static_cast<EnumType>(std::stoi(str));
+
+      // Call the member function of the object with the converted EnumType
+      (obj->*func)(enumValue);
+    }
+
+    template<typename ObjType, typename EnumType>
+    std::function<void(void*, std::string)> convertDiscreteSetter(void (ObjType::*func)(EnumType)) {
+      return [=](void* obj, std::string str) {
+	wrapperDiscreteSetter(static_cast<ObjType*>(obj), func, str);
+      };
+    }
+
+    // Continous Setter
+    template<typename ObjType, typename EnumType>
+    void wrapperContinuousSetter(ObjType* obj, void (ObjType::*func)(double, EnumType), double num, std::string str) {
+      // Convert the input string to the desired EnumType
+      EnumType enumValue = _unitResolver.resolveUnit<EnumType>(str);
+
+      // Call the member function of the object with the converted EnumType
+      (obj->*func)(num, enumValue);
+    }
+
+    template<typename ObjType, typename EnumType>
+    std::function<void(void*, double, std::string)> convertContinuousSetter(void (ObjType::*func)(double, EnumType)) {
+      return [=](void* obj, double num, std::string str) {
+	wrapperContinuousSetter(static_cast<ObjType*>(obj), func, num, str);
+      };
+    }
+
+    // Calculate Wrapper
+    template<typename ObjType>
+    std::function<void(void*)> convertCalculate(void (ObjType::*func)()) {
+      return [=](void* obj, std::string str) {
+	(obj->*func)();
+      };
+    }
+
+    // Getters
+    template<typename ObjType, typename EnumType>
+    double wrapperGetter(ObjType* obj, double (ObjType::*func)(EnumType), std::string str) {
+      // Convert the input string to the desired EnumType
+      EnumType enumValue = _unitResolver.resolveUnit<EnumType>(str);
+
+      // Call the member function of the object with the converted EnumType
+      return (obj->*func)(enumValue);
+    }
+
+    template<typename ObjType, typename EnumType>
+    std::function<double(void*, std::string)> convertGetter(double (ObjType::*func)(EnumType)) {
+      return [=](void* obj, std::string str) {
+	return wrapperGetter(static_cast<ObjType*>(obj), func, str);
+      };
+    }
+  };
+
+  class SIGTestClass {
+  public:
+    void setHeight(double height, LengthUnits::LengthUnitsEnum units) {
+      height_ = LengthUnits::toBaseUnits(height, units);
+    };
+
+    double getHeight(LengthUnits::LengthUnitsEnum units) {
+      return LengthUnits::fromBaseUnits(height_, units);
+    };
+
+    void setSpeed(double speed, SpeedUnits::SpeedUnitsEnum units) {
+      speed_ = SpeedUnits::toBaseUnits(speed, units);
+    };
+
+    double getSpeed(SpeedUnits::SpeedUnitsEnum units) {
+      return SpeedUnits::fromBaseUnits(speed_, units);
+    };
+
+    void setUnits(LengthUnits::LengthUnitsEnum units) {
+      units_ = units;
+    }
+
+    LengthUnits::LengthUnitsEnum getUnits() {
+      return units_;
+    }
+
+  private:
+    double height_;
+    double speed_;
+    LengthUnits::LengthUnitsEnum units_;
+  };
+
+  int main() {
+    std::unordered_map<std::string, std::function<void(void*, std::string)>> discrete_setters;
+    std::unordered_map<std::string, std::function<void(void*, double, std::string)>> cont_setters;
+    std::unordered_map<std::string, std::function<double(void*, std::string)>> getters;
+
+    UnitResolver unitResolver;
+
+    FuncConverter fnConverter(unitResolver);
+
+    SIGTestClass sut;
+
+    // sut.setSpeed(30.0, SpeedUnits::MilesPerHour);
+    cont_setters["setHeight"] = fnConverter.convertContinuousSetter(&SIGTestClass::setHeight);
+    cont_setters["setHeight"](&sut, 10.0, "mi");
+
+    cont_setters["setSpeed"] = fnConverter.convertContinuousSetter(&SIGTestClass::setSpeed);
+    cont_setters["setSpeed"](&sut, 30.0, "mi/h");
+
+    discrete_setters["setUnits"] = fnConverter.convertDiscreteSetter(&SIGTestClass::setUnits);
+    discrete_setters["setUnits"](&sut, "3");
+
+    getters["getSpeed"] = fnConverter.convertGetter(&SIGTestClass::getSpeed);
+    std::cout << getters["getSpeed"](&sut, "ft/min") << std::endl;
+    std::cout << sut.getSpeed(SpeedUnits::FeetPerMinute) << std::endl;
+
+    getters["getHeight"] = fnConverter.convertGetter(&SIGTestClass::getHeight);
+    std::cout << getters["getHeight"](&sut, "ft") << std::endl;
+    std::cout << sut.getHeight(LengthUnits::Feet) << std::endl;
+
+    std::cout << sut.getUnits() << std::endl;
+
+    return 0;
+  }
+#+END_SRC
+
+#+RESULTS:
+|  2640 |
+|  2640 |
+| 52800 |
+| 52800 |
+|     3 |
+
+#+BEGIN_SRC cpp
+  int main() {
+    std::cout << static_cast<std::underlying_type_t<LengthUnits::LengthUnitsEnum>>(std::stoi("0"));
+  }
+#+END_SRC
+
+#+RESULTS:
+: 0
+
+** JSON
+#+NAME: json
+#+BEGIN_SRC cpp
+
+  using jon = nlohmann::json;
+
+  int main() {
+
+    // Read JSON file
+    std::ifstream file("data.json");
+    if (!file) {
+      std::cerr << "Failed to open file!" << std::endl;
+      return 1;
+    }
+
+    json jsonData;
+    file >> jsonData;
+    file.close();
+
+    json inputs = jsonData["SIGTestClass"]["inputs"];
+    for (json::iterator it = inputs.begin(); it != inputs.end(); ++it) {
+      json input_array = it.value();
+      if (input_array.size() == 2) {
+	std::cout << "ContInput: " << it.key() << " " << input_array[0] << " " << input_array[1] << std::endl;
+      } else if (input_array.size() == 1) {
+	std::cout << "DiscInput: " << it.key() << " " << input_array[0] << std::endl;
+      }
+    }
+
+    json outputs = jsonData["SIGTestClass"]["outputs"];
+    for (json::iterator it = outputs.begin(); it != outputs.end(); ++it) {
+      json value = it.value();
+      if (value.is_string()) {
+        std::string units = std::string{value};
+	std::cout << "ContOutput: " << it.key() << " " << units << std::endl;
+      } else {
+	std::cout << "DiscOutput: " << it.key() << std::endl;
+      }
+    }
+  }
+#+END_SRC
+
+#+RESULTS: json
+
+
+
+#+RESULTS:
+
+* DocTest
+:PROPERTIES:
+:header-args:cpp:  :flags -I include/cpp/
+:header-args:cpp+: :includes '(<iostream> <nlohmann/json.hpp>)
+:header-args:cpp+: :main no 
+:header-args:cpp+: :cmdline "-ni -nc -nv"
+:END:
+
+#+BEGIN_SRC cpp
+  #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+  #import "doctest.h"
+
+  using json = nlohmann::json;
+
+  int fact(int n) {
+    return n <= 1 ? n : fact(n - 1) * n;
+  }
+
+  TEST_CASE("testing the factorial function") {
+    CHECK(fact(0) == 0); // should fail
+    CHECK(fact(1) == 1);
+    CHECK(fact(2) == 2);
+    CHECK(fact(3) == 6);
+    CHECK(fact(10) == 3628800);
+  }
+
+  TEST_CASE("[json] testing the JSON parse method") {
+    // Using (raw) string literals and json::parse
+    json ex1 = json::parse(R"(
+         {
+           "pi": 3.141,
+           "happy": true,
+           "arr": [1, 2, 3]
+         }
+       )");
+
+    CHECK(ex1["happy"] == true);
+    CHECK(ex1["pi"] == 3.141);
+    CHECK(ex1["arr"][0] == 1);
+  }
+#+END_SRC

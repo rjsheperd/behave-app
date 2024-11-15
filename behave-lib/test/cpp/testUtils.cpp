@@ -41,6 +41,23 @@ std::string trim(const std::string& str)
   return str.substr(strBegin, strRange);
 }
 
+CSVData* CSVData::factory(std::string const& filename) {
+
+  CSVData* csvData = new CSVData();
+
+  int result = parseCSVFile(filename, csvData->csvHeaders, csvData->csvStringRows, csvData->csvDoubleRows);
+
+  if (result == 0) {
+    return csvData;
+  } else {
+    return nullptr;
+  }
+}
+
+int parseCSVFile(std::string const & filename, CSVData * csvData) {
+  return parseCSVFile(filename, csvData->csvHeaders, csvData->csvStringRows, csvData->csvDoubleRows);
+}
+
 int parseCSVFile(std::string filename,
                  std::vector<std::string> & csvHeaders,
                  std::vector<std::map<std::string, std::string>> & csvStringRows,
@@ -142,3 +159,15 @@ void reportTestResult(int row, struct TestInfo& testInfo, const std::string test
     testInfo.numFailed++;
   }
 }
+
+// void reportTestResult(const std::string testName, const int observed, const int expected)
+// {
+//   BOOST_TEST(observed == expected,
+//                       testName << "\nfailed\nobserved value " << observed << " differs from expected value " << expected);
+// }
+// 
+// void reportTestResult(const std::string testName, const double observed, const double expected, const double epsilon)
+// {
+//   BOOST_TEST(areClose(observed, expected, epsilon),
+//                       testName << "\nfailed\nobserved value " << observed << " differs from expected value " << expected << " by more than " << epsilon << "\n\n");
+// }

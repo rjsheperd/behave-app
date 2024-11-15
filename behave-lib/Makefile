@@ -28,11 +28,11 @@ install: compile
 
 test:
 	cmake -B ${TEST_DIR} -DBEHAVE_WASM=OFF -DTEST_BEHAVE=ON
-	cmake --build ${TEST_DIR}
-	./${TEST_DIR}/testBehave
-	./${TEST_DIR}/testSurface test/csv/surface.csv
-	./${TEST_DIR}/testContain test/csv/contain.csv
-	./${TEST_DIR}/testCrown test/csv/crown.csv
+	cd ${TEST_DIR} && cmake --build . && ctest
+#   ./${TEST_DIR}/testBehave
+#   ./${TEST_DIR}/testSurface test/csv/surface.csv
+#   ./${TEST_DIR}/testContain test/csv/contain.csv
+#   ./${TEST_DIR}/testCrown test/csv/crown.csv
 
 ctags:
 	ctags -e -R --exclude=.git --exclude=build --exclude .ccls-cache .

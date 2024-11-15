@@ -1,13 +1,24 @@
+#DEFINE BOOST_TEST_MODULE Crown
+
+#include <boost/test/included/unit_test.hpp>
 #include <iostream>
+#include <sstream>
+#include <vector>
+#include <utility>
 #include "behaveRun.h"
 #include "fuelModels.h"
 #include "testUtils.h"
 
+using namespace boost::unit_test;
+
 // Define the error tolerance for double values
 constexpr double error_tolerance = 1e-06;
 
+constexpr bool DEBUG = 0;
+
 // Testing Structs
 struct CrownTestInputs {
+  std::string testID = "";
   int fuelModelNumber = 0.0;
   double moistureOneHour = 0.0;
   double moistureTenHour = 0.0;
@@ -45,23 +56,11 @@ struct CrownTestOutputs {
 };
 
 // Testing Function Headers
-void testCrownModule(int row, struct TestInfo& testInfo, CrownTestInputs& crownInputs, CrownTestOutputs& crownOutputs, BehaveRun& behaveRun);
+void testCrownModule(CrownTestInputs& crownInputs, CrownTestOutputs& crownOutputs, BehaveRun& behaveRun);
 
-int main(int argc, char * argv[])
-{
-  if (argc == 1) {
-    std::cout << "Unable continue tests. Please supply CSV filename.\n" << std::endl;
-    return 1;
-  }
+typedef std::tuple<int, CrownTestInputs, CrownTestOutputs> TestTuple;
 
-  TestInfo testInfo;
-  FuelModels fuelModels;
-  CrownTestInputs crownInputs;
-  CrownTestOutputs crownOutputs;
-  SpeciesMasterTable mortalitySpeciesTable;
-  BehaveRun behaveRun(fuelModels, mortalitySpeciesTable);
-
-  std::string csvFilename{argv[1]};
+void convertCSVDataToCrownIO(CSVData * csvData, std::vector<TestTuple> * allCrownIO) {
 
   /* Units/Enum Maps */
   std::map<std::string, LengthUnits::LengthUnitsEnum> lengthUnits{
@@ -124,83 +123,58 @@ int main(int argc, char * argv[])
     {"Crowning", FireType::Crowning}
   };
 
-
-  // CSV Reading
-  std::vector<std::string> csvHeaders;
-  std::vector<std::map<std::string, std::string>> csvStringRows;
-  std::vector<std::map<std::string, double>> csvDoubleRows;
-
-  int result = parseCSVFile(csvFilename, csvHeaders, csvStringRows, csvDoubleRows);
-
-  if (result == 0) {
-    printCSVData(csvHeaders, csvStringRows, csvDoubleRows);
-  }
-
-  std::cout << "Performing tests with: " << csvStringRows.size() << " samples.\n";
-
   // Perform Tests using CSV Inputs
-  for (int i = 0; i < csvStringRows.size(); i++) {
+  for (int i = 0; i < csvData->csvStringRows.size(); i++) {
 
-    std::map<std::string, double> doubleRow = csvDoubleRows[i];
-    std::map<std::string, std::string> stringRow = csvStringRows[i];
+    // Init structs
+    CrownTestInputs crownInputs;
+    CrownTestOutputs crownOutputs;
 
     // Set up Inputs
-    crownInputs.fuelModelNumber = doubleRow["fuelModelNumber"];
-    crownInputs.moistureOneHour = doubleRow["moistureOneHour"];
-    crownInputs.moistureTenHour = doubleRow["moistureTenHour"];
-    crownInputs.moistureHundredHour = doubleRow["moistureHundredHour"];
-    crownInputs.moistureLiveHerbaceous = doubleRow["moistureLiveHerbaceous"];
-    crownInputs.moistureLiveWoody = doubleRow["moistureLiveWoody"];
-    crownInputs.moistureFoliar = doubleRow["moistureFoliar"];
-    crownInputs.moistureUnits = moistureUnits[stringRow["moistureUnits"]];
-    crownInputs.windSpeed = doubleRow["windSpeed"];
-    crownInputs.windSpeedUnits = speedUnits[stringRow["windSpeedUnits"]];
-    crownInputs.windHeightInputMode = windHeightInputMode[stringRow["windHeightInputMode"]];
-    crownInputs.windDirection = doubleRow["windDirection"];
-    crownInputs.windAndSpreadOrientationMode = windAndSpreadOrientationMode[stringRow["windAndSpreadOrientationMode"]];
-    crownInputs.windAdjustmentFactor = doubleRow["windAdjFactor"];
-    crownInputs.windAdjustmentFactorCalculationMethod = windAdjustmentFactorCalculationMethod[stringRow["windAdjFactorCalcMethod"]];
-    crownInputs.slope = doubleRow["slope"];
-    crownInputs.slopeUnits = slopeUnits[stringRow["slopeUnits"]];
-    crownInputs.aspect = doubleRow["aspect"];
-    crownInputs.canopyCover = doubleRow["canopyCover"];
-    crownInputs.coverUnits = coverUnits[stringRow["coverUnits"]];
-    crownInputs.canopyHeight = doubleRow["canopyHeight"];
-    crownInputs.canopyBaseHeight = doubleRow["canopyBaseHeight"];
-    crownInputs.canopyHeightUnits = lengthUnits[stringRow["canopyHeightUnits"]];
-    crownInputs.crownRatio = doubleRow["crownRatio"];
-    crownInputs.canopyBulkDensity = doubleRow["canopyBulkDensity"];
-    crownInputs.canopyBulkDensityUnits = densityUnits[stringRow["canopyBulkDensityUnits"]];
+    crownInputs.testID = csvData->csvStringRows[i]["testID"];
+    crownInputs.fuelModelNumber = csvData->csvDoubleRows[i]["fuelModelNumber"];
+    crownInputs.moistureOneHour = csvData->csvDoubleRows[i]["moistureOneHour"];
+    crownInputs.moistureTenHour = csvData->csvDoubleRows[i]["moistureTenHour"];
+    crownInputs.moistureHundredHour = csvData->csvDoubleRows[i]["moistureHundredHour"];
+    crownInputs.moistureLiveHerbaceous = csvData->csvDoubleRows[i]["moistureLiveHerbaceous"];
+    crownInputs.moistureLiveWoody = csvData->csvDoubleRows[i]["moistureLiveWoody"];
+    crownInputs.moistureFoliar = csvData->csvDoubleRows[i]["moistureFoliar"];
+    crownInputs.moistureUnits = moistureUnits[csvData->csvStringRows[i]["moistureUnits"]];
+    crownInputs.windSpeed = csvData->csvDoubleRows[i]["windSpeed"];
+    crownInputs.windSpeedUnits = speedUnits[csvData->csvStringRows[i]["windSpeedUnits"]];
+    crownInputs.windHeightInputMode = windHeightInputMode[csvData->csvStringRows[i]["windHeightInputMode"]];
+    crownInputs.windDirection = csvData->csvDoubleRows[i]["windDirection"];
+    crownInputs.windAndSpreadOrientationMode = windAndSpreadOrientationMode[csvData->csvStringRows[i]["windAndSpreadOrientationMode"]];
+    crownInputs.windAdjustmentFactor = csvData->csvDoubleRows[i]["windAdjFactor"];
+    crownInputs.windAdjustmentFactorCalculationMethod = windAdjustmentFactorCalculationMethod[csvData->csvStringRows[i]["windAdjFactorCalcMethod"]];
+    crownInputs.slope = csvData->csvDoubleRows[i]["slope"];
+    crownInputs.slopeUnits = slopeUnits[csvData->csvStringRows[i]["slopeUnits"]];
+    crownInputs.aspect = csvData->csvDoubleRows[i]["aspect"];
+    crownInputs.canopyCover = csvData->csvDoubleRows[i]["canopyCover"];
+    crownInputs.coverUnits = coverUnits[csvData->csvStringRows[i]["coverUnits"]];
+    crownInputs.canopyHeight = csvData->csvDoubleRows[i]["canopyHeight"];
+    crownInputs.canopyBaseHeight = csvData->csvDoubleRows[i]["canopyBaseHeight"];
+    crownInputs.canopyHeightUnits = lengthUnits[csvData->csvStringRows[i]["canopyHeightUnits"]];
+    crownInputs.crownRatio = csvData->csvDoubleRows[i]["crownRatio"];
+    crownInputs.canopyBulkDensity = csvData->csvDoubleRows[i]["canopyBulkDensity"];
+    crownInputs.canopyBulkDensityUnits = densityUnits[csvData->csvStringRows[i]["canopyBulkDensityUnits"]];
 
     // Set up Outputs
-    crownOutputs.lengthToWidthRatio = doubleRow["lengthToWidthRatio"];
-    crownOutputs.fireSpreadRate = doubleRow["fireSpreadRate"];
-    crownOutputs.flameLength = doubleRow["flameLength"];
-    crownOutputs.firelineIntensity = doubleRow["firelineIntensity"];
-    crownOutputs.fireType = fireType[stringRow["fireType"]];
+    crownOutputs.lengthToWidthRatio = csvData->csvDoubleRows[i]["lengthToWidthRatio"];
+    crownOutputs.fireSpreadRate = csvData->csvDoubleRows[i]["fireSpreadRate"];
+    crownOutputs.flameLength = csvData->csvDoubleRows[i]["flameLength"];
+    crownOutputs.firelineIntensity = csvData->csvDoubleRows[i]["firelineIntensity"];
+    crownOutputs.fireType = fireType[csvData->csvStringRows[i]["fireType"]];
 
-    // Run test
-    testCrownModule(i, testInfo, crownInputs, crownOutputs, behaveRun);
-
-  };
-  std::cout << "Total tests performed: " << testInfo.numTotalTests << "\n";
-  std::cout << "Total tests passed: " << testInfo.numPassed << "\n";
-  std::cout << "Total tests failed: " << testInfo.numFailed << "\n\n";
-
-  //#ifndef NDEBUG
-  //    // Make Visual Studio wait while in debug mode
-  //    std::cout << "Press Enter to continue . . .";
-  //    std::cin.get();
-  //#endif
-  //    return 0;
-
+    // Add to results
+    TestTuple newIO(i, crownInputs, crownOutputs);
+    allCrownIO->push_back(newIO);
+  }
 }
 
-void testCrownModule(int row, struct TestInfo& testInfo, CrownTestInputs& inputs, CrownTestOutputs& expected, BehaveRun& behaveRun)
+void testCrownModule(CrownTestInputs const& inputs, CrownTestOutputs const& expected, BehaveRun& behaveRun)
 {
   std::cout << "Testing Crown module\n";
-
-  string testName = "";
 
   double observedLengthToWidthRatio = 0;
   double observedSpreadRate = 0;
@@ -244,34 +218,114 @@ void testCrownModule(int row, struct TestInfo& testInfo, CrownTestInputs& inputs
 
   // Compare Results
   if (expected.lengthToWidthRatio != 0) {
-    testName = "Test length to width ratio";
+    std::stringstream testName;
+    if (!inputs.testID.empty()) { testName << "[ID: " << inputs.testID << " ]"; }
+    testName << " Test length-to-width ratio";
     observedLengthToWidthRatio = behaveRun.crown.getCrownFireLengthToWidthRatio();
-    reportTestResult(row, testInfo, testName, observedLengthToWidthRatio, expected.lengthToWidthRatio, error_tolerance);
+    reportTestResult(testName.str(), observedSpreadRate, expected.fireSpreadRate, error_tolerance);
   }
 
   if (expected.fireSpreadRate != 0) {
-    testName = "Test fire spread rate";
+    std::stringstream testName;
+    if (!inputs.testID.empty()) { testName << "[ID: " << inputs.testID << " ]"; }
+    testName << " Test fire spread rate";
     observedSpreadRate = behaveRun.crown.getFinalSpreadRate(SpeedUnits::ChainsPerHour);
-    reportTestResult(row, testInfo, testName, observedSpreadRate, expected.fireSpreadRate, error_tolerance);
+    reportTestResult(testName.str(), observedSpreadRate, expected.fireSpreadRate, error_tolerance);
   }
 
   if (expected.flameLength != 0) {
-    testName = "Test flame length";
+    std::stringstream testName;
+    if (!inputs.testID.empty()) { testName << "[ID: " << inputs.testID << " ]"; }
+    testName << " Test flame length";
     observedFlameLength = behaveRun.crown.getFinalFlameLength(LengthUnits::Feet);
-    reportTestResult(row, testInfo, testName, observedFlameLength, expected.flameLength, error_tolerance);
+    reportTestResult(testName.str(), observedFlameLength, expected.flameLength, error_tolerance);
   }
 
   if (expected.firelineIntensity != 0) {
-    testName = "Test fireline intensity";
+    std::stringstream testName;
+    if (!inputs.testID.empty()) { testName << "[ID: " << inputs.testID << " ]"; }
+    testName << " Test fireline intensity ";
     observedFirelineIntensity = behaveRun.crown.getFinalFirelineIntesity(FirelineIntensityUnits::BtusPerFootPerSecond);
-    reportTestResult(row, testInfo, testName, observedFirelineIntensity, expected.firelineIntensity, error_tolerance);
+    reportTestResult(testName.str(), observedFirelineIntensity, expected.firelineIntensity, error_tolerance);
   }
 
   if (expected.fireType != -1) {
-    testName = "Test fire type";
+    std::stringstream testName;
+    if (!inputs.testID.empty()) { testName << "[ID: " << inputs.testID << " ]"; }
+    testName << "Test fire type ";
     observedFireType = (int)behaveRun.crown.getFireType();
-    reportTestResult(row, testInfo, testName, observedFireType, (int)expected.fireType, error_tolerance);
+    reportTestResult(testName.str(), observedFireType, (int)expected.fireType, error_tolerance);
   }
 
   std::cout << "Finished testing Crown module\n\n";
+}
+
+class CSVData {
+ public:
+
+  static CSVData* factory(std::string const& filename);
+
+  std::vector<std::string> csvHeaders;
+  std::vector<std::map<std::string, std::string>> csvStringRows;
+  std::vector<std::map<std::string, double>> csvDoubleRows;
+};
+
+CSVData* CSVData::factory(std::string const& filename) {
+
+  CSVData* csvData = new CSVData();
+
+  int result = parseCSVFile(filename, csvData->csvHeaders, csvData->csvStringRows, csvData->csvDoubleRows);
+
+  if (result == 0) {
+    return csvData;
+  } else {
+    return nullptr;
+  }
+}
+
+/// The interface with the device driver.
+struct CrownInit {
+  CrownInit() {
+    BOOST_TEST_REQUIRE( framework::master_test_suite().argc == 3 );
+    BOOST_TEST_REQUIRE( framework::master_test_suite().argv[1] == "--csv-file" );
+  }
+  void setup() {
+    // CSV Parsing
+    csvData = CSVData::factory(framework::master_test_suite().argv[2]);
+    BOOST_TEST_REQUIRE(
+                       csvData != nullptr,
+                       "Cannot parse CSV Data from file:" << framework::master_test_suite().argv[2] );
+
+    // Turn CSV Data into Struct
+    ioVec = new IOVec();
+    convertCSVDataToCrownIO(csvData, ioVec);
+    BOOST_TEST_REQUIRE((*ioVec).size() == (csvData->csvHeaders).size(), "Could not convert CSV to Inputs/Outputs.");
+
+    // Create Behave Runner
+    behaveRun = new BehaveRun(new FuelModels(), new SpeciesMasterTable());
+  }
+  void teardown() {
+    delete csvData;
+    delete ioVec;
+    delete behaveRun;
+  }
+
+  static CSVData* csvData;
+  static IOVec* ioVec;
+  static BehaveRun* behaveRun;
+};
+
+// Clean start
+CSVData* CrownInit::csvData = nullptr;
+IOVec* CrownInit::ioVec = nullptr;
+BehaveRun *CrownInit::behaveRun = nullptr;
+
+// Fixture
+BOOST_TEST_GLOBAL_FIXTURE( CrownInit );
+
+// Iterate over all Vector Pairs of Inputs/Outputs
+BOOST_DATA_TEST_CASE(test_crown_only, CrownInit::ioVec, io) {
+  CrownTestInputs inputs = std::get<0>(io);
+  CrownTestOutputs outputs = std::get<1>(io);
+  testCrownModule(inputs, expected, CrownInit::behaveRun);
 }

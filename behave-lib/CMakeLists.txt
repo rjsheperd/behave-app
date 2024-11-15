@@ -188,7 +188,21 @@ add_library(behave STATIC ${SOURCE} ${HEADERS})
 
 IF(TEST_BEHAVE)
 
+    enable_testing()
+    find_package(Boost 1.67 COMPONENTS unit_test_framework REQUIRED)
+
+    include_directories(${Boost_INCLUDE_DIRS})
     add_library(testUtils STATIC test/cpp/testUtils.cpp test/cpp/testUtils.h)
+
+    # creates the executable
+    add_executable(unit_test test/cpp/unit_test.cpp)
+
+    # indicates the include paths
+    target_include_directories(unit_test PRIVATE ${BOOST_INCLUDE_DIRS})
+
+    # declares a test with our executable
+    add_test(NAME unit_test COMMAND unit_test)
+
 
     SET(BEHAVE_TEST_SOURCE
         behave-mirror/src/testBehave/testBehave.cpp)
@@ -215,13 +229,17 @@ IF(TEST_BEHAVE)
         ${HEADERS})
     TARGET_LINK_LIBRARIES(testContain)
 
-    SET(CROWN_TEST_SOURCE
-        test/cpp/testCrown.cpp)
-    ADD_EXECUTABLE(testCrown
-        ${SOURCE}
-        ${CROWN_TEST_SOURCE}
-        ${HEADERS})
-    TARGET_LINK_LIBRARIES(testCrown testUtils)
+    # SET(CROWN_TEST_SOURCE test/cpp/testCrown.cpp)
+    # ADD_EXECUTABLE(testCrown
+    #     ${SOURCE}
+    #     ${CROWN_TEST_SOURCE}
+    #     ${HEADERS})
+    # TARGET_LINK_LIBRARIES(testCrown testUtils)
+
+    add_executable(crownTest test/cpp/testCrown.cpp)
+    target_include_directories(unit_test PRIVATE ${BOOST_INCLUDE_DIRS})
+    add_test(NAME crownTest COMMAND crownTest test/csv/crown.csv)
+
 ENDIF()
 
 IF(BEHAVE_JS)
