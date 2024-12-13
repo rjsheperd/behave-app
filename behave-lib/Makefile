@@ -13,6 +13,9 @@ clean:
 
 all: clean install
 
+nix:
+	nix-shell -p gnumake cmake llvm clang emscripten --command "export EM_CACHE=$PWD/.em_cache && export WEB_IDL=$(fd webidl_binder.py /nix/store) && make install"
+
 # NOTE Make sure to set WEBIDL in Enviornment Variables
 bind:
 	${WEBIDL} include/idl/behave.idl include/js/glue
