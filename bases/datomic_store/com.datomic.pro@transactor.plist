@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>KeepAlive</key>
+	<true/>
+	<key>Label</key>
+	<string>com.datomic.pro/transactor</string>
+	<key>LimitLoadToSessionType</key>
+	<array>
+		<string>Aqua</string>
+		<string>Background</string>
+		<string>LoginWindow</string>
+		<string>StandardIO</string>
+		<string>System</string>
+	</array>
+	<key>WorkingDirectory</key>
+	<string>{{cwd}}</string>
+	<key>ProgramArguments</key>
+	<array>
+	  <string>pwd</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>StandardOutPath</key>
+	<string>{{log-dir}}/transactor-output.log</string>
+	<key>StandardErrorPath</key>
+	<string>{{log-dir}}/transactor-error.log</string>
+	<key>WorkingDirectory</key>
+	<string>/opt/homebrew</string>
+</dict>
+</plist>

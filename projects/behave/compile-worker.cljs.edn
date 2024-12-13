@@ -1,0 +1,6 @@
+^{:watch-dirs ["src/cljs"]}
+{:output-to     "resources/public/cljs-worker/worker.js"
+ :optimizations :whitespace
+ :pretty-print  true
+ :target        :webworker
+ :main          behave.solver.worker}

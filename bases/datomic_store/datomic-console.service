@@ -1,0 +1,16 @@
+[Unit]
+Description=Datomic Transactor
+
+[Service]
+Type=simple
+WorkingDirectory={{cwd}}
+ExecStart={{bb}} console
+Restart=always
+RestartSec=100
+
+# Logging
+StandardOutput=append:{{log-dir}}/transactor-output.log
+StandardError=append:{{log-dir}}/transactor-error.log
+
+[Install]
+WantedBy=default.target
