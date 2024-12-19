@@ -1,12 +1,34 @@
 #+TITLE: Behave Lib
-#+AUTHOR: RJ Sheperd
 
 A new implementation of the extended Rothermel model.
 
-* Requirements
-** [[https://cmake.org/][CMake]]
-** [[https://gcc.gnu.org/][GCC]]
-** [[https://emscripten.org][Emscripten]]
+* Setup
+** Nix Builder
+*** Requirements
+**** [[https://nixos.org/][NixOS]]
+
+*** Installation
+**** Install NixOS
+
+This uses the [[https://github.com/DeterminateSystems/nix-installer][Determinate Systems Installer]], which will install NixOS
+and Nix Flakes locally:
+#+BEGIN_SRC bash
+  curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
+#+END_SRC
+
+**** Start Nix Shell
+
+This will download and set up the required packages, including CMake,
+LLVM, Emscripten, etc.
+#+BEGIN_SRC bash
+  nix-shell
+#+END_SRC
+
+** MacOS/Linux Builder
+*** Requirements
+**** [[https://cmake.org/][CMake]]
+**** [[https://gcc.gnu.org/][GCC]] or [[https://llvm.org/][LLVM/Clang]]
+**** [[https://emscripten.org][Emscripten]]
 
 *** Installation
 #+begin_src sh
@@ -25,12 +47,12 @@ export CXX=$(which clang++)
 export WEBIDL=$(brew --prefix emscripten)/libexec/tools/webidl_binder
 #+end_src
 
-*** Building
+* Building
 #+BEGIN_SRC sh
 make install
 #+END_SRC
 
-*** Process
+** Process
 
 The process of building this library takes multiple steps. At a high
 level overview, we have leveraged two major tools:
@@ -77,7 +99,6 @@ The process is outlined in the [[https://gitlab.sig-gis.com/sig-gis/simple-emscr
 #+RESULTS:
 [[file:docs/behave-flow.png]]
 
-***
 * Debugging WASM (DWARF)
 
 1. Install the chrome extension [[https://chrome.google.com/webstore/detail/cc%20%20-devtools-support-dwa/pdcpmagijalfljmkmjngeonclgbbannb][C/C++ DevTools Support (DWARF)]] mentioned [[https://developer.chrome.com/blog/wasm-debugging-2020/][here]].
