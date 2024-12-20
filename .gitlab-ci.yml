@@ -34,7 +34,8 @@ build-desktop:
       paths:
         - /nix/store
     - key:
-        files: deps.edn
+        files:
+          - deps.edn
       paths:
         - .m2/repository
   script:
