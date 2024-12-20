@@ -7,6 +7,7 @@ pkgs.mkShellNoCC {
   packages = with pkgs; [
     # Tools
     git
+    unzip
 
     # Clojure
     openjdk
