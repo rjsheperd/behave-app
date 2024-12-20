@@ -15,10 +15,11 @@ pkgs.mkShellNoCC {
     clang
     emscripten
     fd
+    python3
   ];
 
   shellHook = ''
   export EM_CACHE="$PWD/.em_cache"
-  export WEBIDL=$(fd webidl_binder.py /nix/store)
+  export WEBIDL=$(fd webidl_binder /nix/store | head -n1)
   '';
 }
