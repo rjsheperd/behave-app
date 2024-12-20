@@ -20,14 +20,14 @@ build-wasm:
         - $PWD/.em_cache
   script:
     # Build WASM
-    - cd behave-lib
-    - nix-shell --run 'make install'
-    - cd ..
+    # - cd behave-lib
+    # - nix-shell --run 'make install'
+    # - cd ..
 
     # Commit back to the repo
     - git config user.email "ci-bot@sig-gis.com"
     - git config user.name "ci-bot"
-    - git remote add gitlab_origin https://oauth2:$ACCESS_TOKEN@$PROJECT_GIT_URL
+    # - git remote add gitlab_origin https://oauth2:$ACCESS_TOKEN@$PROJECT_GIT_URL
     - git remote -v
     - git status
     # - git add .
