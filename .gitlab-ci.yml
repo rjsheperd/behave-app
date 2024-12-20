@@ -10,23 +10,15 @@ build-wasm:
           - behave-lib/shell.nix
       paths:
         - /nix/store
-
-    - key: cache-$CI_COMMIT_REF_SLUG
-      fallback_keys:
-        - cache-$CI_DEFAULT_BRANCH
-        - cache-default
-      paths:
-        - /nix/store
-        - $PWD/.em_cache
   script:
     # Build WASM
-    # - cd behave-lib
-    # - nix-shell --run 'make install'
-    # - cd ..
+    - cd behave-lib
+    - nix-shell --run 'make install'
+    - cd ..
 
     # Commit back to the repo
-    - git config user.email "ci-bot@sig-gis.com"
-    - git config user.name "ci-bot"
+    # - git config user.email "ci-bot@sig-gis.com"
+    # - git config user.name "ci-bot"
     # - git add .
     # - git commit -m "Update WASM"
     # - git push origin HEAD -o ci.skip # prevent triggering pipeline again
@@ -41,12 +33,10 @@ build-desktop:
           - projects/behave/shell.nix
       paths:
         - /nix/store
-    - key: cache-$CI_COMMIT_REF_SLUG
-      fallback_keys:
-        - cache-$CI_DEFAULT_BRANCH
-        - cache-default
+    - key:
+        files: deps.edn
       paths:
-        - /nix/store
+        - .m2/repository
   script:
     # Build Desktop App
     - echo $FIRELAB_AUTH_TOKEN
