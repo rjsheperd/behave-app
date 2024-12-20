@@ -17,21 +17,37 @@ build-wasm:
         - cache-default
       paths:
         - /nix/store
-        - .em_cache
+        - $PWD/.em_cache
   script:
     # Build WASM
-    - ls behave-lib/behave-mirror
     - cd behave-lib
-    - echo Building WASM with Nix...
     - nix-shell --run 'make install'
 
-    # Push back upstream
-    # - git remote add gitlab_origin https://oauth2:$ACCESS_TOKEN@$PROJECT_GIT_URL
-    # - git config user.email "ci-bot@sig-gis.com"
-    # - git config user.name "ci-bot"
-    # - git remote add gitlab_origin https://oauth2:$ACCESS_TOKEN@PROJECT_GIT_URL
-    # - git add projects/behave/resources/
-    # - git commit -m "Update WASM"
-    # - git push gitlab_origin HEAD:main -o ci.skip # prevent triggering pipeline again
+    # Commit back to the repo
+    - git config user.email "ci-bot@sig-gis.com"
+    - git config user.name "ci-bot"
+    - git remote add gitlab_origin https://oauth2:$ACCESS_TOKEN@PROJECT_GIT_URL
+    - git add projects/behave/resources/
+    - git commit -m "Update WASM"
+    - git push gitlab_origin HEAD:main -o ci.skip # prevent triggering pipeline again
 
-
+#build-desktop:
+#  image: nixos/nix:latest
+#  stage: build
+#  needs: ["build-wasm"]
+#  cache:
+#    - key:
+#        files:
+#          - projects/behave/shell.nix
+#      paths:
+#        - /nix/store
+#    - key: cache-$CI_COMMIT_REF_SLUG
+#      fallback_keys:
+#        - cache-$CI_DEFAULT_BRANCH
+#        - cache-default
+#      paths:
+#        - /nix/store
+#  script:
+#    # Build Desktop App
+#    - cd projects/behave
+#    - nix-shell --run 'bb build-desktop'
