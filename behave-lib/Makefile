@@ -36,3 +36,6 @@ test:
 
 ctags:
 	ctags -e -R --exclude=.git --exclude=build --exclude .ccls-cache .
+
+install-with-nix:
+	nix-shell --run 'make install'
