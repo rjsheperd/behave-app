@@ -1,5 +1,12 @@
-{:tasks 
- {-project  "cljweb-behave"
+{:deps      {me.raynes/fs {:mvn/version "1.4.6"}}
+ :tasks
+ {;; Helpers
+  -project  "cljweb-behave"
+  -today    (.format (java.time.LocalDateTime/now)
+                     (java.time.format.DateTimeFormatter/ofPattern "yyyy-MM-dd"))
+  -auth-token (System/getenv "FIRELAB_AUTH_TOKEN")
+
+  ;; System control
   reload    (shell "systemctl --user daemon-reload")
   status    {:depends [-project]
              :task (shell (format "systemctl --user status %s" -project))}
@@ -7,6 +14,47 @@
              :task (shell (format "systemctl --user start %s" -project))}
   stop      {:depends [-project]
              :task (shell (format "systemctl --user stop %s" -project))}
+
+  ;; VMS Management
+  vms-sync  {:requires ([me.raynes.fs    :as fs]
+                        [clojure.java.io :as io]
+                        [babashka.curl   :as curl])
+             :depends  [-today -auth-token]
+             :task
+             (let [[auth-token]   *command-line-args*
+                   auth-token     (or auth-token -auth-token)
+                   public-dir     (fs/file "resources" "public")
+                   layout-msgpack (fs/file (str public-dir) "layout.msgpack")
+                   files-dir      (fs/file (str public-dir) "files")
+                   zip-file       (fs/file (str public-dir) (format "images-%s.zip" -today))]
+
+               (println "Retrieving the latest VMS Data...")
+
+               ;; Download latests VMS layout.msgpack file
+               (io/copy
+                (:body
+                 (curl/get (format "https://firelab.sig-gis.com/sync?auth-token=%s" auth-token)
+                           {:as :bytes
+                            :headers {"Accept" "application/msgpack"}}))
+                layout-msgpack)
+
+               ;; Download ZIP file
+               (io/copy
+                (:body
+                 (curl/get (format "https://firelab.sig-gis.com/clj/sync-images?auth-token=%s" auth-token)
+                           {:as :bytes
+                            :headers {"Accept" "application/zip"}}))
+                        zip-file)
+
+               ;; Remove existing `resources/public/files` dir if it exists
+               (when (fs/exists? files-dir)
+                 (fs/delete-dir files-dir)
+                 (fs/mkdir files-dir))
+
+               ;; Unzip
+               (shell (format "unzip -qq %s -d %s" zip-file files-dir))
+               (println "Got latest VMS Data!"))}
+
   build-js  (clojure "-M:compile-cljs")
   uber      (clojure "-X triangulum.packaging/build-uberjar :app-name behave7 :main-ns behave.core")
   pull      (do
@@ -22,4 +70,37 @@
               (run 'pull)
               (run 'build-js)
               ;; (run 'uber)
-              (run 'start))}}
+              (run 'start))
+
+  ;; Desktop Setup
+  desktop-cfg   {:requires ([me.raynes.fs :as fs])
+                 :task
+                 (let [config         (fs/file "resources" "config.edn")
+                       desktop-config (fs/file "resources" "desktop_config.edn")
+                       cfg-exists?    (fs/exists? config)]
+                   (when cfg-exists?
+                     (fs/copy config (fs/file "resources" "config.edn.bak")))
+
+                   (fs/copy desktop-config config))}
+
+  restore-cfg   {:requires ([me.raynes.fs :as fs])
+                 :task
+                 (let [config         (fs/file "resources" "config.edn")
+                       config-backup  (fs/file "resources" "config.edn.bak")
+                       backup-exists? (fs/exists? config-backup)]
+
+                   (when backup-exists?
+                     (fs/copy config (fs/file "resources" "config.edn.bak")))
+
+                   (fs/copy config-backup config)
+
+                   (fs/delete config-backup))}
+
+  build-desktop {:requires ([me.raynes.fs :as fs])
+                 :task
+                 (do
+                   (run 'vms-sync)
+                   (run 'desktop-cfg)
+                   (run 'build-js)
+                   (run 'uber)
+                   (run 'restore-cfg))}}}
