@@ -1,3 +1,6 @@
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
+
 build-wasm:
   image: nixos/nix:latest
   stage: build
@@ -17,6 +20,7 @@ build-wasm:
         - .em_cache
   script:
     # Build WASM
+    - ls behave-lib/behave-mirror
     - cd behave-lib
     - echo Building WASM with Nix...
     - nix-shell --run 'make install'
