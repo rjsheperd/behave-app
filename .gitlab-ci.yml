@@ -52,3 +52,8 @@ build-desktop:
     - echo $FIRELAB_AUTH_TOKEN
     - cd projects/behave
     - nix-shell --run 'bb build-desktop'
+  artifacts:
+    expire_in: never
+    paths:
+      - projects/behave/target/*.jar
+

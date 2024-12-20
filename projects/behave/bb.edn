@@ -90,11 +90,8 @@
                        backup-exists? (fs/exists? config-backup)]
 
                    (when backup-exists?
-                     (fs/copy config (fs/file "resources" "config.edn.bak")))
-
-                   (fs/copy config-backup config)
-
-                   (fs/delete config-backup))}
+                     (fs/copy config-backup config)
+                     (fs/delete config-backup)))}
 
   build-desktop {:requires ([me.raynes.fs :as fs])
                  :task
