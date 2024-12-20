@@ -22,12 +22,13 @@ build-wasm:
     # Build WASM
     - cd behave-lib
     - nix-shell --run 'make install'
+    - cd ..
 
     # Commit back to the repo
     - git config user.email "ci-bot@sig-gis.com"
     - git config user.name "ci-bot"
-    - git remote add gitlab_origin https://oauth2:$ACCESS_TOKEN@PROJECT_GIT_URL
-    - git add projects/behave/resources/
+    - git remote add gitlab_origin https://oauth2:$ACCESS_TOKEN@$PROJECT_GIT_URL
+    - git add projects/behave/resources/js
     - git commit -m "Update WASM"
     - git push gitlab_origin HEAD:main -o ci.skip # prevent triggering pipeline again
 
