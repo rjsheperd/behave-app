@@ -19,6 +19,6 @@ pkgs.mkShellNoCC {
 
   shellHook = ''
   export EM_CACHE="$PWD/.em_cache"
-  export WEB_IDL=$(fd webidl_binder.py /nix/store)
+  export WEBIDL=$(fd webidl_binder.py /nix/store)
   '';
 }
