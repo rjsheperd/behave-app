@@ -7,6 +7,7 @@
             [behave.schema.core          :refer [all-schemas]]
             [browser-utils.core          :refer [download]]
             [browser-utils.interface     :refer [debounce]]
+            [clojure.core.async          :refer [alts! buffer chan go-loop put! timeout]]
             [clojure.edn                 :as edn]
             [clojure.set                 :refer [union]]
             [datascript.core             :as d]
@@ -22,7 +23,7 @@
 (defonce conn (atom nil))
 (defonce my-txs (atom #{}))
 (defonce sync-txs (atom #{}))
-(defonce batch (atom []))
+(defonce datom-chan (atom nil))
 (defonce worksheet-from-file? (atom false))
 
 ;;; Helpers
@@ -40,8 +41,8 @@
       (rf/dispatch-sync [:ds/initialize (->ds-schema all-schemas) datoms])
       (rf/dispatch-sync [:state/set :sync-loaded? true]))))
 
-(defn- sync-tx-data-handler [[ok body]]
-  (reset! batch [])
+(defn- sync-tx-data-handler
+  [[ok body]]
   (when ok
     (println ok body)))
 
@@ -54,10 +55,11 @@
                                    :content-type "application/msgpack"
                                    :read         pr/-body}}))
 
-(defn- batch-sync-tx-data []
-  (when-not (empty? @batch)
+(defn- batch-sync-tx-data [datoms]
+  (when-not (empty? datoms)
+    #_(println "Performing batch sync" datoms)
     (ajax-request {:uri             "/sync"
-                   :params          {:tx-data @batch}
+                   :params          {:tx-data datoms}
                    :method          :post
                    :handler         sync-tx-data-handler
                    :format          (edn-request-format)
@@ -67,16 +69,40 @@
                                      :content-type "application/edn"
                                      :read         edn/read-string}})))
 
-(def ^:private debounced-batch-sync-tx-data (debounce batch-sync-tx-data 2000))
+(defn- start-batch-processor [batch-size debounce-ms]
+  (reset! datom-chan (chan (buffer batch-size)))
+  (go-loop [batch []
+            timeout-ch (timeout debounce-ms)]
+    (let [[datoms channel] (alts! [@datom-chan timeout-ch])]
+      (cond
+        (= channel @datom-chan)
+        (if (nil? datoms)
+          ;; Channel closed, process remaining datoms
+          (when (seq batch)
+            (batch-sync-tx-data batch)
+            (recur [] (timeout debounce-ms)))
+          (let [new-batch (concat batch datoms)]
+            (if (< (count new-batch) batch-size)
+              (recur new-batch (timeout debounce-ms))
+              (do
+                (batch-sync-tx-data new-batch)
+                (recur [] (timeout debounce-ms))))))
 
-(defn sync-tx-data [{:keys [tx-data]}]
+        (= channel timeout-ch)
+        (do
+          (when (seq batch)
+            (batch-sync-tx-data batch))
+          (recur [] (timeout debounce-ms)))))))
+
+(defn- sync-tx-data [{:keys [tx-data]}]
   (let [datoms (->> tx-data (filter new-datom?) (mapv split-datom))]
     (when-not (empty? datoms)
       (swap! my-txs union (txs datoms))
-      (swap! batch concat datoms)
-      (debounced-batch-sync-tx-data))))
+      (when (nil? @datom-chan)
+        (start-batch-processor 100 2000))
+      (put! @datom-chan datoms))))
 
-(defn apply-latest-datoms [[ok body]]
+(defn- apply-latest-datoms [[ok body]]
   (when ok
     (let [datoms (->> (c/unpack body)
                       (filter new-datom?)
