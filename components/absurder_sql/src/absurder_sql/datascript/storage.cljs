@@ -5,8 +5,7 @@
    [absurder-sql.datascript.protocols :as proto :refer [IPersistentSortedSetStorage IStorage]]
    [absurder-sql.datascript.storage-async :as async-storage :refer [make-async-storage-adapter SyncStorageWrapper]]
    [absurder-sql.datascript.util :as util]
-   [absurder-sql.datascript.persistent-sorted-set :as set]
-   ["../../persistent_sorted_set_js/index.min" :as pss :refer [Branch Leaf PersistentSortedSet RefType Settings]]))
+   [absurder-sql.datascript.persistent-sorted-set :as set]))
 
 (def ^:private ^:dynamic *store-buffer*)
 
@@ -25,7 +24,7 @@
 (defn- gen-addr []
   (vswap! *max-addr inc))
 
-(deftype StorageAdapter [^IStorage storage settings]
+(deftype StorageAdapter [^IStorage storage branching-factor]
   IPersistentSortedSetStorage
   (restore [this addr]
     (.restore this addr))
@@ -37,43 +36,41 @@
     (.accessed this addr))
 
   Object
+  ;; The Rust JsStorage calls this with a JS object: {level, keys, addresses?}
+  ;; We serialize the keys (datom objects) into [e a v tx] vectors for storage,
+  ;; then return the address. But when called from .store on PersistentSortedSet,
+  ;; we receive the serialized node data from Rust.
   (restore [_ addr]
     (util/log "restore" addr)
     (let [{:keys [level keys addresses]} (proto/-restore storage addr)
           keys' (to-array (map (fn [[e a v tx]] (db/datom e a v tx)) keys))]
-      (if addresses
-        (Branch. level (count keys') keys' (to-array addresses) nil settings)
-        (Leaf. (count keys') keys' settings))))
+      ;; Return a plain JS object that JsStorage on Rust side can consume
+      (let [obj #js {:level level :keys keys'}]
+        (when addresses
+          (set! (.-addresses obj) (to-array addresses)))
+        obj)))
 
   (store [_ node]
-    (let [addr (gen-addr)
-          _    (util/log "store" addr)
-          keys (mapv serializable-datom (.keys node))
-          data (cond-> {:level (.level node)
-                        :keys  keys}
-                 (instance? Branch node)
-                 (assoc :addresses (vec (.addresses node))))]
+    ;; `node` is a JS object from Rust: {level, keys: Array<Datom>, addresses?: Array<number>}
+    (let [addr   (gen-addr)
+          _      (util/log "store" addr)
+          level  (.-level node)
+          js-keys (.-keys node)
+          keys   (mapv serializable-datom js-keys)
+          addrs  (.-addresses node)
+          data   (cond-> {:level level
+                          :keys  keys}
+                   (some? addrs)
+                   (assoc :addresses (vec addrs)))]
       (vswap! *store-buffer* conj! [addr data])
       addr))
 
   (accessed [_ addr]
-    ;; Optional: can be used for LRU cache tracking
     nil))
 
-(defn- ->ref-type
-  "Coerce a ref-type keyword or string to a JS RefType value."
-  [v]
-  (case v
-    (:weak "WEAK")     (.-WEAK RefType)
-    (:soft "SOFT")     (.-SOFT RefType)
-    (:strong "STRONG") (.-STRONG RefType)
-    (.-WEAK RefType)))
-
 (defn make-storage-adapter [^IStorage storage opts]
-  (let [branching-factor (or (:branching-factor opts) 512)
-        ref-type (->ref-type (:ref-type opts))
-        settings (Settings. branching-factor ref-type nil)]
-    (StorageAdapter. storage settings)))
+  (let [branching-factor (or (:branching-factor opts) 512)]
+    (StorageAdapter. storage branching-factor)))
 
 (defn maybe-adapt-storage [opts]
   (if-some [storage (:storage opts)]
@@ -86,6 +83,9 @@
 
 (defn storage-adapter [db]
   (when db
+    ;; With WASM, storage adapter is stored differently.
+    ;; The WASM PSS holds the storage internally via JsStorage bridge.
+    ;; We need to find the adapter from the db metadata or the set's storage.
     (.-_storage (:eavt db))))
 
 (defn storage [db]
@@ -117,13 +117,9 @@
 
 ;; Helper to get settings from a set
 (defn- set-settings [set]
-  (let [root (.root set)]
-    {:branching-factor (.-_branchingFactor (.-_settings root))
-     :ref-type (.-_refType (.-_settings root))}))
+  {:branching-factor (.branchingFactor set)})
 
 (defn store-impl! [db adapter force?]
-  ;; Note: In JS/browser, locking is not available, so we skip it
-  ;; If running in Node.js with SharedArrayBuffer, you'd need a different approach
   (if (= (type adapter) SyncStorageWrapper)
     (async-storage/store-impl-sync! db adapter force?)
     (do
@@ -159,15 +155,14 @@
        (if (identical? current-storage storage)
          (store-impl! db adapter false)
          (throw (ex-info "Database is already stored with another IStorage" {:storage current-storage}))))
-     (let [settings (.-_settings (.root (:eavt db)))
-           adapter  (StorageAdapter. storage settings)]
+     (let [bf (.branchingFactor (:eavt db))
+           adapter (StorageAdapter. storage bf)]
        (store-impl! db adapter false)))))
 
 (defn- restore-set-by [cmp addr adapter opts]
   (set/restore-by cmp addr adapter opts))
 
 (defn restore-impl [^IStorage storage opts]
-    ;; Note: locking not available in JS
   (when-some [root (proto/-restore storage root-addr)]
     (let [tail    (proto/-restore storage tail-addr)
           {:keys [schema eavt aevt avet max-eid max-tx max-addr]} root
@@ -227,12 +222,6 @@
     (persistent! @*res)))
 
 (defn collect-garbage [^IStorage storage']
-  ;; In JS there is no System/gc, so WeakRefs to old db versions may still
-  ;; be alive even after going out of scope. We only protect the currently
-  ;; persisted db — that is the only version that matters for storage GC.
-  ;; We walk the BASE stored db (before tail application) because applying
-  ;; the tail creates in-memory tree nodes whose addresses don't match what's
-  ;; actually persisted in storage.
   (prune-stored-dbs!)
   (when-some [[db _tail] (restore-impl storage' {})]
     (let [used   (addresses [db])
@@ -326,7 +315,6 @@
 (defn indexed-db-storage
   "IndexedDB-based storage (async operations wrapped in promises)"
   [db-name store-name]
-  ;; This is a simplified version - in production you'd want proper async handling
   (let [db-promise (js/Promise.
                     (fn [resolve reject]
                       (let [request (.open js/indexedDB db-name 1)]

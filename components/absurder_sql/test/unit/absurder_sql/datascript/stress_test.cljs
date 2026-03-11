@@ -1,6 +1,7 @@
 (ns absurder-sql.datascript.stress-test
   (:require
    [absurder-sql.datascript.core :as d]
+   [absurder-sql.datascript.persistent-sorted-set :as pss]
    [absurder-sql.datascript.sqlite :as ds-sqlite]
    [absurder-sql.datascript.storage-async :as storage-async]
    [absurder-sql.interface :as sql]
@@ -11,6 +12,7 @@
 (defn- with-sqlite []
   (async done
          (go
+           (<p! (pss/ensure-initialized!))
            (<p! (sql/init!))
            (done))))
 

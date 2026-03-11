@@ -1,5 +1,6 @@
 (ns absurder-sql.datascript-client
-  (:require [absurder-sql.datascript.sqlite :as ds-sqlite]
+  (:require [absurder-sql.datascript.persistent-sorted-set :as pss]
+            [absurder-sql.datascript.sqlite :as ds-sqlite]
             [absurder-sql.datascript.core :as d]
             [absurder-sql.datascript.storage-async :as storage-async]
             [absurder-sql.interface :as sql]
@@ -155,7 +156,8 @@
 (defn ^:export init []
   (set-status! "initializing SQLite + DataScript...")
   (log! "Starting up...")
-  (-> (sql/init!)
+  (-> (pss/ensure-initialized!)
+      (p/then (fn [_] (sql/init!)))
       (p/then (fn [_]
                 (let [db-name (:db-name @state)]
                   (-> (sql/connect! db-name)

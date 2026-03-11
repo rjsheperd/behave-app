@@ -4,8 +4,7 @@
    [absurder-sql.datascript.db :as db]
    [absurder-sql.datascript.util :as util]
    [absurder-sql.datascript.protocols :as proto :refer [IStorage]]
-   [absurder-sql.datascript.persistent-sorted-set :as set]
-   ["../../persistent_sorted_set_js/index.min" :as pss :refer [Branch Leaf PersistentSortedSet RefType Settings]]))
+   [absurder-sql.datascript.persistent-sorted-set :as set]))
 
 (def ^:private ^:dynamic *store-buffer*)
 
@@ -23,9 +22,9 @@
 (defn- gen-addr []
   (vswap! *max-addr inc))
 
-(deftype AsyncStorageAdapter [^IStorage storage settings cache]
+(deftype AsyncStorageAdapter [^IStorage storage branching-factor cache]
   Object
-  ;; Async IStorage interface for PersistentSortedSet
+  ;; Async restore: returns a Promise that resolves to a JS object {level, keys, addresses?}
   (restore [_ addr]
     (util/log "async-restore" addr)
     (if-some [cached (get @cache addr)]
@@ -35,50 +34,38 @@
                    (when data
                      (let [{:keys [level keys addresses]} data
                            keys' (to-array (map (fn [[e a v tx]] (db/datom e a v tx)) keys))
-                           node (if addresses
-                                  (Branch. level (count keys') keys' (to-array addresses) nil settings)
-                                  (Leaf. (count keys') keys' settings))]
+                           node  (let [obj #js {:level level :keys keys'}]
+                                   (when addresses
+                                     (set! (.-addresses obj) (to-array addresses)))
+                                   obj)]
                        (swap! cache assoc addr node)
                        node)))))))
 
+  ;; Sync store: receives JS object from Rust {level, keys, addresses?}
   (store [_ node]
     (let [addr (gen-addr)
           _    (util/log "async-store" addr)
-          keys (mapv serializable-datom (.keys node))
-          data (cond-> {:level (.level node)
+          level (.-level node)
+          js-keys (.-keys node)
+          keys (mapv serializable-datom js-keys)
+          addrs (.-addresses node)
+          data (cond-> {:level level
                         :keys  keys}
-                 (instance? Branch node)
-                 (assoc :addresses (vec (.addresses node))))]
+                 (some? addrs)
+                 (assoc :addresses (vec addrs)))]
       (vswap! *store-buffer* conj! [addr data])
       addr))
 
   (accessed [_ addr]
-    ;; Optional: can be used for LRU cache tracking
     nil))
-
-(def ^:private WEAK-REF (.-WEAK RefType))
-(def ^:private SOFT-REF (.-SOFT RefType))
-(def ^:private STRONG-REF (.-STRONG RefType))
-
-(defn- ->ref-type
-  "Coerce a ref-type value to a JS RefType enum string.  Accepts enum strings
-   (pass-through) and keywords (:weak, :soft, :strong) as stored by JVM DataScript."
-  [v]
-  (case v
-    (:weak "WEAK")     WEAK-REF
-    (:soft "SOFT")     SOFT-REF
-    (:strong "STRONG") STRONG-REF
-    WEAK-REF))
 
 (defn make-async-storage-adapter [^IStorage storage opts]
   (let [branching-factor (or (:branching-factor opts) 512)
-        ref-type (->ref-type (or (:ref-type opts) (.-WEAK RefType)))
-        settings (Settings. branching-factor ref-type nil)
         cache (atom {})]
-    (AsyncStorageAdapter. storage settings cache)))
+    (AsyncStorageAdapter. storage branching-factor cache)))
 
 ;; SyncStorageWrapper - bridges async storage with sync PersistentSortedSet
-(deftype SyncStorageWrapper [async-adapter cache dirty-addrs settings]
+(deftype SyncStorageWrapper [async-adapter cache dirty-addrs branching-factor]
   proto/IPersistentSortedSetStorage
   (restore [_ addr]
     (.restore _ addr))
@@ -111,12 +98,10 @@
   "Create a sync storage wrapper around an async storage backend"
   [^IStorage storage opts]
   (let [branching-factor (or (:branching-factor opts) 512)
-        ref-type (->ref-type (or (:ref-type opts) (.-WEAK RefType)))
-        settings (Settings. branching-factor ref-type nil)
-        async-adapter (AsyncStorageAdapter. storage settings (atom {}))
+        async-adapter (AsyncStorageAdapter. storage branching-factor (atom {}))
         cache (atom {})
         dirty-addrs (atom #{})]
-    (SyncStorageWrapper. async-adapter cache dirty-addrs settings)))
+    (SyncStorageWrapper. async-adapter cache dirty-addrs branching-factor)))
 
 (defn prefetch-node!
   "Async: Load a single node from async storage into sync cache"
@@ -144,9 +129,9 @@
                   (.then (fn [node]
                            (swap! visited conj addr)
                            (swap! queue rest)
-                            ;; If branch node, enqueue children addresses
-                           (when (instance? Branch node)
-                             (let [child-addrs (filter some? (vec (.-_addresses node)))]
+                           ;; If node has addresses (branch node), enqueue children
+                           (when (and node (some? (.-addresses node)))
+                             (let [child-addrs (filter some? (vec (.-addresses node)))]
                                (swap! queue concat child-addrs)))
                            (process-next)))
                   (.catch reject)))
@@ -163,11 +148,14 @@
         ;; Collect all dirty nodes into store buffer
         (doseq [addr dirty]
           (when-some [node (get cache-val addr)]
-            (let [keys (mapv serializable-datom (.keys node))
-                  data (cond-> {:level (.level node)
+            (let [level (.-level node)
+                  js-keys (.-keys node)
+                  keys (mapv serializable-datom js-keys)
+                  addrs (.-addresses node)
+                  data (cond-> {:level level
                                 :keys  keys}
-                         (instance? Branch node)
-                         (assoc :addresses (vec (.addresses node))))]
+                         (some? addrs)
+                         (assoc :addresses (vec addrs)))]
               (vswap! *store-buffer* conj! [addr data]))))
         ;; Store all at once
         (-> (proto/-store (.-storage (.-async-adapter wrapper)) (persistent! @*store-buffer*))
@@ -213,9 +201,7 @@
 
 ;; Helper to get settings from a set
 (defn- set-settings [set]
-  (let [root (.root set)]
-    {:branching-factor (.-_branchingFactor (.-_settings root))
-     :ref-type (.-_refType (.-_settings root))}))
+  {:branching-factor (.branchingFactor set)})
 
 (defn store-impl!
   "Store DB to async storage. Returns a Promise that resolves to db."
@@ -254,8 +240,8 @@
        (if (identical? current-storage storage)
          (store-impl! db adapter false)
          (js/Promise.reject (ex-info "Database is already stored with another IAsyncStorage" {:storage current-storage}))))
-     (let [settings (.-_settings (.root (:eavt db)))
-           adapter  (AsyncStorageAdapter. storage settings (atom {}))]
+     (let [bf (.branchingFactor (:eavt db))
+           adapter (AsyncStorageAdapter. storage bf (atom {}))]
        (store-impl! db adapter false)))))
 
 (defn store-tail
@@ -329,8 +315,6 @@
     (let [eavt-addr (store-set (:eavt db) wrapper)
           aevt-addr (store-set (:aevt db) wrapper)
           avet-addr (store-set (:avet db) wrapper)
-          ;; Extract settings from wrapper instead of calling .root
-          settings (.-settings wrapper)
           meta (merge
                 {:schema   (:schema db)
                  :max-eid  (:max-eid db)
@@ -339,8 +323,7 @@
                  :aevt     aevt-addr
                  :avet     avet-addr
                  :max-addr @*max-addr
-                 :branching-factor (.-_branchingFactor settings)
-                 :ref-type (.-_refType settings)})]
+                 :branching-factor (.-branching-factor wrapper)})]
       (if (or force? (pos? (count @*store-buffer*)))
         (do
           (vswap! *store-buffer* conj! [root-addr meta])
@@ -416,10 +399,6 @@
   "Collect garbage from async storage. Returns a Promise."
   [^IStorage storage']
   (prune-stored-dbs!)
-  ;; Use restore-impl-sync to get the BASE stored db with all nodes prefetched.
-  ;; We need sync access for walkAddresses, and we use the base db (before tail)
-  ;; because applying the tail creates in-memory nodes whose addresses don't
-  ;; match what's persisted in storage.
   (-> (restore-impl-sync storage' {})
       (.then (fn [result]
                (if-not result

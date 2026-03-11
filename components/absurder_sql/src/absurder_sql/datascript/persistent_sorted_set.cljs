@@ -1,15 +1,22 @@
 (ns ^{:author "Nikita Prokopov"
       :doc "A B-tree based persistent sorted set. Supports transients, custom comparators, fast iteration, efficient slices (iterator over a part of the set) and reverse slices. Almost a drop-in replacement for [[clojure.core/sorted-set]], the only difference being this one can't store nil.
 
-      ClojureScript wrapper for the JavaScript implementation."}
+      ClojureScript wrapper for the Rust/WASM implementation."}
  absurder-sql.datascript.persistent-sorted-set
   (:refer-clojure :exclude [conj disj sorted-set sorted-set-by])
   (:require
-   ["../../persistent_sorted_set_js/index.min" :as pss :refer [PersistentSortedSet RefType Seq Settings]]))
+   ["persistent-sorted-set" :as pss :refer [WasmPSS WasmSeq]]))
 
-(defonce ^:private STRONG-REF (.-STRONG RefType))
-(defonce ^:private SOFT-REF (.-SOFT RefType))
-(defonce ^:private WEAK-REF (.-WEAK RefType))
+;; WASM initialization — must complete before any PSS operations.
+;; Override per build via :closure-defines in shadow-cljs.edn.
+(goog-define ^string WASM_URL "/ds/persistent_sorted_set_bg.wasm")
+
+(defonce init-promise (pss/init WASM_URL))
+
+(defn ensure-initialized!
+  "Returns a promise that resolves when WASM is ready."
+  []
+  init-promise)
 
 ;; JavaScript interop helpers
 (defn- js-comparator
@@ -22,37 +29,16 @@
         (pos? result) 1
         :else 0))))
 
-;; Settings
-(defn- settings->js
-  "Convert Clojure settings map to JavaScript Settings object"
-  [opts]
-  (let [branching-factor (or (:branching-factor opts) 512)
-        ref-type (case (:ref-type opts)
-                   :strong STRONG-REF
-                   :soft   SOFT-REF
-                   :weak   WEAK-REF
-                   STRONG-REF)]
-    (new Settings branching-factor ref-type)))
-
-(defn- settings->clj
-  "Convert JavaScript Settings object to Clojure map"
-  [^js settings]
-  {:branching-factor (.branchingFactor settings)
-   :ref-type         (condp = (.refType settings)
-                       STRONG-REF :strong
-                       SOFT-REF   :soft
-                       WEAK-REF   :weak)})
-
 ;; Main API functions
 (defn conj
   "Analogue to [[clojure.core/conj]] but with comparator that overrides the one stored in set."
-  [^PersistentSortedSet set key cmp]
+  [^WasmPSS set key cmp]
   (let [js-cmp (js-comparator cmp)]
     (.conj set key js-cmp)))
 
 (defn disj
   "Analogue to [[clojure.core/disj]] with comparator that overrides the one stored in set."
-  [^PersistentSortedSet set key cmp]
+  [^WasmPSS set key cmp]
   (let [js-cmp (js-comparator cmp)]
     (.disj set key js-cmp)))
 
@@ -61,9 +47,9 @@
    `(slice set from to)` returns iterator for all Xs where from <= X <= to.
    `(slice set from nil)` returns iterator for all Xs where X >= from.
    Optionally pass in comparator that will override the one that set uses. Supports efficient [[clojure.core/rseq]]."
-  ([^PersistentSortedSet set from to]
+  ([^WasmPSS set from to]
    (.slice set from to))
-  ([^PersistentSortedSet set from to cmp]
+  ([^WasmPSS set from to cmp]
    (let [js-cmp (js-comparator cmp)]
      (.slice set from to js-cmp))))
 
@@ -72,9 +58,9 @@
    `(rslice set from to)` returns backwards iterator for all Xs where from <= X <= to.
    `(rslice set from nil)` returns backwards iterator for all Xs where X <= from.
    Optionally pass in comparator that will override the one that set uses. Supports efficient [[clojure.core/rseq]]."
-  ([^PersistentSortedSet set from to]
+  ([^WasmPSS set from to]
    (.rslice set from to))
-  ([^PersistentSortedSet set from to cmp]
+  ([^WasmPSS set from to cmp]
    (let [js-cmp (js-comparator cmp)]
      (.rslice set from to js-cmp))))
 
@@ -82,10 +68,10 @@
   "An efficient way to seek to a specific key in a seq (either returned by [[clojure.core.seq]] or a slice.)
   `(seek (seq set) to)` returns iterator for all Xs where to <= X.
   Optionally pass in comparator that will override the one that set uses."
-  ([^Seq seq to]
+  ([^WasmSeq seq to]
    (when seq
      (.seek seq to)))
-  ([^Seq seq to cmp]
+  ([^WasmSeq seq to cmp]
    (when seq
      (let [js-cmp (js-comparator cmp)]
        (.seek seq to js-cmp)))))
@@ -99,9 +85,9 @@
   ([cmp keys len opts]
    (let [js-cmp     (js-comparator cmp)
          js-arr     (if (array? keys) keys (to-array keys))
-         storage    (:storage opts) 
-         settings   (settings->js opts)]
-     (.from PersistentSortedSet js-arr js-cmp storage settings))))
+         storage    (:storage opts)
+         settings   #js {:branchingFactor (or (:branching-factor opts) 512)}]
+     (.from WasmPSS js-arr js-cmp storage settings))))
 
 (defn from-sequential
   "Create a set with custom comparator and a collection of keys. Useful when you don't want to call [[clojure.core/apply]] on [[sorted-set-by]]."
@@ -111,29 +97,29 @@
    (let [js-cmp   (js-comparator cmp)
          arr      (to-array keys)
          _        (.sort arr js-cmp)
-         storage  (:storage opts) 
-         settings (settings->js opts)]
-     (.from PersistentSortedSet arr js-cmp storage settings))))
+         storage  (:storage opts)
+         settings #js {:branchingFactor (or (:branching-factor opts) 512)}]
+     (.from WasmPSS arr js-cmp storage settings))))
 
 (defn sorted-set*
   "Create a set with custom comparator, metadata and settings"
   [opts]
   (let [js-cmp   (js-comparator (or (:cmp opts) compare))
-        storage  (:storage opts) 
-        settings (settings->js opts)]
-    (.withComparatorAndStorage PersistentSortedSet js-cmp storage settings)))
+        storage  (:storage opts)
+        settings #js {:branchingFactor (or (:branching-factor opts) 512)}]
+    (.withComparatorAndStorage WasmPSS js-cmp storage settings)))
 
 (defn sorted-set-by
   "Create a set with custom comparator."
   ([cmp]
-   (.empty PersistentSortedSet (js-comparator cmp)))
+   (.empty WasmPSS (js-comparator cmp)))
   ([cmp & keys]
    (from-sequential cmp keys)))
 
 (defn sorted-set
   "Create a set with default comparator."
   ([]
-   (.empty PersistentSortedSet))
+   (.empty WasmPSS (js-comparator compare)))
   ([& keys]
    (from-sequential compare keys)))
 
@@ -145,8 +131,8 @@
    (restore-by cmp address storage {}))
   ([cmp address storage opts]
    (let [js-cmp   (js-comparator cmp)
-         settings (settings->js opts)]
-     (PersistentSortedSet. js-cmp storage settings address nil -1 0))))
+         settings #js {:branchingFactor (or (:branching-factor opts) 512)}]
+     (.restore WasmPSS js-cmp address storage settings))))
 
 (defn restore
   "Constructs lazily-loaded set from storage and root address.
@@ -160,30 +146,31 @@
 (defn walk-addresses
   "Visit each address used by this set. Usable for cleaning up
    garbage left in storage from previous versions of the set"
-  [^PersistentSortedSet set consume-fn]
+  [^WasmPSS set consume-fn]
   (.walkAddresses set consume-fn))
 
 (defn settings
   "Get the settings for this set as a Clojure map"
-  [^PersistentSortedSet set]
-  (settings->clj (.-_settings set)))
+  [^WasmPSS set]
+  {:branching-factor (.branchingFactor set)
+   :ref-type         :strong})
 
 (defn store
   "Store each not-yet-stored node by calling IStorage::store and remembering
    returned address. Incremental, won't store same node twice on subsequent calls.
    Returns root address. Remember it and use it for restore"
-  ([^PersistentSortedSet set]
+  ([^WasmPSS set]
    (.store set))
-  ([^PersistentSortedSet set storage]
+  ([^WasmPSS set storage]
    (.store set storage)))
 
-;; Extend JavaScript PersistentSortedSet to implement Clojure protocols
-(extend-type PersistentSortedSet
+;; Extend WasmPSS to implement Clojure protocols
+(extend-type WasmPSS
   ISeqable
   (-seq [this]
     (let [js-seq (.seq this)]
       (when js-seq
-        ;; Convert JavaScript iterator to Clojure seq
+        ;; Convert WASM iterator to Clojure seq
         (let [arr (.toArray js-seq)]
           (seq arr)))))
 
@@ -218,7 +205,7 @@
 
   IEquiv
   (-equiv [this other]
-    (if (instance? PersistentSortedSet other)
+    (if (instance? WasmPSS other)
       (.equals this other)
       (and
        (set? other)
@@ -235,9 +222,9 @@
       (-write writer "#")
       (-write writer (pr-str (vec arr))))))
 
-;; Extend JavaScript Seq to implement Clojure protocols
-(when Seq
-  (extend-type Seq
+;; Extend WasmSeq to implement Clojure protocols
+(when WasmSeq
+  (extend-type WasmSeq
     ISeqable
     (-seq [this] this)
 

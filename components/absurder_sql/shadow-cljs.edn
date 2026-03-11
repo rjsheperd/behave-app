@@ -13,13 +13,25 @@
                                   :runner-ns    kaocha.cljs2.shadow-runner
                                   :test-dir     "target/kaocha-test"
                                   :ns-regexp    ".*-test$"
+                                  :js-options   {:js-provider :shadow
+                                                 :resolve {"persistent-sorted-set"
+                                                           {:target :file
+                                                            :file   "rust/persistent-sorted-set/pkg/index.js"}}}
+                                  :compiler-options {:closure-defines {absurder-sql.datascript.persistent-sorted-set/WASM_URL
+                                                                      "/js/persistent_sorted_set_bg.wasm"}}
+                                  :build-hooks  [(absurder-sql.build/test-hook)]
                                   :devtools     {:http-port 1818
                                                  :http-root "target/kaocha-test"
-                                                 :preloads  [lambdaisland.chui.remote]}}
+                                                 :preloads  [absurder-sql.test-preloads
+                                                        lambdaisland.chui.remote]}}
                 :datascript      {:target           :browser
                                   :output-dir       "out/ds"
                                   :asset-path       "/ds"
-                                  :js-options       {:js-provider :shadow}
+                                  :js-options       {:js-provider :shadow
+                                                     :resolve {"persistent-sorted-set"
+                                                               {:target :file
+                                                                :file   "rust/persistent-sorted-set/pkg/index.js"}}}
                                   :compiler-options {:externs ["resources/externs.js"]}
+                                  :build-hooks      [(absurder-sql.build/datascript-hook)]
                                   :modules          {:main {:entries [absurder-sql.datascript-client]
                                                             :init-fn absurder-sql.datascript-client/init}}}}}

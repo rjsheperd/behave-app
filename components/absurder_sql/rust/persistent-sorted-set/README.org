@@ -1,0 +1,376 @@
+#+TITLE: Persistent Sorted Set — Rust/WASM B+ Tree
+#+AUTHOR: sig
+#+OPTIONS: toc:3
+
+* Overview
+
+A persistent (immutable, structural-sharing) B+ tree implementation in Rust,
+compiled to WASM for use from ClojureScript via =wasm-bindgen=. This is a port
+of the JavaScript =PersistentSortedSet= used by DataScript.
+
+The key design goals:
+
+- *Persistent data structure*: =conj= and =disj= return new trees sharing
+  structure with the original via =Rc<Node>=.
+- *Lazy storage*: Trees can be stored to and restored from a pluggable storage
+  backend (SQLite, in-memory, or a JS callback bridge). Restored trees load
+  nodes lazily on first access.
+- *Dual-target*: Native builds use =i64= keys for testing; WASM builds use
+  =JsValue= keys to support arbitrary ClojureScript objects (datoms, strings,
+  etc.).
+- *Drop-in replacement*: The WASM API mirrors the original JS =PersistentSortedSet=
+  closely enough that the CLJS wrapper (=persistent_sorted_set.cljs=) needed
+  only import changes and minor adjustments.
+
+* Crate Structure
+
+#+BEGIN_SRC
+src/
+├── lib.rs              Module declarations, re-exports
+├── key.rs              Key type alias (JsValue on wasm32, i64 on native)
+├── node.rs             Node enum (Leaf | Branch), binary search, comparator type
+├── leaf.rs             Leaf node: sorted key vector, add/remove with split/merge
+├── branch.rs           Branch node: keys + child pointers, lazy child loading
+├── seq.rs              Iterator (Seq): forward/reverse traversal with bounds
+├── chunk.rs            Chunked iteration for efficient batch leaf access
+├── set.rs              PersistentSortedSet: top-level API, conj/disj/slice/store
+├── settings.rs         Settings: branching factor, editable flag
+├── results.rs          AddResult / RemoveResult enums
+├── storage.rs          IStorage trait, MemoryStorage, StorageCell (interior mutability)
+├── sqlite_storage.rs   SQLiteStorage (native only, uses rusqlite)
+├── wasm.rs             wasm-bindgen exports: WasmPSS, WasmSeq (wasm32 only)
+└── js_storage.rs       JsStorage: IStorage via JS callbacks (wasm32 only)
+#+END_SRC
+
+* Architecture
+
+** Node Types
+
+The tree uses two node types in a single enum:
+
+#+BEGIN_SRC rust
+pub enum Node {
+    Leaf(Leaf),       // level 0: holds sorted Vec<Key>
+    Branch(Branch),   // level > 0: holds keys + child pointers/addresses
+}
+#+END_SRC
+
+Branches store children as =Option<Rc<Node>>= (loaded) plus =Option<i64>=
+addresses (for lazy restoration from storage). When a child is accessed but not
+yet loaded, the branch fetches it via the storage backend.
+
+** Comparator
+
+The comparator is a boxed function passed at construction time:
+
+#+BEGIN_SRC rust
+pub type Comparator = dyn Fn(&Key, &Key) -> Ordering;
+#+END_SRC
+
+On WASM, this wraps a =js_sys::Function= that calls back to the ClojureScript
+comparator (e.g., =cmp-datoms-eavt=). The JS function receives two =JsValue=
+args and must return =-1=, =0=, or =1=.
+
+** Persistence (Structural Sharing)
+
+Operations return new trees:
+
+#+BEGIN_SRC rust
+let set2 = set1.conj(&key);  // set1 unchanged, set2 shares most nodes
+let set3 = set2.disj(&key);  // set2 unchanged
+#+END_SRC
+
+Nodes are reference-counted (=Rc<Node>=). Unmodified subtrees are shared between
+versions. Transient (editable) mode is available for batch mutations via
+=as_transient()= / =persistent()=.
+
+** Storage
+
+The =IStorage= trait abstracts node persistence:
+
+#+BEGIN_SRC rust
+pub trait IStorage {
+    fn store(&mut self, node: &Node) -> i64;       // serialize node, return address
+    fn restore(&self, address: i64) -> Rc<Node>;   // deserialize node by address
+    fn accessed(&self, address: i64) {}             // LRU cache hint
+    fn list_addresses(&self) -> Vec<i64>;           // for garbage collection
+    fn delete(&mut self, addresses: &[i64]);        // remove garbage
+}
+#+END_SRC
+
+Three implementations:
+
+| Implementation   | Target  | Description                                       |
+|------------------+---------+---------------------------------------------------|
+| =MemoryStorage=  | Any     | HashMap-backed, for testing                       |
+| =SQLiteStorage=  | Native  | rusqlite-backed, with LRU cache, binary key blobs |
+| =JsStorage=      | WASM    | Delegates to JS object via callback functions     |
+
+** JsStorage Bridge (WASM ↔ CLJS)
+
+=JsStorage= enables the WASM PSS to use the existing CLJS =StorageAdapter= for
+persistence. It extracts =store=, =restore=, and =accessed= functions from a JS
+object and calls them with proper =this= binding:
+
+#+BEGIN_SRC rust
+pub struct JsStorage {
+    obj: JsValue,                           // original JS object (for `this`)
+    store_fn: js_sys::Function,             // (node_obj) -> address
+    restore_fn: js_sys::Function,           // (address) -> node_obj
+    accessed_fn: Option<js_sys::Function>,  // (address) -> void
+    settings: Settings,
+}
+#+END_SRC
+
+Nodes are serialized to/from plain JS objects at the boundary:
+
+#+BEGIN_SRC javascript
+// Leaf:   { level: 0, keys: [key1, key2, ...] }
+// Branch: { level: N, keys: [key1, key2, ...], addresses: [addr1, addr2, ...] }
+#+END_SRC
+
+*Critical*: Methods are called with =fn.call(self.obj, ...)= not
+=fn.call(null, ...)=, because CLJS =deftype= methods access fields through
+=this= (=self__=).
+
+* Building
+
+** Prerequisites
+
+- Rust toolchain with =wasm32-unknown-unknown= target
+- =wasm-pack= (=cargo install wasm-pack=)
+
+** WASM Build
+
+#+BEGIN_SRC sh
+cd rust/persistent-sorted-set
+wasm-pack build --target web
+#+END_SRC
+
+This produces =pkg/= with:
+- =persistent_sorted_set.js= — wasm-bindgen generated glue (ESM, uses =import.meta.url=)
+- =persistent_sorted_set_bg.wasm= — the compiled WASM binary
+- =persistent_sorted_set_bg.js= — low-level JS bindings
+
+The generated ESM glue uses =import.meta.url= which Closure Compiler (used by
+shadow-cljs) cannot handle. We use a hand-written CommonJS wrapper instead:
+
+- =pkg/index.js= — CommonJS wrapper that shadow-cljs resolves via =:js-options :resolve=
+
+** Native Build (for testing)
+
+#+BEGIN_SRC sh
+cargo test
+#+END_SRC
+
+Native tests use =i64= keys and exercise the same B+ tree logic without WASM overhead.
+
+* WASM Initialization
+
+WASM must be loaded asynchronously before any PSS operations. The =index.js=
+wrapper exports an =init(wasmUrl)= function:
+
+#+BEGIN_SRC javascript
+const pss = require("persistent-sorted-set");
+await pss.init("/ds/persistent_sorted_set_bg.wasm");
+
+// Now WasmPSS and WasmSeq are ready
+const set = pss.WasmPSS.empty(comparatorFn);
+#+END_SRC
+
+=init()= tries synchronous XHR first (works on some runtimes), then falls back
+to =fetch()=. The returned promise resolves when the WASM module is
+instantiated. Subsequent calls are no-ops (idempotent).
+
+* Using from JavaScript
+
+** Creating Sets
+
+#+BEGIN_SRC javascript
+const pss = require("persistent-sorted-set");
+await pss.init("/path/to/persistent_sorted_set_bg.wasm");
+
+// Comparator must return -1, 0, or 1
+const cmp = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+
+// Empty set
+const s1 = pss.WasmPSS.empty(cmp);
+
+// From array
+const s2 = pss.WasmPSS.from([3, 1, 4, 1, 5], cmp, undefined, undefined);
+
+// With storage and settings
+const s3 = pss.WasmPSS.withComparatorAndStorage(cmp, storageObj, { branchingFactor: 32 });
+#+END_SRC
+
+** Mutating (Returns New Set)
+
+#+BEGIN_SRC javascript
+const s2 = s1.conj("hello", undefined);   // add key
+const s3 = s2.disj("hello", undefined);   // remove key
+#+END_SRC
+
+Second argument is an optional comparator override (pass =undefined= for default).
+
+** Querying
+
+#+BEGIN_SRC javascript
+s.contains("hello")       // => true/false
+s.count()                 // => number
+s.toArray()               // => Array of all keys in order
+#+END_SRC
+
+** Iteration
+
+#+BEGIN_SRC javascript
+const seq = s.seq();       // forward iterator (or undefined if empty)
+seq.first()                // => first key
+seq.next()                 // => next WasmSeq (or undefined)
+seq.toArray()              // => remaining keys as Array
+seq.seek(target, cmp)      // => WasmSeq starting at target
+
+s.slice(from, to, cmp)    // => WasmSeq for keys in [from, to]
+s.rslice(from, to, cmp)   // => WasmSeq for keys in [from, to], reversed
+#+END_SRC
+
+Pass =null= / =undefined= for unbounded ends: =s.slice(from, null, cmp)=.
+
+** Storage
+
+#+BEGIN_SRC javascript
+// Storage object must have store(nodeObj) and restore(address) methods.
+// Optionally: accessed(address) for LRU hinting.
+const storage = {
+    store(node)    { /* persist node, return integer address */ },
+    restore(addr)  { /* return { level, keys, addresses? } */ },
+    accessed(addr) { /* optional: mark recently used */ }
+};
+
+const addr = s.store(storage);              // persist tree, returns root address
+s.walkAddresses((addr) => { ... });         // visit all addresses in tree
+
+// Restore from storage
+const s2 = pss.WasmPSS.restore(cmp, addr, storage, { branchingFactor: 32 });
+#+END_SRC
+
+* Using from ClojureScript
+
+The CLJS wrapper at =src/absurder_sql/datascript/persistent_sorted_set.cljs=
+provides an idiomatic API and extends =WasmPSS= / =WasmSeq= with ClojureScript
+protocols (=ISeqable=, =ICounted=, =ILookup=, =IEquiv=, =IHash=, etc.).
+
+** WASM Init
+
+#+BEGIN_SRC clojure
+(ns my-app
+  (:require [absurder-sql.datascript.persistent-sorted-set :as pss]))
+
+;; Must await before any PSS operations
+(<p! (pss/ensure-initialized!))
+#+END_SRC
+
+The WASM URL defaults to ="/ds/persistent_sorted_set_bg.wasm"= and can be
+overridden via =:closure-defines= in =shadow-cljs.edn=:
+
+#+BEGIN_SRC clojure
+:compiler-options {:closure-defines {absurder-sql.datascript.persistent-sorted-set/WASM_URL
+                                     "/custom/path/to/bg.wasm"}}
+#+END_SRC
+
+** API
+
+#+BEGIN_SRC clojure
+;; Create
+(pss/sorted-set)                          ;; empty, default comparator
+(pss/sorted-set-by my-cmp)               ;; empty, custom comparator
+(pss/sorted-set* {:cmp my-cmp            ;; with all options
+                   :storage adapter
+                   :branching-factor 32})
+
+;; Build from data
+(pss/from-sorted-array cmp (to-array keys) (count keys) opts)
+(pss/from-sequential cmp keys opts)
+
+;; Mutate (returns new set)
+(pss/conj set key cmp)
+(pss/disj set key cmp)
+
+;; Iterate
+(seq set)                                 ;; ISeqable — lazy seq of keys
+(pss/slice set from to)                   ;; bounded forward iterator
+(pss/rslice set from to)                  ;; bounded reverse iterator
+(pss/seek some-seq target)                ;; seek within an existing seq
+
+;; Storage
+(pss/store set)                           ;; persist, returns root address
+(pss/store set storage)                   ;; persist with explicit storage
+(pss/restore address storage)             ;; restore from address
+(pss/restore-by cmp address storage opts) ;; restore with custom comparator
+(pss/walk-addresses set callback-fn)      ;; visit all stored addresses
+
+;; Settings
+(pss/settings set)  ;; => {:branching-factor N, :ref-type :strong}
+#+END_SRC
+
+** Protocol Extensions
+
+=WasmPSS= implements: =ISeqable=, =ICounted=, =ILookup=, =ICollection=, =ISet=,
+=IFn=, =IEquiv=, =IHash=, =IPrintWithWriter=.
+
+=WasmSeq= implements: =ISeqable=, =ISeq=, =INext=, =ICounted=, =IEquiv=,
+=IPrintWithWriter=.
+
+** shadow-cljs Configuration
+
+The WASM package is resolved as a local file in =shadow-cljs.edn=:
+
+#+BEGIN_SRC clojure
+:js-options {:js-provider :shadow
+             :resolve {"persistent-sorted-set"
+                       {:target :file
+                        :file   "rust/persistent-sorted-set/pkg/index.js"}}}
+#+END_SRC
+
+The =.wasm= file must be served from the dev server. Build hooks in
+=src/absurder_sql/build.clj= copy it to the output directory.
+
+* Testing
+
+** Rust (native)
+
+#+BEGIN_SRC sh
+cargo test
+#+END_SRC
+
+85 tests covering: insert, delete, iteration, slicing, seeking, storage
+round-trips, edge cases (empty tree, single element, large trees), and
+transient/persistent transitions.
+
+** CLJS (via kaocha)
+
+#+BEGIN_SRC sh
+bun shadow-cljs compile :test-kaocha
+./bin/kaocha
+#+END_SRC
+
+Tests in =test/unit/absurder_sql/datascript/storage_test.cljs= exercise the full
+stack: WASM PSS → CLJS wrapper → StorageAdapter → SQLite round-trip.
+
+** Standalone HTML
+
+=pkg/test.html= provides a minimal browser test that verifies the WASM module
+loads and basic operations work, independent of shadow-cljs or CLJS.
+
+* Key Differences from JS Implementation
+
+| Aspect             | JS PSS                         | Rust/WASM PSS                          |
+|--------------------+--------------------------------+----------------------------------------|
+| Key type           | Any JS value                   | =JsValue= (wasm) / =i64= (native)     |
+| Structural sharing | JS object identity             | =Rc<Node>= reference counting          |
+| Weak references    | =WeakRef= / =RefType= enum     | Not needed — =Rc= + LRU cache          |
+| Storage interface  | JS protocol (=IStorage=)       | Rust trait via JS callback bridge       |
+| Node types         | =ANode= / =Branch= / =Leaf=    | =enum Node { Leaf, Branch }=           |
+| Interior mutability| Mutable JS objects             | =RefCell= for =StorageCell=            |
+| Branching factor   | Default 512                    | Default 512 (configurable)             |
+| Settings =ref-type=| =:weak= or =:strong=           | Always =:strong= (hardcoded in CLJS)   |
+| Node counts        | Deterministic for given BF     | Slightly different split/merge behavior |
