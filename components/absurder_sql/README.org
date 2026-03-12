@@ -1,0 +1,168 @@
+#+TITLE: absurder_sql
+#+AUTHOR: rsheperd
+
+* Overview
+
+CLJS component providing DataScript with a Rust/WASM persistent sorted set (PSS)
+backend and SQLite storage. Eliminates the CLJS/Rust interop boundary problems
+(~._storage~ inaccessible on WasmPSS, ~equals~ always false, JsStorage
+double-crossing the WASM boundary) by giving Rust first-class knowledge of
+datoms.
+
+* Architecture
+
+#+begin_example
+┌─────────────────────────────────────────────────┐
+│  CLJS (DataScript)                              │
+│  db.cljc  ──▸  persistent_sorted_set.cljs       │
+│                     │                           │
+│                     ▼                           │
+│              ┌─────────────┐                    │
+│              │  WasmPSS    │  (wasm-bindgen)    │
+│              └──────┬──────┘                    │
+├─────────────────────┼───────────────────────────┤
+│  Rust/WASM          │                           │
+│              ┌──────▼──────┐                    │
+│              │  Datom Key  │  native comparators │
+│              │  B+ tree    │  per IndexType      │
+│              └──────┬──────┘                    │
+│                     │                           │
+│              ┌──────▼──────┐                    │
+│              │  JsStorage  │  (bridge to CLJS)  │
+│              └─────────────┘                    │
+└─────────────────────────────────────────────────┘
+#+end_example
+
+** Key design decisions
+
+- *Datom as Key*: WASM ~Key~ type is ~Datom~ (not ~JsValue~). Rust owns the
+  parsed datom struct with fields ~e~, ~a~ (~Attr~), ~v~ (~Value~), ~tx~.
+- *Rust-native comparators*: ~IndexType~ enum (~EAVT~, ~AEVT~, ~AVET~) selects
+  the comparator in Rust — no JS callback boundary crossing for sorting.
+- *Lossless round-trip*: ~Datom~ stores ~original_js: Option<JsValue>~ so that
+  ~datom_to_js~ returns the original CLJS Datom object without lossy
+  reconstruction.
+- *Storage adapter propagation*: ~._storage~ is attached as a JS property on
+  WasmPSS instances and propagated through ~conj~/~disj~ so that
+  ~storage-adapter~ can retrieve it from ~(:eavt db)~.
+
+* Source layout
+
+| Path                                          | Purpose                                       |
+|-----------------------------------------------+-----------------------------------------------|
+| ~rust/persistent-sorted-set/src/datom.rs~     | ~Datom~, ~Attr~, ~Value~ types                |
+| ~rust/persistent-sorted-set/src/comparator.rs~ | ~cmp_datoms~, ~IndexType~, ~comparator_for_index~ |
+| ~rust/persistent-sorted-set/src/key.rs~       | ~Key = Datom~ (wasm32) / ~i64~ (native)       |
+| ~rust/persistent-sorted-set/src/wasm.rs~      | wasm-bindgen exports, Datom↔JsValue conversion |
+| ~rust/persistent-sorted-set/src/js_storage.rs~ | JsStorage bridge (delegates to CLJS callbacks) |
+| ~rust/persistent-sorted-set/src/set.rs~       | ~PersistentSortedSet~ (B+ tree core)          |
+| ~src/absurder_sql/datascript/persistent_sorted_set.cljs~ | CLJS wrapper for WasmPSS              |
+| ~src/absurder_sql/datascript/db.cljc~         | Datom deftype, DB, empty-db, comparators      |
+| ~src/absurder_sql/datascript/storage.cljs~    | Sync StorageAdapter, store/restore impl       |
+| ~src/absurder_sql/datascript/storage_async.cljs~ | Async storage with prefetch/sync wrapper   |
+| ~src/absurder_sql/datascript/conn.cljc~       | Connection management, transact!, restore      |
+| ~src/absurder_sql/datascript/core.cljc~       | Public API (create-conn, transact!, q, etc.)  |
+| ~src/absurder_sql/datascript_client.cljs~     | Demo UI client (browser)                      |
+| ~src/absurder_sql/datascript/sqlite.cljs~     | SQLite-backed IStorage for browser            |
+| ~src/absurder_sql/build.clj~                  | shadow-cljs build hooks (wasm-pack, copy)     |
+
+* Building
+
+** Rust/WASM
+
+#+begin_src sh
+cd rust/persistent-sorted-set
+cargo test                                    # native tests (20 tests)
+wasm-pack build --target web --no-typescript  # WASM binary
+#+end_src
+
+The build hook in ~build.clj~ runs ~wasm-pack build~ automatically when Rust
+sources are newer than the WASM binary. It also patches ~import.meta.url~ out of
+the wasm-pack output (Closure Compiler cannot transpile it, and the CLJS code
+always provides an explicit WASM URL).
+
+** CLJS
+
+#+begin_src sh
+bun shadow-cljs compile :test-kaocha   # test build
+bun shadow-cljs compile :datascript    # datascript client build
+#+end_src
+
+shadow-cljs resolves ~"persistent-sorted-set"~ to
+~rust/persistent-sorted-set/pkg/persistent_sorted_set.js~ via ~:js-provider
+:shadow~ with ~:target :file~.
+
+* Running tests
+
+Funnel and a web server must be running separately:
+
+#+begin_src sh
+bun shadow-cljs compile :test-kaocha  # compile CLJS tests
+./bin/kaocha                          # run tests (needs funnel + Chrome)
+#+end_src
+
+- Funnel listens on port 44220, Chrome debugger on port 9222
+- ~kaocha_hooks.clj~ handles Chrome launch/reload via CDP
+- Test output served on port 8022
+
+* How it works
+
+** WASM initialization
+
+#+begin_src clojure
+;; persistent_sorted_set.cljs
+(defonce init-promise (init-wasm WASM_URL))
+
+(defn ensure-initialized! [] init-promise)
+#+end_src
+
+The ~default~ export from wasm-pack (~__wbg_init~) fetches and instantiates the
+WASM binary. ~WASM_URL~ is overridden per build via ~:closure-defines~.
+
+** Index creation (fast path)
+
+#+begin_src clojure
+;; db.cljc — empty-db
+:eavt (set/sorted-set* (assoc opts :cmp cmp-datoms-eavt :index-type "eavt"))
+:aevt (set/sorted-set* (assoc opts :cmp cmp-datoms-aevt :index-type "aevt"))
+:avet (set/sorted-set* (assoc opts :cmp cmp-datoms-avet :index-type "avet"))
+#+end_src
+
+When ~:index-type~ is present, ~sorted-set*~ calls
+~WasmPSS.emptyWithIndex(indexType)~ which creates a PSS with a Rust-native
+comparator — no JS callback overhead.
+
+** Datom conversion
+
+CLJS Datom objects cross into Rust via ~datom_from_js~:
+- ~.-e~, ~.-tx~ → ~i64~
+- ~.-a~ (keyword via ~.fqn~) → ~Attr::Keyword { ns, name }~
+- ~.-v~ (type-detected) → ~Value::Long~, ~Value::Str~, ~Value::Bool~, etc.
+
+On the way out, ~datom_to_js~ returns ~original_js~ (the original CLJS Datom)
+when available, falling back to constructing a plain JS object for
+Rust-originated boundary datoms.
+
+The CLJS side registers a converter (~set/set-js->datom-fn!~) in ~db.cljc~ that
+wraps any plain JS datom objects back into CLJS ~Datom~ deftype instances,
+converting string attributes (e.g. ~":person/name"~) back to keywords.
+
+** Storage flow
+
+1. ~create-conn~ calls ~maybe-adapt-storage~ to wrap raw ~IStorage~ in a
+   ~StorageAdapter~ (implements ~IPersistentSortedSetStorage~)
+2. ~sorted-set*~ passes the adapter to ~WasmPSS.emptyWithIndexAndStorage~ and
+   attaches it as ~._storage~ on the JS object
+3. ~conj~/~disj~ propagate ~._storage~ to the new WasmPSS instance
+4. ~conn-from-db~ retrieves the adapter via ~(.-_storage (:eavt db))~
+5. ~-transact!~ calls ~-ds-store!~ / ~-ds-store-tail!~ through the adapter
+6. The adapter's ~store~/~restore~ methods serialize datoms as ~[e a v tx]~
+   vectors via ~serializable-datom~ and delegate to the underlying ~IStorage~
+
+* Roadmap
+
+See [[file:DATASCRIPT_RUST.org][DATASCRIPT_RUST.org]] for the full plan.
+
+- [X] Phase 1: Native Datom Keys (Rust-native comparators, Datom↔JsValue, CLJS wiring)
+- [ ] Phase 2: WASM SQLiteStorage (binary datom serialization, SQLite on WASM)
+- [ ] Phase 3: WasmDB (Schema in Rust, Database struct, simplified CLJS storage)

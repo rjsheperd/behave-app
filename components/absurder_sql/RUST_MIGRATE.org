@@ -1,0 +1,857 @@
+* Persistent Sorted Set → Rust/WASM with AbsurderSQL Storage
+
+** Overview
+
+Port the JS persistent sorted set (B+ tree) to Rust, compiled to WASM via =wasm-pack=.
+Use =absurder-sql= (Rust) as the underlying SQLite storage, so node store/restore
+never crosses the JS↔WASM boundary.
+
+** Architecture
+
+#+begin_example
+┌─────────────────────────────┐
+│  ClojureScript (DataScript)  │
+│  persistent_sorted_set.cljs  │  ← thin wrapper (same API)
+└──────────┬──────────────────┘
+           │ wasm-bindgen (conj/disj/slice/store/restore)
+┌──────────▼──────────────────┐
+│  Rust WASM module            │
+│  ┌─────────────────────────┐│
+│  │ persistent-sorted-set   ││  ← B-tree logic (pure Rust)
+│  │   uses ↓                ││
+│  │ SQLiteStorage (IStorage)││  ← stores nodes as SQLite rows
+│  │   uses ↓                ││
+│  │ absurder-sql            ││  ← SQLite + IndexedDB VFS
+│  └─────────────────────────┘│
+│  (single .wasm binary)      │
+└─────────────────────────────┘
+#+end_example
+
+The critical win: *node restore/store never leaves WASM*. Only =conj=/=disj=/=slice=
+results cross the boundary, and those are individual datom values that already had to
+cross anyway.
+
+** Source mapping
+
+| JS File               | Rust Module           | Notes                                                          |
+|-----------------------+-----------------------+----------------------------------------------------------------|
+| =ArrayUtil.js=        | Not needed            | Rust has =Vec::splice=, =copy_from_slice=, etc.               |
+| =Stitch.js=           | Not needed            | Replace with idiomatic =Vec= building / =extend_from_slice=   |
+| =RefType.js=          | =ref_type.rs=         | Simple enum ={ Strong, Weak }=. No =Soft= in WASM.            |
+| =Settings.js=         | =settings.rs=         | Struct: =branching_factor: usize=, =ref_type=, =editable=     |
+| =ANode.js=            | =node.rs=             | Enum =Node { Leaf(Leaf), Branch(Branch) }= — replaces classes |
+| =Leaf.js=             | =leaf.rs=             | =struct Leaf { keys: Vec<JsValue>, len: usize }=              |
+| =Branch.js=           | =branch.rs=           | =struct Branch { level, keys, addresses, children }=           |
+| =NodeFactory.js=      | Fold into =Node::restore()= |                                                           |
+| =Seq.js=              | =seq.rs=              | Iterator struct with parent stack                              |
+| =Chunk.js=            | =chunk.rs=            | Chunked leaf iteration                                        |
+| =PersistentSortedSet.js= | =set.rs=           | Main public struct                                             |
+| =IStorage.js=         | =storage.rs=          | Trait                                                          |
+| —                     | =sqlite_storage.rs=   | *NEW*: =IStorage= impl backed by absurder-sql SQLite          |
+| =Registry.js=         | Not ported            | Debug only                                                     |
+
+** Core Rust types
+
+#+begin_src rust
+enum Node {
+    Leaf(Leaf),
+    Branch(Branch),
+}
+
+struct Leaf {
+    keys: Vec<JsValue>,  // datoms stay as JsValue
+}
+
+struct Branch {
+    level: u32,
+    keys: Vec<JsValue>,
+    addresses: Option<Vec<i64>>,             // SQLite rowids (not JsValue!)
+    children: Option<Vec<Option<Rc<Node>>>>,
+}
+
+enum AddResult {
+    Unchanged,
+    EarlyExit,
+    One(Rc<Node>),
+    Split(Rc<Node>, Rc<Node>),
+}
+
+enum RemoveResult {
+    Unchanged,
+    EarlyExit,
+    Rebalanced {
+        left: Option<Rc<Node>>,
+        center: Rc<Node>,
+        right: Option<Rc<Node>>,
+    },
+}
+#+end_src
+
+** Design decisions
+
+- *Values are =JsValue=*: The set stores arbitrary JS values (datoms). The comparator
+  is a JS function called via =wasm-bindgen=. Datoms remain as =JsValue= on the WASM
+  boundary.
+- *Node = Rust enum*: =enum Node { Leaf(Leaf), Branch(Branch) }= replaces the OOP
+  hierarchy. Pattern matching replaces =instanceof=.
+- *=Rc<Node>= for structural sharing*: Persistent trees share subtrees. Use =Rc<Node>=
+  (single-threaded WASM) instead of WeakRef/cloning.
+- *Sentinel returns replaced by enums*: =UNCHANGED=/=EARLY_EXIT= arrays become
+  =AddResult= / =RemoveResult= enum variants.
+- *Addresses are =i64=*: SQLite rowids, not =JsValue=. Eliminates serialization
+  overhead for the storage layer.
+
+** SQLiteStorage — the key change
+
+Replace the JS =IStorage= → CLJS =StorageAdapter= → JS =IStorage= chain with a
+single Rust struct that talks directly to SQLite inside the same WASM module.
+
+*** IStorage trait
+
+#+begin_src rust
+trait IStorage {
+    fn store(&mut self, node: &Node) -> i64;   // returns address (rowid)
+    fn restore(&self, address: i64) -> Node;
+    fn accessed(&self, address: i64);           // LRU hint
+}
+#+end_src
+
+*** SQLiteStorage impl
+
+#+begin_src rust
+struct SQLiteStorage {
+    db: /* absurder-sql connection or raw rusqlite::Connection */,
+    cache: LruCache<i64, Rc<Node>>,  // hot-node cache
+}
+#+end_src
+
+*** Schema
+
+#+begin_src sql
+CREATE TABLE IF NOT EXISTS pss_nodes (
+    addr    INTEGER PRIMARY KEY,
+    level   INTEGER NOT NULL,
+    keys    BLOB NOT NULL,       -- serialized datom keys
+    addrs   BLOB                 -- child addresses (branch only)
+);
+#+end_src
+
+*** Store (called bottom-up during =set.store()=)
+
+#+begin_src rust
+fn store(&mut self, node: &Node) -> i64 {
+    let addr = self.next_addr();
+    match node {
+        Node::Leaf(leaf) => {
+            let keys_blob = serialize_keys(&leaf.keys);
+            self.db.execute(
+                "INSERT INTO pss_nodes (addr, level, keys) VALUES (?, 0, ?)",
+                &[addr, keys_blob]
+            );
+        }
+        Node::Branch(branch) => {
+            let keys_blob = serialize_keys(&branch.keys);
+            let addrs_blob = serialize_addrs(&branch.addresses);
+            self.db.execute(
+                "INSERT INTO pss_nodes (addr, level, keys, addrs) VALUES (?, ?, ?, ?)",
+                &[addr, branch.level, keys_blob, addrs_blob]
+            );
+        }
+    }
+    addr
+}
+#+end_src
+
+*** Restore (called lazily when tree walks into a stored subtree)
+
+#+begin_src rust
+fn restore(&self, address: i64) -> Node {
+    if let Some(cached) = self.cache.get(&address) {
+        return cached.clone();
+    }
+    let row = self.db.query_row(
+        "SELECT level, keys, addrs FROM pss_nodes WHERE addr = ?",
+        &[address]
+    );
+    let keys = deserialize_keys(row.keys_blob);
+    if row.level == 0 {
+        Node::Leaf(Leaf { keys, .. })
+    } else {
+        let addresses = deserialize_addrs(row.addrs_blob);
+        Node::Branch(Branch { level: row.level, keys, addresses, children: None, .. })
+    }
+}
+#+end_src
+
+*** Datom serialization strategy
+
+Datoms are CLJS objects =[e a v tx]=. Use a compact binary encoding (not EDN):
+- Entity ID (=e=): i64
+- Attribute (=a=): string (interned/indexed)
+- Value (=v=): tagged union (type byte + payload)
+- Transaction (=tx=): i64
+
+This is faster than the current EDN round-trip through JS.
+
+** wasm-bindgen exports
+
+Expose the same API surface the CLJS wrapper expects:
+
+#+begin_src rust
+#[wasm_bindgen]
+impl PersistentSortedSet {
+    #[wasm_bindgen(js_name = "empty")]
+    pub fn empty(cmp: Option<js_sys::Function>) -> PersistentSortedSet;
+
+    #[wasm_bindgen(js_name = "withComparatorAndStorage")]
+    pub fn with_comparator_and_storage(
+        cmp: JsValue, storage: JsValue, settings: JsValue
+    ) -> PersistentSortedSet;
+
+    pub fn conj(&self, key: JsValue) -> PersistentSortedSet;
+    pub fn disj(&self, key: JsValue) -> PersistentSortedSet;
+    pub fn contains(&self, key: &JsValue) -> bool;
+    pub fn count(&self) -> usize;
+    pub fn slice(&self, from: JsValue, to: JsValue) -> Option<Seq>;
+    pub fn rslice(&self, from: JsValue, to: JsValue) -> Option<Seq>;
+    pub fn seq(&self) -> Option<Seq>;
+    pub fn rseq(&self) -> Option<Seq>;
+
+    #[wasm_bindgen(js_name = "asTransient")]
+    pub fn as_transient(&self) -> PersistentSortedSet;
+    pub fn persistent(&mut self) -> PersistentSortedSet;
+
+    pub fn store(&mut self) -> JsValue;  // returns root address
+    #[wasm_bindgen(js_name = "walkAddresses")]
+    pub fn walk_addresses(&self, on_address: js_sys::Function);
+}
+
+#[wasm_bindgen]
+impl Seq {
+    pub fn first(&self) -> JsValue;
+    pub fn next(&self) -> Option<Seq>;
+    pub fn seek(&self, to: JsValue) -> Option<Seq>;
+    #[wasm_bindgen(js_name = "toArray")]
+    pub fn to_array(&self) -> js_sys::Array;
+}
+#+end_src
+
+** Storage lifecycle integration
+
+*** Current flow (JS)
+
+1. =store-impl!= → walks tree, serializes datoms as EDN, stores via =IStorage= protocol (JS↔CLJS)
+2. =restore-impl= → reads root metadata, lazily loads tree from =IStorage= (JS↔CLJS)
+
+*** New flow (Rust)
+
+1. *Store*: Rust =PersistentSortedSet::store()= writes nodes directly to SQLite.
+   CLJS only stores metadata (schema, max-eid, max-tx, root addresses) — one small write.
+2. *Restore*: CLJS calls =PersistentSortedSet::restore_from_storage(address, db_handle)=
+   which constructs a lazy tree rooted at the given address. Node loading happens in Rust.
+3. *Garbage collection*: =walk_addresses= stays the same.
+   =collect_garbage= deletes unused rows: =DELETE FROM pss_nodes WHERE addr NOT IN (...)=.
+
+** CLJS wrapper changes
+
+=persistent_sorted_set.cljs= needs minimal changes:
+- Swap the import from =persistent_sorted_set_js/index.min= to the wasm-pack output
+- The =extend-type= protocol implementations remain the same
+- =StorageAdapter= in =storage.cljs= is simplified — no longer serializes/deserializes
+  datoms in CLJS; the Rust side handles it
+
+** Module structure
+
+#+begin_example
+rust/persistent-sorted-set/
+├── Cargo.toml
+├── src/
+│   ├── lib.rs              # wasm-bindgen exports
+│   ├── set.rs              # PersistentSortedSet
+│   ├── node.rs             # Node enum + shared logic (search, etc.)
+│   ├── leaf.rs             # Leaf struct + add/remove
+│   ├── branch.rs           # Branch struct + add/remove
+│   ├── seq.rs              # Seq iterator
+│   ├── chunk.rs            # Chunk batched iteration
+│   ├── settings.rs         # Settings struct
+│   ├── storage.rs          # IStorage trait
+│   ├── sqlite_storage.rs   # SQLiteStorage impl using absurder-sql
+│   └── results.rs          # AddResult, RemoveResult enums
+└── tests/
+    └── btree_tests.rs      # Pure Rust B-tree tests
+#+end_example
+
+** Build integration
+
+1. =wasm-pack build --target web= → produces single =.wasm= + JS glue (includes
+   persistent-sorted-set + absurder-sql + SQLite)
+2. Update =shadow-cljs.edn= to load the WASM module
+3. WASM init during app startup (async, one-time)
+
+** Implementation order
+
+| Step | What                                                        | Depends on |
+|------+-------------------------------------------------------------+------------|
+|    1 | Scaffold workspace + =Settings= + =Node= enum              | —          |
+|    2 | =Leaf::add= + =contains= + =PersistentSortedSet::conj/contains= | 1          |
+|    3 | =Branch::add= (splits work end-to-end)                      | 2          |
+|    4 | =Leaf::remove= + =Branch::remove= → =disj=                 | 3          |
+|    5 | =Seq= + =slice=/=rslice=                                    | 3          |
+|    6 | Transient mode                                              | 2          |
+|    7 | =IStorage= trait + =SQLiteStorage= using absurder-sql       | 1          |
+|    8 | =store=/=restore= integration                               | 4, 7       |
+|    9 | wasm-bindgen exports                                        | all above  |
+|   10 | Update CLJS wrapper + shadow-cljs config                    | 9          |
+|   11 | Run DataScript test suite                                   | 10         |
+
+** Testing strategy
+
+1. *Rust unit tests* (=cargo test=): B-tree logic with mock in-memory storage
+2. *Rust integration tests*: =SQLiteStorage= with real rusqlite (native, not WASM)
+3. *WASM tests* (=wasm-pack test --headless --chrome=): Full round-trip through wasm-bindgen
+4. *CLJS tests*: Existing DataScript test suite — should pass unchanged
+
+** Risks and mitigations
+
+| Risk                              | Mitigation                                                                                                                                                          |
+|-----------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Datom serialization cost          | Binary format (not EDN). Benchmark vs current JS→string→JS path — likely faster.                                                                                   |
+| Comparator crosses WASM boundary  | Unavoidable for custom CLJS comparators. But =contains=/=search= during restore can use a Rust comparator if datoms are in a known binary format.                   |
+| absurder-sql async API            | Use =sqlite-wasm-rs= directly (synchronous =rusqlite::Connection=) inside the same WASM module, bypassing the async layer.                                         |
+| Single .wasm binary size          | absurder-sql + SQLite + B-tree. Use =wasm-opt -Oz=. Should be manageable (~500KB–1MB gzipped).                                                                     |
+| WASM module init is async         | Load once at app startup. DataScript operations are synchronous after init.                                                                                         |
+
+** What NOT to port
+
+- =Registry.js= — debug only
+- =hashCode=/=equals= — keep in CLJS protocol extensions
+- =map=/=filter=/=forEach=/=reduce= — keep in CLJS, just iterate over Seq
+- =RefType.SOFT= — irrelevant in WASM; use =Rc= for structural sharing
+- The entire JS =IStorage= → CLJS =StorageAdapter= bridge — *replaced by =SQLiteStorage= in Rust*
+
+** Detailed file specifications
+
+*** =src/results.rs= — Return type enums
+
+Replaces JS sentinel arrays (=UNCHANGED=, =EARLY_EXIT=, =[node]=, =[left, center, right]=).
+
+#+begin_src rust
+/// Result of an add (conj) operation on a node
+pub enum AddResult {
+    /// Key already existed, tree unchanged
+    Unchanged,
+    /// Node was modified in-place (transient/editable path only)
+    EarlyExit,
+    /// Subtree fits in one node (no split)
+    One(Rc<Node>),
+    /// Subtree split into two nodes (caller must add separator)
+    Split(Rc<Node>, Rc<Node>),
+}
+
+/// Result of a remove (disj) operation on a node
+pub enum RemoveResult {
+    /// Key not found, tree unchanged
+    Unchanged,
+    /// Node was modified in-place (transient/editable path only)
+    EarlyExit,
+    /// Rebalanced result: [left_sibling, center, right_sibling]
+    Rebalanced {
+        left: Option<Rc<Node>>,
+        center: Rc<Node>,
+        right: Option<Rc<Node>>,
+    },
+}
+#+end_src
+
+*** =src/settings.rs= — Configuration
+
+No =makeReference=/=readReference= — Rust's =Rc<Node>= handles sharing natively.
+No =expand_len= pre-allocation — =Vec= handles growth automatically.
+
+#+begin_src rust
+#[derive(Clone)]
+pub struct Settings {
+    branching_factor: usize,   // default 512, max keys per node
+    editable: Option<bool>,    // Some(true) = transient mode
+}
+
+impl Settings {
+    pub fn new(branching_factor: usize) -> Self;
+    pub fn default() -> Self { Self::new(512) }
+    pub fn branching_factor(&self) -> usize;
+    pub fn min_branching_factor(&self) -> usize;  // branching_factor >> 1
+    pub fn editable(&self) -> bool;               // editable == Some(true)
+    pub fn as_editable(&self) -> Self;             // clone with editable=Some(true)
+    pub fn make_persistent(&mut self);             // editable = Some(false)
+}
+#+end_src
+
+*** =src/node.rs= — Node enum + shared search logic
+
+Replaces =ANode.js= class hierarchy. Binary search returns =Result<usize, usize>=
+instead of Java-style negative encoding. =Ok(idx)= = found, =Err(insertion_point)= = not found.
+
+#+begin_src rust
+pub enum Node {
+    Leaf(Leaf),
+    Branch(Branch),
+}
+
+/// Comparator type alias
+pub type Comparator = Box<dyn Fn(&JsValue, &JsValue) -> std::cmp::Ordering>;
+
+impl Node {
+    // Delegation (pattern-match and forward)
+    pub fn level(&self) -> u32;
+    pub fn len(&self) -> usize;
+    pub fn min_key(&self) -> &JsValue;
+    pub fn max_key(&self) -> &JsValue;
+    pub fn keys(&self) -> &[JsValue];
+
+    pub fn contains(&self, storage: &dyn IStorage, key: &JsValue, cmp: &Comparator) -> bool;
+    pub fn count(&self, storage: &dyn IStorage) -> usize;
+    pub fn add(&self, storage: &dyn IStorage, key: JsValue,
+               cmp: &Comparator, settings: &Settings) -> AddResult;
+    pub fn remove(&self, storage: &dyn IStorage, key: &JsValue,
+                  left: Option<&Node>, right: Option<&Node>,
+                  cmp: &Comparator, settings: &Settings) -> RemoveResult;
+    pub fn store(&self, storage: &mut dyn IStorage) -> i64;
+    pub fn walk_addresses(&self, storage: &dyn IStorage, on_address: &mut dyn FnMut(i64) -> bool);
+
+    // Shared binary search (used by both Leaf and Branch)
+    pub fn search(keys: &[JsValue], key: &JsValue, cmp: &Comparator) -> Result<usize, usize>;
+    pub fn search_first(keys: &[JsValue], key: &JsValue, cmp: &Comparator) -> Result<usize, usize>;
+    pub fn search_last(keys: &[JsValue], key: &JsValue, cmp: &Comparator) -> Option<usize>;
+
+    // Restore from storage data
+    pub fn restore(level: u32, keys: Vec<JsValue>,
+                   addresses: Option<Vec<i64>>, settings: &Settings) -> Node;
+}
+#+end_src
+
+*** =src/leaf.rs= — Leaf node (level 0)
+
+No =Stitch= needed. =Vec= operations replace it:
+
+#+begin_src rust
+// JS Stitch:  new Stitch(arr, 0).copyAll(keys, 0, ins).copyOne(key).copyAll(keys, ins, len)
+// Rust:
+let mut new_keys = Vec::with_capacity(self.keys.len() + 1);
+new_keys.extend_from_slice(&self.keys[..ins]);
+new_keys.push(key);
+new_keys.extend_from_slice(&self.keys[ins..]);
+#+end_src
+
+#+begin_src rust
+pub struct Leaf {
+    pub(crate) keys: Vec<JsValue>,
+    pub(crate) settings: Settings,
+}
+
+impl Leaf {
+    pub fn new(settings: Settings) -> Self;
+    pub fn with_keys(keys: Vec<JsValue>, settings: Settings) -> Self;
+
+    /// Add key. Paths:
+    ///   1. Key exists → Unchanged
+    ///   2. Fits + editable → insert in-place, EarlyExit
+    ///   3. Fits + immutable → new Leaf, One(node)
+    ///   4. Full → Split(left, right).  Split: half1 = (len+1)/2
+    pub fn add(&self, key: JsValue, cmp: &Comparator, settings: &Settings) -> AddResult;
+
+    /// Remove key. Paths:
+    ///   1. Not found → Unchanged
+    ///   2. No rebalance needed + editable → EarlyExit
+    ///   3. No rebalance needed + immutable → Rebalanced{left, new, right}
+    ///   4. Join-left → Rebalanced{None, merged, right}
+    ///   5. Join-right → Rebalanced{left, merged, None}
+    ///   6. Borrow-left → Rebalanced{new_left, new_center, right}
+    ///   7. Borrow-right → Rebalanced{left, new_center, new_right}
+    pub fn remove(&self, key: &JsValue,
+                  left: Option<&Leaf>, right: Option<&Leaf>,
+                  cmp: &Comparator, settings: &Settings) -> RemoveResult;
+
+    pub fn contains(&self, key: &JsValue, cmp: &Comparator) -> bool;
+    pub fn count(&self) -> usize;
+    pub fn store(&self, storage: &mut dyn IStorage) -> i64;
+}
+#+end_src
+
+*** =src/branch.rs= — Branch node (level >= 1)
+
+#+begin_src rust
+pub struct Branch {
+    pub(crate) level: u32,
+    pub(crate) keys: Vec<JsValue>,                    // keys[i] = max_key of children[i]
+    pub(crate) addresses: Option<Vec<Option<i64>>>,    // SQLite rowids, nullable per-slot
+    pub(crate) children: Option<Vec<Option<Rc<Node>>>>,
+    pub(crate) settings: Settings,
+}
+
+impl Branch {
+    /// Get child at index, lazily loading from storage if needed.
+    pub fn child(&self, storage: &dyn IStorage, idx: usize) -> Rc<Node>;
+
+    /// Set child at index, clearing its address (marks as dirty).
+    pub fn set_child(&mut self, idx: usize, child: Rc<Node>);
+
+    /// Add key. After recursive descent into child:
+    ///   1. Child Unchanged → Unchanged
+    ///   2. Child EarlyExit → EarlyExit
+    ///   3. Child One(node), editable → update in place
+    ///   4. Child One(node), immutable → new Branch
+    ///   5. Child Split(l,r), fits → new Branch with extra child
+    ///   6. Child Split(l,r), full → split this Branch too
+    ///      Split adjustment: if ins+1 == half1 then half1++
+    pub fn add(&self, storage: &dyn IStorage, key: JsValue,
+               cmp: &Comparator, settings: &Settings) -> AddResult;
+
+    /// Remove key. new_len calculation:
+    ///   new_len = self.len - 1
+    ///             - left_child.is_some() - right_child.is_some()
+    ///             + result_left.is_some() + 1 + result_right.is_some()
+    pub fn remove(&self, storage: &dyn IStorage, key: &JsValue,
+                  left: Option<&Branch>, right: Option<&Branch>,
+                  cmp: &Comparator, settings: &Settings) -> RemoveResult;
+
+    /// Store bottom-up: store unstored children first, then self.
+    pub fn store(&self, storage: &mut dyn IStorage) -> i64;
+
+    pub fn walk_addresses(&self, storage: &dyn IStorage, on_address: &mut dyn FnMut(i64) -> bool);
+}
+#+end_src
+
+*** =src/seq.rs= — Iterator with parent stack
+
+Fixes JS bugs: reverse =advance()= used =_parent= instead of =this._parent=,
+=seek()= used =_version= instead of =this._version=.
+
+#+begin_src rust
+/// A single frame in the iteration stack
+struct SeqFrame {
+    node: Rc<Node>,             // Branch node at this level
+    idx: usize,                 // Current child index
+    parent: Option<Box<SeqFrame>>,
+}
+
+/// Sorted set iterator — forward or reverse, with optional bounds
+pub struct Seq {
+    set: *const PersistentSortedSet,  // back-reference for storage + version
+    leaf: Rc<Node>,                   // current Leaf node
+    idx: usize,                       // index within leaf
+    stack: Option<Box<SeqFrame>>,     // parent stack (branch frames)
+    key_to: Option<JsValue>,          // upper/lower bound (inclusive)
+    cmp: Option<Comparator>,
+    ascending: bool,
+    version: u64,
+}
+
+impl Seq {
+    pub fn first(&self) -> &JsValue;
+    pub fn over(&self) -> bool;  // ascending: current > bound; descending: current < bound
+    pub fn advance(&mut self) -> bool;  // move to next; pop stack + descend when leaf exhausted
+    pub fn next(&self) -> Option<Seq>;  // clone + advance
+    pub fn seek(&self, to: &JsValue, cmp: Option<&Comparator>) -> Option<Seq>;
+    pub fn to_array(&self) -> Vec<JsValue>;
+    fn check_version(&self);  // panic if set mutated since creation
+}
+#+end_src
+
+Stack navigation (ascending, leaf exhausted):
+1. =self.idx >= self.leaf.len() - 1= → done with this leaf
+2. Pop stack: =frame = self.stack.take()=
+3. Advance frame: =frame.idx += 1=
+4. If =frame.idx < frame.node.len()=: push back, descend to =child(frame.idx)=, reset =idx=0=
+5. Else: recurse up (pop next frame)
+
+*** =src/chunk.rs= — Chunked leaf iteration
+
+#+begin_src rust
+pub struct Chunk {
+    keys: Vec<JsValue>,  // shared ref to leaf's keys
+    start: usize,        // inclusive
+    end: usize,          // inclusive
+    ascending: bool,
+    version: u64,
+}
+
+impl Chunk {
+    pub fn from_seq(seq: &Seq) -> Option<Chunk>;
+    pub fn count(&self) -> usize;
+    pub fn nth(&self, i: usize) -> Option<&JsValue>;
+    pub fn drop_first(&self) -> Chunk;
+    pub fn reduce<F, A>(&self, f: F, init: A) -> A;
+    pub fn to_array(&self) -> Vec<JsValue>;
+}
+#+end_src
+
+*** =src/storage.rs= — IStorage trait + MemoryStorage
+
+#+begin_src rust
+pub trait IStorage {
+    fn store(&mut self, node: &Node) -> i64;
+    fn restore(&self, address: i64) -> Rc<Node>;
+    fn accessed(&self, address: i64) { let _ = address; }
+    fn list_addresses(&self) -> Vec<i64>;
+    fn delete(&mut self, addresses: &[i64]);
+}
+
+/// In-memory storage for testing
+pub struct MemoryStorage {
+    nodes: HashMap<i64, StoredNode>,
+    next_addr: i64,
+}
+
+struct StoredNode {
+    level: u32,
+    keys: Vec<JsValue>,
+    addresses: Option<Vec<i64>>,
+}
+#+end_src
+
+*** =src/sqlite_storage.rs= — SQLiteStorage using absurder-sql
+
+#+begin_src rust
+pub struct SQLiteStorage {
+    #[cfg(not(target_arch = "wasm32"))]
+    conn: rusqlite::Connection,
+    #[cfg(target_arch = "wasm32")]
+    conn: /* sqlite_wasm_rs handle */,
+
+    cache: LruCache<i64, Rc<Node>>,
+    next_addr: i64,
+    settings: Settings,
+}
+
+impl SQLiteStorage {
+    pub fn new(conn: /* connection */, settings: Settings) -> Self;
+
+    /// Datom key serialization: compact binary, NOT EDN
+    /// Per key: [e: i64_le] [a_len: u16_le] [a: utf8] [v_type: u8] [v: var] [tx: i64_le]
+    fn serialize_keys(keys: &[JsValue]) -> Vec<u8>;
+    fn deserialize_keys(blob: &[u8]) -> Vec<JsValue>;
+
+    /// Child addresses: packed i64_le array
+    fn serialize_addrs(addrs: &[i64]) -> Vec<u8>;
+    fn deserialize_addrs(blob: &[u8]) -> Vec<i64>;
+}
+
+impl IStorage for SQLiteStorage { /* see schema and queries above */ }
+#+end_src
+
+*** =src/set.rs= — PersistentSortedSet
+
+#+begin_src rust
+pub struct PersistentSortedSet {
+    cmp: Comparator,
+    storage: Option<Box<dyn IStorage>>,
+    settings: Settings,
+    address: Option<i64>,       // root address (lazy load)
+    root: Option<Rc<Node>>,     // in-memory root (None if lazy)
+    count: i64,                 // -1 = unknown (lazy)
+    version: u64,               // incremented on mutation
+}
+
+impl PersistentSortedSet {
+    // Constructors
+    pub fn empty(cmp: Comparator) -> Self;
+    pub fn with_storage(cmp: Comparator, storage: Box<dyn IStorage>, settings: Settings) -> Self;
+
+    // Root access (lazy: if root is None and address is Some, call storage.restore)
+    pub fn root(&self) -> Rc<Node>;
+
+    // Query
+    pub fn contains(&self, key: &JsValue) -> bool;
+    pub fn count(&self) -> usize;
+
+    // Mutation
+    //   Persistent: returns new set with shared structure
+    //   Transient: mutates self, returns self
+    //   If root splits on add: new Branch(root.level+1) as parent
+    //   If root collapses on remove (Branch with len==1): replace with child
+    pub fn conj(&self, key: JsValue) -> PersistentSortedSet;
+    pub fn disj(&self, key: &JsValue) -> PersistentSortedSet;
+
+    // Iteration (builds Seq by descending from root, creating stack frames)
+    pub fn slice(&self, from: Option<&JsValue>, to: Option<&JsValue>) -> Option<Seq>;
+    pub fn rslice(&self, from: Option<&JsValue>, to: Option<&JsValue>) -> Option<Seq>;
+    pub fn seq(&self) -> Option<Seq>;
+    pub fn rseq(&self) -> Option<Seq>;
+
+    // Transient
+    pub fn as_transient(&self) -> PersistentSortedSet;
+    pub fn persistent(&mut self) -> PersistentSortedSet;
+
+    // Storage
+    pub fn store(&mut self) -> i64;
+    pub fn walk_addresses(&self, on_address: &mut dyn FnMut(i64) -> bool);
+    pub fn restore(cmp: Comparator, address: i64, storage: Box<dyn IStorage>,
+                   settings: Settings) -> Self;
+}
+#+end_src
+
+*** =src/lib.rs= — wasm-bindgen exports
+
+Thin wrapper structs (=WasmPersistentSortedSet=, =WasmSeq=, =WasmChunk=) that hold
+the inner Rust types and expose =#[wasm_bindgen]= methods with =JsValue= parameters.
+
+Comparator bridge: wraps =js_sys::Function= into Rust =Comparator=:
+#+begin_src rust
+fn js_to_comparator(f: js_sys::Function) -> Comparator {
+    Box::new(move |a: &JsValue, b: &JsValue| {
+        let result = f.call2(&JsValue::NULL, a, b)
+            .unwrap()
+            .as_f64()
+            .unwrap_or(0.0);
+        if result < 0.0 { Ordering::Less }
+        else if result > 0.0 { Ordering::Greater }
+        else { Ordering::Equal }
+    })
+}
+#+end_src
+
+** Detailed test specifications
+
+*** =tests/search_tests.rs= — Binary search correctness
+
+- =test_search_empty_keys= — search in empty slice returns =Err(0)=
+- =test_search_single_key_found= — =search([5], 5)= → =Ok(0)=
+- =test_search_single_key_missing= — =search([5], 3)= → =Err(0)=, =search([5], 7)= → =Err(1)=
+- =test_search_multiple_found= — =search([1,3,5,7,9], 5)= → =Ok(2)=
+- =test_search_multiple_missing= — =search([1,3,5,7,9], 4)= → =Err(2)=
+- =test_search_first_boundary= — =search_first([1,3,5,7,9], 4)= → first >= 4 is at idx 2
+- =test_search_first_exact= — =search_first([1,3,5,7,9], 5)= → =Ok(2)=
+- =test_search_last_boundary= — =search_last([1,3,5,7,9], 4)= → =Some(1)=
+- =test_search_last_exact= — =search_last([1,3,5,7,9], 5)= → =Some(2)=
+- =test_search_last_none= — =search_last([5,7,9], 3)= → =None=
+- =test_search_first_beyond= — =search_first([1,3,5], 10)= → past end
+
+*** =tests/leaf_tests.rs= — Leaf add/remove
+
+**** Add tests
+- =test_leaf_add_to_empty= — add to empty → =One(leaf with 1 key)=
+- =test_leaf_add_sorted_order= — add multiple, verify sorted
+- =test_leaf_add_duplicate= — add existing → =Unchanged=
+- =test_leaf_add_at_beginning= — insert smaller than all
+- =test_leaf_add_at_end= — insert larger than all
+- =test_leaf_add_until_split= — fill to bf, add one more → =Split(left, right)=
+- =test_leaf_split_distribution= — bf=4, 5th key: half1=3, half2=2
+- =test_leaf_split_insert_first_half= — new key goes in left half
+- =test_leaf_split_insert_second_half= — new key goes in right half
+- =test_leaf_add_editable= — transient: =EarlyExit=, modifies in place
+
+**** Remove tests
+- =test_leaf_remove_only_key= — remove sole key → empty leaf
+- =test_leaf_remove_no_rebalance= — =len-1 >= min_bf= → =Rebalanced{left, new, right}=
+- =test_leaf_remove_not_found= — missing key → =Unchanged=
+- =test_leaf_remove_join_left= — underflow + left has space → merge
+- =test_leaf_remove_join_right= — underflow + right has space → merge
+- =test_leaf_remove_borrow_left= — underflow + left larger → borrow
+- =test_leaf_remove_borrow_right= — underflow + right larger → borrow
+- =test_leaf_remove_root_no_rebalance= — underflow but no siblings → no rebalance
+- =test_leaf_remove_editable= — transient: =EarlyExit=
+
+*** =tests/branch_tests.rs= — Branch add/remove
+
+- =test_branch_add_to_child= — routes to child, no split
+- =test_branch_add_child_splits= — child splits, branch absorbs
+- =test_branch_add_child_splits_branch_full= — both child and branch split
+- =test_branch_split_adjustment= — verify =half1++= when =ins+1 == half1=
+- =test_branch_add_editable= — transient: in-place update
+- =test_branch_remove_simple= — remove, no rebalancing
+- =test_branch_remove_child_joins_left= — child merges with left sibling
+- =test_branch_remove_child_borrows_left= — child borrows from left
+- =test_branch_remove_branch_joins_left= — branch itself underflows
+- =test_branch_remove_propagates= — rebalancing at multiple levels
+- =test_branch_address_cleared_on_child_change= — =set_child= clears address
+- =test_branch_lazy_load= — =child()= calls =storage.restore()= when child is =None=
+
+*** =tests/set_tests.rs= — PersistentSortedSet end-to-end
+
+**** Basic operations
+- =test_empty_set= — count=0, contains nothing
+- =test_conj_single= — conj one, count=1
+- =test_conj_multiple_sorted= — conj 1..100 in order
+- =test_conj_multiple_reverse= — conj 100..1
+- =test_conj_multiple_random= — random values, verify sorted
+- =test_conj_duplicate= — same key twice → identity
+- =test_disj_single= — remove only element → empty
+- =test_disj_missing= — remove non-existent → identity
+- =test_conj_then_disj= — add 1000, remove all → empty
+
+**** Structural tests (small bf to force deep trees)
+- =test_root_split= — bf=4, 5 elements → root splits
+- =test_root_collapse= — remove until single-child root → collapses
+- =test_three_level_tree= — bf=4, enough elements for 3 levels
+- =test_rebalancing_cascade= — removals causing multi-level rebalancing
+
+**** Persistence
+- =test_persistent_sharing= — conj returns new set, old unchanged
+- =test_structural_sharing= — shared subtrees don't interfere
+
+**** Transient
+- =test_transient_conj= — as_transient → conj many → persistent → verify
+- =test_transient_disj= — as_transient → disj many → persistent → verify
+- =test_transient_version_check= — iterate + mutate → panic
+
+**** Large scale
+- =test_conj_10000= — 10000 elements with bf=512
+- =test_conj_disj_interleaved= — alternating add/remove of 5000 ops
+
+*** =tests/seq_tests.rs= — Iterator correctness
+
+- =test_seq_empty_set= — =seq()= on empty → None
+- =test_seq_full_traversal= — all elements in sorted order
+- =test_rseq_full_traversal= — reverse order
+- =test_rseq_matches_reverse= — =rseq().to_array() == seq().to_array().reverse()=
+- =test_slice_from_to= — =slice(3, 7)= returns =[3,4,5,6,7]=
+- =test_slice_from_missing= — =slice(4, _)= with no exact 4 → starts at next >= 4
+- =test_slice_empty_range= — =slice(10, 5)= → =None=
+- =test_rslice_from_to= — =rslice(7, 3)= returns =[7,6,5,4,3]=
+- =test_seek_forward= — seq → seek(5) → at 5
+- =test_seek_beyond_range= — seek past end → =None=
+- =test_seq_across_leaves= — iteration crosses leaf boundaries (bf=4)
+- =test_seq_three_levels= — bf=4, 100 elements, full traversal
+
+*** =tests/storage_tests.rs= — Storage round-trip
+
+- =test_store_restore_leaf= — store leaf, restore, keys match
+- =test_store_restore_branch= — store branch with children, structure matches
+- =test_store_restore_tree= — store entire tree, traverse restored → same elements
+- =test_walk_addresses= — visits all stored addresses
+- =test_garbage_collection= — store, modify, re-store, GC → old nodes deleted
+- =test_sqlite_store_restore= — same as memory but with SQLite (native only)
+- =test_sqlite_cache_hit= — restore same address twice → cache hit
+- =test_sqlite_large_tree= — store/restore 10000-element tree
+- =test_sqlite_serialization_roundtrip= — serialize/deserialize keys blob preserves values
+- =test_lazy_root_load= — root not loaded until accessed
+- =test_lazy_child_load= — child not loaded until =child()= called
+- =test_lazy_iteration= — iterate over stored tree, nodes loaded on demand
+
+*** =tests/compatibility_tests.rs= — JS↔Rust parity
+
+Known inputs with expected outputs captured from JS version:
+
+- =test_compat_insert_1_to_100= — verify =toArray= matches JS output
+- =test_compat_remove_evens= — insert 1..100, remove evens, verify remainder
+- =test_compat_split_at_bf= — bf=4, insert =[1,2,3,4,5]= → verify tree structure
+- =test_compat_slice_various= — slice/rslice bounds match JS
+- =test_compat_restore_js_data= — restore from data written by JS implementation
+
+*** =tests/wasm_tests.rs= — WASM integration (=wasm-pack test=)
+
+- =test_wasm_empty_set= — create empty set via JS API
+- =test_wasm_conj_disj= — add/remove via =JsValue=
+- =test_wasm_comparator= — pass JS function as comparator
+- =test_wasm_slice_iteration= — slice returns =WasmSeq=, iterate
+- =test_wasm_store_sqlite= — store to SQLite in WASM, restore, verify
+- =test_wasm_transient= — transient operations via WASM API
+
+** JS bugs to fix in Rust port
+
+1. *=Seq.advance()= reverse path* (=Seq.js= lines 96-102): Uses =_parent= instead of
+   =this._parent= (5 instances). Causes =ReferenceError= during reverse iteration at
+   tree boundaries. =rslice()= iteration crashes.
+
+2. *=Seq.seek()= version variable* (=Seq.js= lines 153, 156, 173): Uses =_version=
+   instead of =this._version=. Causes =ReferenceError= during seek operations.

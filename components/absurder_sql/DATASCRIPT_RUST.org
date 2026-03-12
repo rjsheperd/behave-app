@@ -1,0 +1,193 @@
+#+TITLE: Unified Rust DataScript Core
+#+AUTHOR: rsheperd
+#+DATE: 2026-03-12
+
+* Context
+
+The CLJS/Rust interop boundary is broken: =._storage= inaccessible on WasmPSS, =equals= always false, JsStorage double-crossing the WASM boundary. Move the datascript core into Rust to eliminate these problems.
+
+* Phase 1: Native Datom Keys
+
+** 1.1 Unify Key type
+
+- *File:* =rust/persistent-sorted-set/src/key.rs=
+- Change ~#[cfg(target_arch = "wasm32")] pub type Key = JsValue~ to ~pub type Key = Datom~ (for WASM)
+- Keep native ~Key = i64~ for now (or also switch to Datom)
+- *Test:* ~cargo test~ — all existing native tests still compile
+
+** 1.2 Replace Comparator with IndexType
+
+- *File:* =rust/persistent-sorted-set/src/node.rs=
+- Change ~Comparator = dyn Fn(&Key, &Key) -> Ordering~ to store ~IndexType~ enum
+- Call ~cmp_datoms(index_type, &d1, &d2)~ from =comparator.rs= directly
+- Update ~PersistentSortedSet~ to store ~IndexType~ instead of ~Rc<Comparator>~
+- *Files also affected:* =set.rs=, =branch.rs=, =leaf.rs=, =seq.rs=
+- *Test:* ~cargo test~ — existing comparator tests pass; new test comparing datoms through PSS conj/disj
+
+** 1.3 Datom ↔ JsValue conversion
+
+- *File:* =rust/persistent-sorted-set/src/wasm.rs=
+- Add ~datom_from_js(val: &JsValue) -> Datom~ — extracts =e=, =a=, =v=, =tx= fields from CLJS Datom deftype
+  - =a= (keyword): parse ~"person/name"~ → ~Attr::Keyword { ns: Some("person"), name: "name" }~
+  - =v=: detect JS type → ~Value::Long~, ~Value::Str~, ~Value::Bool~, etc.
+- Add ~datom_to_js(d: &Datom) -> JsValue~ — creates JS object with =e=, =a=, =v=, =tx= properties
+- *Test (Rust):* ~#[wasm_bindgen_test]~ round-trip: create JS datom → ~datom_from_js~ → ~datom_to_js~ → verify fields match
+- *Test (Rust):* All value types: Long, Double, Str, Bool, Keyword, Ref, Nil
+
+** 1.4 New WasmPSS constructors
+
+- *File:* =rust/persistent-sorted-set/src/wasm.rs=
+- ~WasmPSS::empty_with_index(index_type: String)~ — creates PSS with Rust comparator
+- ~WasmPSS::conj_datom(e, a, v, tx)~ — converts args to Datom, conjs into tree
+- ~WasmPSS::disj_datom(e, a, v, tx)~ — converts args to Datom, disjs from tree
+- ~WasmPSS::datoms_slice(from_e, from_a, ..., to_e, to_a, ...) -> Array~ — slice returning JS datom array
+- Keep old ~conj(key, cmp)~ temporarily for backward compat
+- *Test (Rust):* ~#[wasm_bindgen_test]~ create EAVT set, conj 3 datoms, verify count and seq order
+
+** 1.5 Update CLJS wrapper
+
+- *File:* =src/absurder_sql/datascript/persistent_sorted_set.cljs=
+- ~sorted-set*~ uses ~WasmPSS.empty_with_index~ when opts contains =:index-type=
+- ~conj~ calls ~.conj_datom~ with extracted fields instead of ~.conj~ with JS comparator
+- ~disj~ calls ~.disj_datom~ similarly
+- Keep old path as fallback
+- *Test (CLJS):* Existing kaocha storage tests pass with new constructors
+
+** 1.6 Wire into db.cljc
+
+- *File:* =src/absurder_sql/datascript/db.cljc=
+- ~empty-db~ passes =:index-type "eavt"/"aevt"/"avet"= in opts to ~sorted-set*~
+- *Test (CLJS):* ~(d/empty-db)~ creates DB with Rust-compared indexes; ~(d/db-with db [[:db/add 1 :name "Ivan"]])~ works
+
+** Phase 1 integration test
+
+- ~cargo test~ passes (all Rust tests)
+- ~wasm-pack build~ succeeds
+- ~bun shadow-cljs compile :test-kaocha && ./bin/kaocha~ — storage_test and interface_test pass
+
+* Phase 2: WASM SQLiteStorage
+
+** 2.1 Datom binary serialization
+
+- *File:* =rust/persistent-sorted-set/src/sqlite_storage.rs=
+- Add ~serialize_datom(d: &Datom) -> Vec<u8>~ and ~deserialize_datom(bytes: &[u8]) -> Datom~
+- Format: ~[e:i64_le][a_type:u8][a_len:u32_le][a_bytes:utf8][v_type:u8][v_data:var][tx:i64_le]~
+- Attribute types: 0=None, 1=Keyword(no ns), 2=Keyword(with ns), 3=Str
+- Value types: 0=Nil, 1=Bool, 2=Long, 3=Double, 4=Str, 5=Keyword, 6=Ref, 7=Instant, 8=Uuid, 9=Bytes
+- *Test:* Round-trip every Value variant through serialize/deserialize
+- *Test:* Round-trip datoms with various attribute types (no ns, with ns, string)
+
+** 2.2 SQLiteStorage for WASM target
+
+- *File:* =rust/persistent-sorted-set/src/sqlite_storage.rs=
+- Conditional compilation: ~rusqlite~ on native, ~sqlite-wasm-rs~ on WASM
+- Same table schema: ~pss_nodes(addr INTEGER PRIMARY KEY, level INTEGER, keys BLOB, addrs BLOB)~
+- ~keys BLOB~ = concatenated serialized datoms with length prefixes
+- ~addrs BLOB~ = concatenated i64 little-endian
+- LRU cache (same as native impl)
+- *Test (native):* Store tree of 100 datoms to SQLite, restore, verify all present
+- *Test (WASM):* ~#[wasm_bindgen_test]~ same test with ~sqlite-wasm-rs~
+
+** 2.3 SQLite connection management
+
+- *File:* =rust/persistent-sorted-set/src/wasm.rs= (or new =connection.rs=)
+- Module-level ~thread_local! { RefCell<HashMap<String, Rc<Connection>>> }~
+- ~open_or_get(db_name: &str) -> Rc<Connection>~
+- *Test:* Open same db twice, get same connection; open different db, get different connection
+
+** 2.4 WasmPSS with SQLite storage
+
+- *File:* =rust/persistent-sorted-set/src/wasm.rs=
+- ~WasmPSS::with_sqlite(index_type: String, db_name: String, settings: JsValue) -> WasmPSS~
+- ~.store()~ writes to SQLite directly (no JS callbacks)
+- ~WasmPSS::restore_from_sqlite(index_type, address, db_name, settings) -> WasmPSS~
+- *Test (WASM):* Create set with SQLite, conj datoms, store, create new set via restore, verify contents
+
+** 2.5 Delete JsStorage
+
+- *File:* Delete =rust/persistent-sorted-set/src/js_storage.rs=
+- *File:* =rust/persistent-sorted-set/src/lib.rs= — remove ~pub mod js_storage~
+- *Test:* ~cargo build --target wasm32-unknown-unknown~ succeeds without js_storage
+
+** Phase 2 integration test
+
+- ~cargo test~ passes
+- ~wasm-pack build~ succeeds
+- CLJS storage tests pass using SQLite backend
+
+* Phase 3: WasmDB
+
+** 3.1 Schema types in Rust
+
+- *File:* New =rust/persistent-sorted-set/src/schema.rs=
+- ~Schema = HashMap<Attr, AttrSchema>~ where ~AttrSchema~ has fields for =:db/cardinality=, =:db/valueType=, =:db/unique=, =:db/index=, =:db/isComponent=
+- ~ReverseSchema~ groups attrs by property (e.g., ~multival_attrs: HashSet<Attr>~, ~ref_attrs: HashSet<Attr>~, ~indexed_attrs: HashSet<Attr>~)
+- ~schema_from_js(JsValue) -> Schema~ — parses CLJS schema map
+- *Test:* Parse example schema with refs, many-cardinality, unique attrs; verify rschema groupings
+
+** 3.2 Database struct
+
+- *File:* New =rust/persistent-sorted-set/src/db.rs=
+- ~Database { schema, eavt, aevt, avet, max_eid, max_tx, rschema }~
+- ~Database::empty(schema) -> Database~ — creates 3 empty PSS indexes
+- ~Database::with_datom(datom, added) -> Database~ — conj/disj into appropriate indexes based on schema (indexed attrs go into avet)
+- ~Database::with_datoms(datoms: &[(Datom, bool)]) -> Database~ — batch version
+- *Test:* Empty db + with_datom for non-indexed attr → present in eavt+aevt, absent from avet
+- *Test:* Empty db + with_datom for indexed attr → present in all 3
+- *Test:* Retraction removes from all relevant indexes
+
+** 3.3 Database query methods
+
+- ~Database::datoms(index_type, c0, c1, c2, c3) -> Vec<Datom>~ — slice index by components
+- ~Database::search(e, a, v, tx) -> Vec<Datom>~ — search for matching datoms (used by entity API)
+- ~Database::count() -> usize~
+- *Test:* Add 10 datoms, query by entity, by attribute, by value; verify results
+
+** 3.4 Database storage
+
+- ~Database::store(db_name) -> Result<()>~ — stores all 3 indexes + metadata row (addr=0: schema, max_eid, max_tx, eavt_root, aevt_root, avet_root)
+- ~Database::restore(db_name) -> Result<Database>~ — reads metadata, lazy-restores indexes
+- ~Database::collect_garbage(db_name) -> Result<()>~ — walk all 3 indexes, delete orphan addresses
+- *Test:* Store db with 100 datoms, restore, verify equality
+- *Test:* Store, modify, store again, GC, verify orphans removed
+
+** 3.5 WasmDB exports
+
+- *File:* =rust/persistent-sorted-set/src/wasm.rs=
+- ~WasmDB::empty(schema: JsValue) -> WasmDB~
+- ~WasmDB::with_datoms(datoms_array: Array) -> WasmDB~
+- ~WasmDB::datoms(index: String, c0, c1, c2, c3) -> Array~
+- ~WasmDB::search(e, a, v, tx) -> Array~
+- ~WasmDB::store(db_name: String) -> Promise~
+- ~WasmDB::restore(db_name: String) -> Promise<WasmDB>~
+- ~WasmDB::collect_garbage() -> Promise~
+- Accessors: ~schema()~, ~max_eid()~, ~max_tx()~, ~count()~
+- *Test (WASM):* Full lifecycle: empty → with_datoms → store → restore → datoms query → verify
+
+** 3.6 CLJS DB wrapper
+
+- *File:* =src/absurder_sql/datascript/db.cljc=
+- Add ~_wasm_db~ field to DB record (or use metadata)
+- ~ISearch~ delegates to ~(.search wasm-db e a v tx)~
+- ~ICounted~ delegates to ~(.count wasm-db)~
+- ~empty-db~ creates ~WasmDB.empty(schema)~ and wraps it
+- *Test (CLJS):* ~(d/empty-db {:name {:db/index true}})~ creates DB backed by WasmDB
+
+** 3.7 Simplify CLJS storage layer
+
+- *File:* =src/absurder_sql/datascript/storage.cljs=
+- ~store-impl!~ → ~(.store wasm-db db-name)~
+- ~restore-impl~ → ~WasmDB.restore(db-name)~
+- Remove: ~StorageAdapter~, ~*store-buffer*~, ~gen-addr~, ~remember-db~, ~stored-dbs~ WeakRef machinery
+- *File:* =src/absurder_sql/datascript/storage_async.cljs=
+- Remove: ~SyncStorageWrapper~, ~AsyncStorageAdapter~, ~prefetch-tree!~
+- *File:* =src/absurder_sql/datascript/conn.cljc=
+- ~storage-adapter~ reads from WasmDB instead of ~(.-_storage (:eavt db))~
+- *Test (CLJS):* Full kaocha test suite passes
+
+** Phase 3 integration test
+
+- ~cargo test~ passes
+- ~wasm-pack build~ succeeds
+- All kaocha tests pass: storage_test, async_storage_test, interface_test
+- Test: transact 1000 datoms, store to SQLite, restore, query, verify results match
