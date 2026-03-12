@@ -1,10 +1,11 @@
 //! Key type abstraction for the persistent sorted set.
 //!
-//! On native targets, keys are i64.
-//! On wasm32 targets, keys are JsValue to support arbitrary JS/CLJS objects.
+//! On native targets, keys are i64 (for testing and simple use cases).
+//! On wasm32 targets, keys are Datom — first-class datom knowledge in Rust,
+//! no WASM boundary crossings for comparisons.
 
 #[cfg(target_arch = "wasm32")]
-pub type Key = wasm_bindgen::JsValue;
+pub type Key = crate::datom::Datom;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub type Key = i64;

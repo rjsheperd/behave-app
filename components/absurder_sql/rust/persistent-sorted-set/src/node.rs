@@ -1,6 +1,7 @@
 //! Node: the unified enum over Leaf and Branch, plus binary search utilities.
 //! Also defines the `Comparator` type alias used throughout the crate.
 
+use std::cell::RefCell;
 use std::cmp::Ordering;
 
 use crate::branch::Branch;
@@ -241,9 +242,24 @@ impl Node {
                 level,
                 keys,
                 addresses: Some(addr_vec),
-                children: Some(vec![None; len]),
+                children: RefCell::new(vec![None; len]),
                 settings: settings.clone(),
             })
+        }
+    }
+
+    /// Create a clean copy suitable for LRU caching: keeps keys and addresses
+    /// but drops children references. Branch children are set to None so that
+    /// access goes through StorageCell::restore_cached.
+    pub fn storage_copy(node: &Node) -> Node {
+        match node {
+            Node::Leaf(l) => Node::Leaf(l.clone()),
+            Node::Branch(b) => {
+                let addrs: Option<Vec<i64>> = b.addresses.as_ref().map(|a| {
+                    a.iter().filter_map(|opt| *opt).collect()
+                });
+                Node::restore(b.level, b.keys.clone(), addrs, &b.settings)
+            }
         }
     }
 }

@@ -256,6 +256,28 @@
 
 (defn datom? [x] (instance? Datom x))
 
+#?(:cljs
+   (letfn [(str->keyword [^string s]
+             (let [s (if (identical? ":" (.charAt s 0)) (.substring s 1) s)
+                   i (.indexOf s "/")]
+               (if (== i -1)
+                 (keyword s)
+                 (keyword (.substring s 0 i) (.substring s (inc i))))))
+           (convert-attr [a]
+             (cond
+               (keyword? a) a
+               (string? a)  (str->keyword a)
+               :else        a))]
+     (set/set-js->datom-fn!
+       (fn [js-obj]
+         (if (instance? Datom js-obj)
+           js-obj
+           (Datom. (unchecked-get js-obj "e")
+                   (convert-attr (unchecked-get js-obj "a"))
+                   (unchecked-get js-obj "v")
+                   (or (unchecked-get js-obj "tx") tx0)
+                   0 0))))))
+
 (defn+ ^:private hash-datom [^Datom d]
   (-> (hash (.-e d))
     (combine-hashes (hash (.-a d)))
@@ -971,9 +993,9 @@
   (map->DB
     {:schema        schema
      :rschema       (rschema (merge implicit-schema schema))
-     :eavt          (set/sorted-set* (assoc opts :cmp cmp-datoms-eavt))
-     :aevt          (set/sorted-set* (assoc opts :cmp cmp-datoms-aevt))
-     :avet          (set/sorted-set* (assoc opts :cmp cmp-datoms-avet))
+     :eavt          (set/sorted-set* (assoc opts :cmp cmp-datoms-eavt :index-type "eavt"))
+     :aevt          (set/sorted-set* (assoc opts :cmp cmp-datoms-aevt :index-type "aevt"))
+     :avet          (set/sorted-set* (assoc opts :cmp cmp-datoms-avet :index-type "avet"))
      :max-eid       e0
      :max-tx        tx0
      :pull-patterns (lru/cache 100)

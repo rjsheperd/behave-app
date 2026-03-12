@@ -3,7 +3,8 @@
    [absurder-sql.datascript.db :as db #?@(:cljs [:refer [DB FilteredDB]])]
    [absurder-sql.datascript.protocols :as proto]
    [extend-clj.core :as extend]
-   [#?(:clj me.tonsky.persistent-sorted-set :cljs absurder-sql.datascript.persistent-sorted-set) :as set])
+   [#?(:clj me.tonsky.persistent-sorted-set :cljs absurder-sql.datascript.persistent-sorted-set) :as set]
+   [#?(:clj datascript.storage :cljs absurder-sql.datascript.storage) :as storage])
   #?(:clj
      (:import
       [absurder-sql.datascript.db DB FilteredDB])))
@@ -71,7 +72,7 @@
   ([datoms schema]
    (conn-from-db (db/init-db datoms schema {})))
   ([datoms schema opts]
-   (conn-from-db (db/init-db datoms schema opts))))
+   (conn-from-db (db/init-db datoms schema (storage/maybe-adapt-storage opts)))))
 
 (defn create-conn
   ([]
@@ -79,7 +80,7 @@
   ([schema]
    (conn-from-db (db/empty-db schema {})))
   ([schema opts]
-   (conn-from-db (db/empty-db schema opts))))
+   (conn-from-db (db/empty-db schema (storage/maybe-adapt-storage opts)))))
 
 (defn restore-conn [result]
   (when-some [[db tail] result]

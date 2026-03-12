@@ -1,6 +1,9 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::num::NonZeroUsize;
 use std::rc::Rc;
+
+use lru::LruCache;
 
 use crate::key::Key;
 use crate::node::Node;
@@ -101,27 +104,70 @@ impl IStorage for MemoryStorage {
 
 /// Wrapper that provides interior mutability for storage behind shared references.
 /// This is needed because tree traversal takes &self but storage operations need &mut self.
+/// Includes an LRU cache that is the single source of strong `Rc<Node>` references
+/// for stored (persisted) nodes. Branch children hold `Weak<Node>` references;
+/// when the LRU evicts an entry, the node can be freed and re-loaded on demand.
 pub struct StorageCell {
     inner: RefCell<Box<dyn IStorage>>,
+    cache: RefCell<LruCache<i64, Rc<Node>>>,
 }
 
 impl StorageCell {
     pub fn new(storage: Box<dyn IStorage>) -> Self {
+        Self::with_cache_size(storage, 1024)
+    }
+
+    pub fn with_cache_size(storage: Box<dyn IStorage>, cache_size: usize) -> Self {
+        let cap = NonZeroUsize::new(cache_size)
+            .unwrap_or(NonZeroUsize::new(1024).unwrap());
         Self {
             inner: RefCell::new(storage),
+            cache: RefCell::new(LruCache::new(cap)),
         }
     }
 
     pub fn store(&self, node: &Node) -> i64 {
-        self.inner.borrow_mut().store(node)
+        let addr = self.inner.borrow_mut().store(node);
+        // Cache a clean copy with addresses but no children references.
+        // This ensures child access goes through restore_cached (LRU-managed)
+        // rather than holding Strong refs to the original subtree.
+        self.cache.borrow_mut().put(addr, Rc::new(Node::storage_copy(node)));
+        addr
     }
 
+    /// Restore a node, checking the LRU cache first.
+    /// On cache miss, delegates to the inner storage and caches the result.
+    pub fn restore_cached(&self, address: i64) -> Rc<Node> {
+        {
+            let mut cache = self.cache.borrow_mut();
+            if let Some(node) = cache.get(&address) {
+                return Rc::clone(node);
+            }
+        }
+        let node = self.inner.borrow().restore(address);
+        self.cache.borrow_mut().put(address, Rc::clone(&node));
+        node
+    }
+
+    /// Restore without LRU cache (direct from storage).
     pub fn restore(&self, address: i64) -> Rc<Node> {
-        self.inner.borrow().restore(address)
+        self.restore_cached(address)
     }
 
+    /// Insert a node into the LRU cache under the given address.
+    /// Used after storing a child to keep it alive in cache while
+    /// the Branch downgrades its reference to Weak.
+    pub fn cache_node(&self, address: i64, node: Rc<Node>) {
+        self.cache.borrow_mut().put(address, node);
+    }
+
+    /// Bump an address in the LRU (mark as recently used).
     pub fn accessed(&self, address: i64) {
-        self.inner.borrow().accessed(address)
+        {
+            let mut cache = self.cache.borrow_mut();
+            cache.get(&address); // promotes to most-recently-used
+        }
+        self.inner.borrow().accessed(address);
     }
 
     pub fn list_addresses(&self) -> Vec<i64> {
@@ -129,6 +175,12 @@ impl StorageCell {
     }
 
     pub fn delete(&self, addresses: &[i64]) {
+        {
+            let mut cache = self.cache.borrow_mut();
+            for addr in addresses {
+                cache.pop(addr);
+            }
+        }
         self.inner.borrow_mut().delete(addresses)
     }
 }

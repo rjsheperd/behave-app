@@ -14,6 +14,8 @@ pub mod chunk;
 pub mod storage;
 pub mod sqlite_storage;
 pub mod set;
+pub mod datom;
+pub mod comparator;
 
 #[cfg(target_arch = "wasm32")]
 pub mod wasm;

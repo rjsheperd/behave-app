@@ -267,9 +267,9 @@
                                     adapter (make-async-storage-adapter storage opts)
                                     db      (db/restore-db
                                              {:schema  schema
-                                              :eavt    (restore-set-by db/cmp-datoms-eavt eavt adapter opts)
-                                              :aevt    (restore-set-by db/cmp-datoms-aevt aevt adapter opts)
-                                              :avet    (restore-set-by db/cmp-datoms-avet avet adapter opts)
+                                              :eavt    (restore-set-by db/cmp-datoms-eavt eavt adapter (assoc opts :index-type "eavt"))
+                                              :aevt    (restore-set-by db/cmp-datoms-aevt aevt adapter (assoc opts :index-type "aevt"))
+                                              :avet    (restore-set-by db/cmp-datoms-avet avet adapter (assoc opts :index-type "avet"))
                                               :max-eid max-eid
                                               :max-tx  max-tx})]
                                 (remember-db db)
@@ -298,9 +298,9 @@
                                              ;; Create DB with sync wrapper - all nodes are cached
                                              (let [db (db/restore-db
                                                        {:schema  schema
-                                                        :eavt    (restore-set-by db/cmp-datoms-eavt eavt wrapper opts)
-                                                        :aevt    (restore-set-by db/cmp-datoms-aevt aevt wrapper opts)
-                                                        :avet    (restore-set-by db/cmp-datoms-avet avet wrapper opts)
+                                                        :eavt    (restore-set-by db/cmp-datoms-eavt eavt wrapper (assoc opts :index-type "eavt"))
+                                                        :aevt    (restore-set-by db/cmp-datoms-aevt aevt wrapper (assoc opts :index-type "aevt"))
+                                                        :avet    (restore-set-by db/cmp-datoms-avet avet wrapper (assoc opts :index-type "avet"))
                                                         :max-eid max-eid
                                                         :max-tx  max-tx})]
                                                (remember-db db)

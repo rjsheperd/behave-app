@@ -72,13 +72,18 @@
   (let [branching-factor (or (:branching-factor opts) 512)]
     (StorageAdapter. storage branching-factor)))
 
-(defn maybe-adapt-storage [opts]
+(defn maybe-adapt-storage
+  "Ensure :storage in opts is wrapped in a StorageAdapter for the PSS layer.
+   If the storage already satisfies IDatascriptStorageAdapter, extract its
+   underlying IStorage and wrap that. Otherwise wrap the IStorage directly."
+  [opts]
   (if-some [storage (:storage opts)]
-    (if (satisfies? proto/IDatascriptStorageAdapter storage)
+    (if (instance? StorageAdapter storage)
       opts
-      (update opts :storage
-              (if (:async? opts) make-async-storage-adapter make-storage-adapter)
-              opts))
+      (let [raw-storage (if (satisfies? proto/IDatascriptStorageAdapter storage)
+                          (or (proto/-ds-get-storage storage) storage)
+                          storage)]
+        (assoc opts :storage (make-storage-adapter raw-storage opts))))
     opts))
 
 (defn storage-adapter [db]
@@ -171,9 +176,9 @@
           adapter (make-storage-adapter storage opts)
           db      (db/restore-db
                    {:schema  schema
-                    :eavt    (restore-set-by db/cmp-datoms-eavt eavt adapter opts)
-                    :aevt    (restore-set-by db/cmp-datoms-aevt aevt adapter opts)
-                    :avet    (restore-set-by db/cmp-datoms-avet avet adapter opts)
+                    :eavt    (restore-set-by db/cmp-datoms-eavt eavt adapter (assoc opts :index-type "eavt"))
+                    :aevt    (restore-set-by db/cmp-datoms-aevt aevt adapter (assoc opts :index-type "aevt"))
+                    :avet    (restore-set-by db/cmp-datoms-avet avet adapter (assoc opts :index-type "avet"))
                     :max-eid max-eid
                     :max-tx  max-tx})]
       (remember-db db)

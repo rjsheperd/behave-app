@@ -55,7 +55,7 @@
 (extend-type SimpleStorage
   proto/IDatascriptStorageAdapter
   (-ds-store! [this db force?]
-    (let [adapter (storage/->StorageAdapter this (.-_settings (.root (:eavt db))))]
+    (let [adapter (storage/->StorageAdapter this (.branchingFactor (:eavt db)))]
       (storage/store-impl! db adapter force?)))
   (-ds-store-tail! [this _db tail]
     (proto/-store this

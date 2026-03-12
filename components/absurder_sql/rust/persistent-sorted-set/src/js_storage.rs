@@ -1,6 +1,8 @@
-//! JS-callback storage bridge for Phase 2.
+//! JS-callback storage bridge.
 //! Implements IStorage by calling back to JS functions for store/restore.
 //! Only compiled for wasm32 targets.
+//!
+//! Keys are serialized as JS arrays of [e, a, v, tx] for each datom.
 
 use std::rc::Rc;
 
@@ -11,10 +13,9 @@ use crate::key::Key;
 use crate::node::Node;
 use crate::settings::Settings;
 use crate::storage::IStorage;
+use crate::wasm::{datom_from_js, datom_to_js};
 
 /// Storage that delegates to JS callback functions.
-/// Keeps a reference to the original JS object so methods are called with
-/// the correct `this` binding.
 pub struct JsStorage {
     obj: JsValue,
     store_fn: js_sys::Function,
@@ -59,8 +60,6 @@ impl JsStorage {
 
 impl IStorage for JsStorage {
     fn store(&mut self, node: &Node) -> i64 {
-        // Serialize node to a JS object:
-        // { level: number, keys: Array<JsValue>, addresses?: Array<number> }
         let obj = js_sys::Object::new();
         let level = node.level();
 
@@ -71,9 +70,10 @@ impl IStorage for JsStorage {
         )
         .unwrap();
 
+        // Serialize datom keys as JS array of datom objects
         let keys_arr = js_sys::Array::new();
         for k in node.keys() {
-            keys_arr.push(k);
+            keys_arr.push(&datom_to_js(k));
         }
         js_sys::Reflect::set(&obj, &JsValue::from_str("keys"), &keys_arr).unwrap();
 
@@ -96,7 +96,6 @@ impl IStorage for JsStorage {
             .call1(&self.obj, &JsValue::from_f64(address as f64))
             .unwrap();
 
-        // Expect: { level: number, keys: Array<JsValue>, addresses?: Array<number> }
         let level = js_sys::Reflect::get(&result, &JsValue::from_str("level"))
             .unwrap()
             .as_f64()
@@ -106,7 +105,7 @@ impl IStorage for JsStorage {
         let keys_arr: js_sys::Array = keys_val.into();
         let mut keys: Vec<Key> = Vec::with_capacity(keys_arr.length() as usize);
         for i in 0..keys_arr.length() {
-            keys.push(keys_arr.get(i));
+            keys.push(datom_from_js(&keys_arr.get(i)));
         }
 
         let addresses: Option<Vec<i64>> = js_sys::Reflect::get(&result, &JsValue::from_str("addresses"))
@@ -130,10 +129,9 @@ impl IStorage for JsStorage {
     }
 
     fn list_addresses(&self) -> Vec<i64> {
-        vec![] // Not needed for JS bridge — GC handled on CLJS side
+        vec![]
     }
 
     fn delete(&mut self, _addresses: &[i64]) {
-        // Handled by CLJS side
     }
 }

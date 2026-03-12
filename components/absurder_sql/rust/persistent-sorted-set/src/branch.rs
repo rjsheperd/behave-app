@@ -1,8 +1,11 @@
 //! Branch node: interior level of the B+ tree.
-//! Holds sorted keys, child node pointers (`Rc<Node>`), and optional storage
-//! addresses for lazy loading. Children are loaded from storage on first access.
+//! Holds sorted keys, child node pointers, and optional storage addresses for
+//! lazy loading. Stored children use `Weak<Node>` references whose lifetimes
+//! are managed by the `StorageCell` LRU cache; unstored children use strong
+//! `Rc<Node>` references that cannot be evicted.
 
-use std::rc::Rc;
+use std::cell::RefCell;
+use std::rc::{Rc, Weak};
 
 use crate::key::Key;
 use crate::node::{Comparator, Node};
@@ -10,13 +13,61 @@ use crate::results::{AddResult, RemoveResult};
 use crate::settings::Settings;
 use crate::storage::StorageCell;
 
-#[derive(Clone, Debug)]
+/// Reference to a child node. Stored children use `Weak` (lifetime managed by
+/// the StorageCell LRU cache); unstored children use `Strong`.
+pub(crate) enum ChildRef {
+    /// Not yet stored — strong reference keeps node alive.
+    Strong(Rc<Node>),
+    /// Stored (has address) — weak reference, lifetime managed by StorageCell LRU.
+    Cached(Weak<Node>),
+}
+
+impl ChildRef {
+    fn upgrade(&self) -> Option<Rc<Node>> {
+        match self {
+            ChildRef::Strong(rc) => Some(Rc::clone(rc)),
+            ChildRef::Cached(weak) => weak.upgrade(),
+        }
+    }
+}
+
+impl Clone for ChildRef {
+    fn clone(&self) -> Self {
+        match self {
+            ChildRef::Strong(rc) => ChildRef::Strong(Rc::clone(rc)),
+            ChildRef::Cached(weak) => ChildRef::Cached(weak.clone()),
+        }
+    }
+}
+
+impl std::fmt::Debug for ChildRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ChildRef::Strong(rc) => write!(f, "Strong({:?})", Rc::as_ptr(rc)),
+            ChildRef::Cached(weak) => write!(f, "Cached(alive={})", weak.upgrade().is_some()),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct Branch {
     pub(crate) level: u32,
     pub(crate) keys: Vec<Key>,
     pub(crate) addresses: Option<Vec<Option<i64>>>,
-    pub(crate) children: Option<Vec<Option<Rc<Node>>>>,
+    pub(crate) children: RefCell<Vec<Option<ChildRef>>>,
     pub(crate) settings: Settings,
+}
+
+impl Clone for Branch {
+    fn clone(&self) -> Self {
+        Self {
+            level: self.level,
+            keys: self.keys.clone(),
+            addresses: self.addresses.clone(),
+            children: RefCell::new(self.children.borrow().clone()),
+            settings: self.settings.clone(),
+        }
+    }
 }
 
 impl Branch {
@@ -27,11 +78,18 @@ impl Branch {
         children: Option<Vec<Option<Rc<Node>>>>,
         settings: Settings,
     ) -> Self {
+        let child_refs: Vec<Option<ChildRef>> = match children {
+            Some(ch) => ch
+                .into_iter()
+                .map(|opt| opt.map(ChildRef::Strong))
+                .collect(),
+            None => vec![None; keys.len()],
+        };
         Self {
             level,
             keys,
             addresses,
-            children,
+            children: RefCell::new(child_refs),
             settings,
         }
     }
@@ -47,26 +105,32 @@ impl Branch {
     }
 
     /// Get child at index, lazily loading from storage if needed.
+    /// Uses interior mutability to cache weak references back into the children vec.
     pub fn child(&self, storage: Option<&StorageCell>, idx: usize) -> Rc<Node> {
-        if let Some(children) = &self.children {
-            if let Some(Some(child)) = children.get(idx) {
-                // Hint to storage that address was accessed
+        let mut children = self.children.borrow_mut();
+
+        // Try existing reference
+        if let Some(child_ref) = children[idx].as_ref() {
+            if let Some(rc) = child_ref.upgrade() {
+                // Node still alive — bump LRU if stored
                 if let (Some(s), Some(addr)) = (storage, self.address(idx)) {
                     s.accessed(addr);
                 }
-                return Rc::clone(child);
+                return rc;
             }
         }
 
-        // Lazy load from storage
+        // Need to load from storage
         let addr = self
             .address(idx)
             .expect("branch child has no address and no cached node");
         let storage = storage.expect("storage required for lazy child load");
-        let child = storage.restore(addr);
-        // Note: in immutable design we can't cache back into self.
-        // The StorageCell/LRU cache handles repeated lookups.
-        child
+        let rc = storage.restore_cached(addr);
+
+        // Cache weak ref back into children vec
+        children[idx] = Some(ChildRef::Cached(Rc::downgrade(&rc)));
+
+        rc
     }
 
     pub fn contains(
@@ -119,7 +183,6 @@ impl Branch {
                     AddResult::EarlyExit => AddResult::EarlyExit,
 
                     AddResult::One(node) => {
-                        // Child didn't split — build new branch with updated child
                         let new_key = node.max_key().clone();
                         let mut new_keys = self.keys.clone();
                         new_keys[ins] = new_key;
@@ -131,18 +194,15 @@ impl Branch {
                                 v
                             });
 
-                        let mut new_children: Vec<Option<Rc<Node>>> = self
-                            .children
-                            .as_ref()
-                            .map(|c| c.clone())
-                            .unwrap_or_else(|| vec![None; self.keys.len()]);
-                        new_children[ins] = Some(node);
+                        let children = self.children.borrow();
+                        let mut new_children: Vec<Option<ChildRef>> = children.clone();
+                        new_children[ins] = Some(ChildRef::Strong(node));
 
                         AddResult::One(Rc::new(Node::Branch(Branch {
                             level: self.level,
                             keys: new_keys,
                             addresses: new_addrs,
-                            children: Some(new_children),
+                            children: RefCell::new(new_children),
                             settings: settings.clone(),
                         })))
                     }
@@ -152,7 +212,6 @@ impl Branch {
                         let rk = right_child.max_key().clone();
 
                         if self.keys.len() < settings.branching_factor() {
-                            // Room for one more — build new branch with extra slot
                             let mut new_keys =
                                 Vec::with_capacity(self.keys.len() + 1);
                             new_keys.extend_from_slice(&self.keys[..ins]);
@@ -169,12 +228,12 @@ impl Branch {
                                 v
                             });
 
-                            let new_children: Vec<Option<Rc<Node>>> = {
-                                let old = self.children.as_ref().map(|c| c.as_slice()).unwrap_or(&[]);
+                            let new_children: Vec<Option<ChildRef>> = {
+                                let old = self.children.borrow();
                                 let mut v = Vec::with_capacity(old.len() + 1);
                                 v.extend_from_slice(&old[..ins]);
-                                v.push(Some(left_child));
-                                v.push(Some(right_child));
+                                v.push(Some(ChildRef::Strong(left_child)));
+                                v.push(Some(ChildRef::Strong(right_child)));
                                 v.extend_from_slice(&old[ins + 1..]);
                                 v
                             };
@@ -183,7 +242,7 @@ impl Branch {
                                 level: self.level,
                                 keys: new_keys,
                                 addresses: new_addrs,
-                                children: Some(new_children),
+                                children: RefCell::new(new_children),
                                 settings: settings.clone(),
                             })))
                         } else {
@@ -193,9 +252,7 @@ impl Branch {
                             if ins + 1 == half1 {
                                 half1 += 1;
                             }
-                            let _half2 = total - half1;
 
-                            // Build expanded arrays first, then split
                             let mut exp_keys = Vec::with_capacity(total);
                             exp_keys.extend_from_slice(&self.keys[..ins]);
                             exp_keys.push(lk);
@@ -212,12 +269,12 @@ impl Branch {
                                     v
                                 });
 
-                            let exp_children: Vec<Option<Rc<Node>>> = {
-                                let old = self.children.as_ref().map(|c| c.as_slice()).unwrap_or(&[]);
+                            let exp_children: Vec<Option<ChildRef>> = {
+                                let old = self.children.borrow();
                                 let mut v = Vec::with_capacity(total);
                                 v.extend_from_slice(&old[..ins]);
-                                v.push(Some(left_child));
-                                v.push(Some(right_child));
+                                v.push(Some(ChildRef::Strong(left_child)));
+                                v.push(Some(ChildRef::Strong(right_child)));
                                 v.extend_from_slice(&old[ins + 1..]);
                                 v
                             };
@@ -236,14 +293,14 @@ impl Branch {
                                     level: self.level,
                                     keys: keys1,
                                     addresses: addrs1,
-                                    children: Some(children1),
+                                    children: RefCell::new(children1),
                                     settings: settings.clone(),
                                 })),
                                 Rc::new(Node::Branch(Branch {
                                     level: self.level,
                                     keys: keys2,
                                     addresses: addrs2,
-                                    children: Some(children2),
+                                    children: RefCell::new(children2),
                                     settings: settings.clone(),
                                 })),
                             )
@@ -325,13 +382,12 @@ impl Branch {
                 let build_branch = |_self_left: Option<&Branch>,
                                      _self_right: Option<&Branch>|
                  -> Rc<Node> {
-                    // Assemble new keys, addresses, children
                     let start = if idx > 0 { idx - 1 } else { 0 };
                     let end = std::cmp::min(idx + 2, self.keys.len());
 
                     let mut new_keys = Vec::with_capacity(new_len);
                     let mut new_addrs: Vec<Option<i64>> = Vec::with_capacity(new_len);
-                    let mut new_children_vec: Vec<Option<Rc<Node>>> =
+                    let mut new_children_vec: Vec<Option<ChildRef>> =
                         Vec::with_capacity(new_len);
 
                     // prefix
@@ -341,10 +397,9 @@ impl Branch {
                     } else {
                         new_addrs.extend(std::iter::repeat(None).take(start));
                     }
-                    if let Some(ch) = &self.children {
+                    {
+                        let ch = self.children.borrow();
                         new_children_vec.extend_from_slice(&ch[..start]);
-                    } else {
-                        new_children_vec.extend(std::iter::repeat(None).take(start));
                     }
 
                     // result left
@@ -355,13 +410,13 @@ impl Branch {
                         } else {
                             self.address(idx - 1)
                         });
-                        new_children_vec.push(Some(Rc::clone(rl)));
+                        new_children_vec.push(Some(ChildRef::Strong(Rc::clone(rl))));
                     }
 
                     // center
                     new_keys.push(res_center.max_key().clone());
                     new_addrs.push(None); // always dirty
-                    new_children_vec.push(Some(Rc::clone(&res_center)));
+                    new_children_vec.push(Some(ChildRef::Strong(Rc::clone(&res_center))));
 
                     // result right
                     if let Some(rr) = &res_right {
@@ -371,7 +426,7 @@ impl Branch {
                         } else {
                             self.address(idx + 1)
                         });
-                        new_children_vec.push(Some(Rc::clone(rr)));
+                        new_children_vec.push(Some(ChildRef::Strong(Rc::clone(rr))));
                     }
 
                     // suffix
@@ -383,18 +438,16 @@ impl Branch {
                             std::iter::repeat(None).take(self.keys.len() - end),
                         );
                     }
-                    if let Some(ch) = &self.children {
+                    {
+                        let ch = self.children.borrow();
                         new_children_vec.extend_from_slice(&ch[end..]);
-                    } else {
-                        new_children_vec
-                            .extend(std::iter::repeat(None).take(self.keys.len() - end));
                     }
 
                     Rc::new(Node::Branch(Branch {
                         level: self.level,
                         keys: new_keys,
                         addresses: Some(new_addrs),
-                        children: Some(new_children_vec),
+                        children: RefCell::new(new_children_vec),
                         settings: settings.clone(),
                     }))
                 };
@@ -456,11 +509,10 @@ impl Branch {
                             level: self.level,
                             keys: Vec::new(),
                             addresses: Some(Vec::new()),
-                            children: Some(Vec::new()),
+                            children: RefCell::new(Vec::new()),
                             settings: settings.clone(),
                         };
 
-                        // left tail + center
                         append_branch_range(&mut borrowed, l, new_left_len, left_len);
                         append_branch_range(&mut borrowed, center_b, 0, new_len);
 
@@ -482,7 +534,7 @@ impl Branch {
                         level: self.level,
                         keys: Vec::new(),
                         addresses: Some(Vec::new()),
-                        children: Some(Vec::new()),
+                        children: RefCell::new(Vec::new()),
                         settings: settings.clone(),
                     };
                     append_branch_range(&mut new_center, center_b, 0, new_len);
@@ -504,7 +556,6 @@ impl Branch {
 
     /// Store bottom-up: store all unstored children first, then store self.
     pub fn store(&self, storage: &StorageCell) -> i64 {
-        // Ensure all children are stored
         let mut addrs: Vec<Option<i64>> = self
             .addresses
             .clone()
@@ -512,20 +563,24 @@ impl Branch {
 
         for i in 0..self.keys.len() {
             if addrs[i].is_none() {
-                if let Some(children) = &self.children {
-                    if let Some(Some(child)) = children.get(i) {
-                        addrs[i] = Some(child.store(storage));
+                let children = self.children.borrow();
+                if let Some(child_ref) = children[i].as_ref() {
+                    if let Some(rc) = child_ref.upgrade() {
+                        drop(children);
+                        let child_addr = rc.store(storage);
+                        addrs[i] = Some(child_addr);
                     }
                 }
             }
         }
 
-        // Build a temporary node with all addresses filled
+        // Build a temporary node with all addresses filled for serialization
+        let children_snapshot = self.children.borrow().clone();
         let stored_branch = Node::Branch(Branch {
             level: self.level,
             keys: self.keys.clone(),
             addresses: Some(addrs),
-            children: self.children.clone(),
+            children: RefCell::new(children_snapshot),
             settings: self.settings.clone(),
         });
         storage.store(&stored_branch)
@@ -557,7 +612,7 @@ fn join_branches(left: &Branch, right: &Branch, settings: &Settings) -> Branch {
         level: left.level,
         keys: Vec::with_capacity(total),
         addresses: Some(Vec::with_capacity(total)),
-        children: Some(Vec::with_capacity(total)),
+        children: RefCell::new(Vec::with_capacity(total)),
         settings: settings.clone(),
     };
     append_branch_range(&mut b, left, 0, left.keys.len());
@@ -567,6 +622,7 @@ fn join_branches(left: &Branch, right: &Branch, settings: &Settings) -> Branch {
 
 /// Extract a subrange of a branch as a new branch.
 fn slice_branch(src: &Branch, from: usize, to: usize, settings: &Settings) -> Branch {
+    let children = src.children.borrow();
     Branch {
         level: src.level,
         keys: src.keys[from..to].to_vec(),
@@ -574,10 +630,7 @@ fn slice_branch(src: &Branch, from: usize, to: usize, settings: &Settings) -> Br
             .addresses
             .as_ref()
             .map(|a| a[from..to].to_vec()),
-        children: src
-            .children
-            .as_ref()
-            .map(|c| c[from..to].to_vec()),
+        children: RefCell::new(children[from..to].to_vec()),
         settings: settings.clone(),
     }
 }
@@ -592,11 +645,9 @@ fn append_branch_range(dst: &mut Branch, src: &Branch, from: usize, to: usize) {
             dst_addrs.extend(std::iter::repeat(None).take(to - from));
         }
     }
-    if let Some(dst_ch) = &mut dst.children {
-        if let Some(src_ch) = &src.children {
-            dst_ch.extend_from_slice(&src_ch[from..to]);
-        } else {
-            dst_ch.extend(std::iter::repeat(None).take(to - from));
-        }
+    {
+        let src_ch = src.children.borrow();
+        let mut dst_ch = dst.children.borrow_mut();
+        dst_ch.extend_from_slice(&src_ch[from..to]);
     }
 }

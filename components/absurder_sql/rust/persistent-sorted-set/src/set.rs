@@ -59,9 +59,10 @@ impl PersistentSortedSet {
         storage: Box<dyn crate::storage::IStorage>,
         settings: Settings,
     ) -> Self {
+        let cache_size = settings.cache_size();
         Self {
             cmp,
-            storage: Some(Rc::new(StorageCell::new(storage))),
+            storage: Some(Rc::new(StorageCell::with_cache_size(storage, cache_size))),
             settings: settings.clone(),
             address: None,
             root: Some(Rc::new(Node::Leaf(Leaf::new(settings)))),
@@ -97,7 +98,8 @@ impl PersistentSortedSet {
 
     /// Set the storage backend (for sets created without one).
     pub fn set_storage(&mut self, storage: Box<dyn crate::storage::IStorage>) {
-        self.storage = Some(Rc::new(StorageCell::new(storage)));
+        let cache_size = self.settings.cache_size();
+        self.storage = Some(Rc::new(StorageCell::with_cache_size(storage, cache_size)));
     }
 
     pub fn contains(&self, key: &Key) -> bool {
@@ -314,6 +316,8 @@ impl PersistentSortedSet {
     }
 
     /// Store tree bottom-up into storage. Returns root address.
+    /// After storing, releases the in-memory root so that nodes can be
+    /// evicted from the StorageCell LRU cache and re-loaded on demand.
     pub fn store(&mut self) -> i64 {
         if let Some(addr) = self.address {
             return addr;
@@ -327,6 +331,10 @@ impl PersistentSortedSet {
         let root = self.root();
         let addr = root.store(storage);
         self.address = Some(addr);
+        // Release the in-memory root tree. Future access via root() will
+        // lazy-load from storage, creating nodes with proper addresses
+        // and empty children slots for on-demand loading.
+        self.root = None;
         addr
     }
 
@@ -348,9 +356,10 @@ impl PersistentSortedSet {
         storage: Box<dyn crate::storage::IStorage>,
         settings: Settings,
     ) -> Self {
+        let cache_size = settings.cache_size();
         Self {
             cmp,
-            storage: Some(Rc::new(StorageCell::new(storage))),
+            storage: Some(Rc::new(StorageCell::with_cache_size(storage, cache_size))),
             settings,
             address: Some(address),
             root: None,

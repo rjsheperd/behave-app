@@ -1,5 +1,4 @@
 #+TITLE: Persistent Sorted Set — Rust/WASM B+ Tree
-#+AUTHOR: sig
 #+OPTIONS: toc:3
 
 * Overview

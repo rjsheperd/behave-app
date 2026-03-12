@@ -5,18 +5,35 @@
  absurder-sql.datascript.persistent-sorted-set
   (:refer-clojure :exclude [conj disj sorted-set sorted-set-by])
   (:require
-   ["persistent-sorted-set" :as pss :refer [WasmPSS WasmSeq]]))
+   ["persistent-sorted-set" :as pss :refer [WasmPSS WasmSeq] :default init-wasm]))
 
 ;; WASM initialization — must complete before any PSS operations.
 ;; Override per build via :closure-defines in shadow-cljs.edn.
 (goog-define ^string WASM_URL "/ds/persistent_sorted_set_bg.wasm")
 
-(defonce init-promise (pss/init WASM_URL))
+(defonce init-promise (init-wasm WASM_URL))
 
 (defn ensure-initialized!
   "Returns a promise that resolves when WASM is ready."
   []
   init-promise)
+
+;; Converter from JS datom objects to CLJS Datom deftypes.
+;; Set by db.cljc after Datom deftype is defined, avoiding circular deps.
+(defonce ^:private js->datom-fn (atom nil))
+
+(defn set-js->datom-fn!
+  "Register a function that converts a plain JS datom object {e,a,v,tx}
+   to a CLJS Datom deftype instance."
+  [f]
+  (reset! js->datom-fn f))
+
+(defn- convert-datom
+  "Convert a JS datom object to a CLJS Datom if a converter is registered."
+  [js-obj]
+  (if-let [f @js->datom-fn]
+    (f js-obj)
+    js-obj))
 
 ;; JavaScript interop helpers
 (defn- js-comparator
@@ -30,17 +47,24 @@
         :else 0))))
 
 ;; Main API functions
+(defn- propagate-storage
+  "Copy _storage from old set to new set after structural change."
+  [^WasmPSS old ^WasmPSS new]
+  (when-let [s (.-_storage old)]
+    (set! (.-_storage new) s))
+  new)
+
 (defn conj
   "Analogue to [[clojure.core/conj]] but with comparator that overrides the one stored in set."
   [^WasmPSS set key cmp]
   (let [js-cmp (js-comparator cmp)]
-    (.conj set key js-cmp)))
+    (propagate-storage set (.conj set key js-cmp))))
 
 (defn disj
   "Analogue to [[clojure.core/disj]] with comparator that overrides the one stored in set."
   [^WasmPSS set key cmp]
   (let [js-cmp (js-comparator cmp)]
-    (.disj set key js-cmp)))
+    (propagate-storage set (.disj set key js-cmp))))
 
 (defn slice
   "An iterator for part of the set with provided boundaries.
@@ -101,13 +125,34 @@
          settings #js {:branchingFactor (or (:branching-factor opts) 512)}]
      (.from WasmPSS arr js-cmp storage settings))))
 
+(defn- attach-storage
+  "Attach storage adapter as a JS property on the WasmPSS instance
+   so it can be retrieved later by storage-adapter."
+  [^WasmPSS pss storage]
+  (when storage
+    (set! (.-_storage pss) storage))
+  pss)
+
 (defn sorted-set*
-  "Create a set with custom comparator, metadata and settings"
+  "Create a set with custom comparator, metadata and settings.
+   When `:index-type` is provided (\"eavt\", \"aevt\", \"avet\"),
+   uses fast Rust-native comparator instead of JS callback."
   [opts]
-  (let [js-cmp   (js-comparator (or (:cmp opts) compare))
-        storage  (:storage opts)
-        settings #js {:branchingFactor (or (:branching-factor opts) 512)}]
-    (.withComparatorAndStorage WasmPSS js-cmp storage settings)))
+  (let [storage (:storage opts)]
+    (if-let [index-type (:index-type opts)]
+      ;; Fast path: Rust-native comparator, no JS boundary crossings
+      (let [settings #js {:branchingFactor (or (:branching-factor opts) 512)}]
+        (if (or (nil? storage) (undefined? storage))
+          (.emptyWithIndex WasmPSS index-type)
+          (attach-storage
+           (.emptyWithIndexAndStorage WasmPSS index-type storage settings)
+           storage)))
+      ;; Legacy path: JS comparator callback
+      (let [js-cmp   (js-comparator (or (:cmp opts) compare))
+            settings #js {:branchingFactor (or (:branching-factor opts) 512)}]
+        (attach-storage
+         (.withComparatorAndStorage WasmPSS js-cmp storage settings)
+         storage)))))
 
 (defn sorted-set-by
   "Create a set with custom comparator."
@@ -126,13 +171,21 @@
 (defn restore-by
   "Constructs lazily-loaded set from storage, root address and custom comparator.
    Supports all operations that normal in-memory impl would,
-   will fetch missing nodes by calling IStorage::restore when needed"
+   will fetch missing nodes by calling IStorage::restore when needed.
+   When `:index-type` is in opts, uses fast Rust-native comparator."
   ([cmp address storage]
    (restore-by cmp address storage {}))
   ([cmp address storage opts]
-   (let [js-cmp   (js-comparator cmp)
-         settings #js {:branchingFactor (or (:branching-factor opts) 512)}]
-     (.restore WasmPSS js-cmp address storage settings))))
+   (if-let [index-type (:index-type opts)]
+     (let [settings #js {:branchingFactor (or (:branching-factor opts) 512)}]
+       (attach-storage
+        (.restoreWithIndex WasmPSS index-type address storage settings)
+        storage))
+     (let [js-cmp   (js-comparator cmp)
+           settings #js {:branchingFactor (or (:branching-factor opts) 512)}]
+       (attach-storage
+        (.restore WasmPSS js-cmp address storage settings)
+        storage)))))
 
 (defn restore
   "Constructs lazily-loaded set from storage and root address.
@@ -170,9 +223,9 @@
   (-seq [this]
     (let [js-seq (.seq this)]
       (when js-seq
-        ;; Convert WASM iterator to Clojure seq
+        ;; Convert WASM iterator to Clojure seq, mapping JS datoms to CLJS Datoms
         (let [arr (.toArray js-seq)]
-          (seq arr)))))
+          (seq (amap arr i _ (convert-datom (aget arr i))))))))
 
   ICounted
   (-count [this]
@@ -190,11 +243,11 @@
 
   ICollection
   (-conj [this key]
-    (.conj this key))
+    (propagate-storage this (.conj this key)))
 
   ISet
   (-disjoin [this key]
-    (.disj this key))
+    (propagate-storage this (.disj this key)))
 
   IFn
   (-invoke
@@ -220,7 +273,7 @@
   (-pr-writer [this writer opts]
     (let [arr (.toArray this)]
       (-write writer "#")
-      (-write writer (pr-str (vec arr))))))
+      (-write writer (pr-str (mapv convert-datom arr))))))
 
 ;; Extend WasmSeq to implement Clojure protocols
 (when WasmSeq
@@ -230,7 +283,7 @@
 
     ISeq
     (-first [this]
-      (.first this))
+      (convert-datom (.first this)))
 
     (-rest [this]
       (or (.next this) ()))
@@ -261,4 +314,4 @@
     IPrintWithWriter
     (-pr-writer [this writer opts]
       (let [arr (.toArray this)]
-        (-write writer (pr-str (vec arr)))))))
+        (-write writer (pr-str (mapv convert-datom arr)))))))

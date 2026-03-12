@@ -1,10 +1,9 @@
 /// Configuration for the persistent sorted set.
-/// In Rust, no RefType/WeakRef needed — Rc<Node> handles structural sharing
-/// and SQLiteStorage uses an explicit LRU cache.
 #[derive(Clone, Debug)]
 pub struct Settings {
     branching_factor: usize,
     edit: Option<bool>,
+    cache_size: usize,
 }
 
 impl Settings {
@@ -13,7 +12,17 @@ impl Settings {
         Self {
             branching_factor: bf,
             edit: None,
+            cache_size: 1024,
         }
+    }
+
+    pub fn with_cache_size(mut self, cache_size: usize) -> Self {
+        self.cache_size = if cache_size == 0 { 1024 } else { cache_size };
+        self
+    }
+
+    pub fn cache_size(&self) -> usize {
+        self.cache_size
     }
 
     pub fn branching_factor(&self) -> usize {
@@ -33,6 +42,7 @@ impl Settings {
         Self {
             branching_factor: self.branching_factor,
             edit: Some(true),
+            cache_size: self.cache_size,
         }
     }
 
@@ -44,6 +54,6 @@ impl Settings {
 
 impl Default for Settings {
     fn default() -> Self {
-        Self::new(512)
+        Self::new(512) // cache_size defaults to 1024 via new()
     }
 }

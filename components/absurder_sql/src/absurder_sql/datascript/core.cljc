@@ -11,7 +11,8 @@
    [absurder-sql.datascript.query :as dq]
    [absurder-sql.datascript.impl.entity :as de]
    [absurder-sql.datascript.util :as util]
-   [#?(:clj me.tonsky.persistent-sorted-set :cljs absurder-sql.datascript.persistent-sorted-set) :as set])
+   [#?(:clj me.tonsky.persistent-sorted-set :cljs absurder-sql.datascript.persistent-sorted-set) :as set]
+   [#?(:clj datascript.storage :cljs absurder-sql.datascript.storage) :as storage])
   #?(:clj
      (:import
       [absurder-sql.datascript.db Datom DB FilteredDB]
@@ -467,7 +468,9 @@
    Returns nil if there's no database yet in storage"
   ([storage] (restore-conn storage {}))
   ([storage opts]
-   (when-some [result (proto/-restore-impl storage opts)]
+   (when-some [result (if (satisfies? proto/IDatascriptStorageAdapter storage)
+                         (proto/-restore-impl storage opts)
+                         (storage/restore-impl storage opts))]
      (conn/restore-conn result))))
 
 (def ^{:arglists '([conn tx-data] [conn tx-data tx-meta])} transact!
