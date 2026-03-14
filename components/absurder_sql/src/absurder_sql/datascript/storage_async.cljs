@@ -277,16 +277,22 @@
                  (js/Promise.resolve nil))))))
 
 (defn restore-impl-sync
-  "Restore DB from async storage using sync wrapper with prefetch. Returns Promise."
+  "Restore DB from async storage using sync wrapper with prefetch. Returns Promise.
+   When :db-name is in opts AND the stored metadata has :storage-format :unified,
+   PSS indexes are restored from Rust's pss_nodes table (unified path).
+   Otherwise falls back to the JsStorage bridge path."
   [^IStorage storage opts]
   (-> (proto/-restore storage root-addr)
       (.then (fn [root]
                (if root
-                 (let [{:keys [schema eavt aevt avet max-eid max-tx max-addr]} root
+                 (let [{:keys [schema eavt aevt avet max-eid max-tx max-addr storage-format]} root
                        _ (vreset! *max-addr max-addr)
-                       opts (merge root opts)
-                       wrapper (make-sync-storage-wrapper storage opts)]
-                   ;; Prefetch all three index trees
+                       ;; Only use unified restore when data was stored in unified format
+                       unified? (and (:db-name opts) (= :unified storage-format))
+                       set-opts (cond-> (merge root opts)
+                                  (not unified?) (dissoc :db-name))
+                       wrapper (make-sync-storage-wrapper storage set-opts)]
+                   ;; Prefetch all three index trees (no-op for unified: nodes not in datascript table)
                    (-> (js/Promise.all
                         #js [(prefetch-tree! wrapper eavt)
                              (prefetch-tree! wrapper aevt)
@@ -298,9 +304,9 @@
                                              ;; Create DB with sync wrapper - all nodes are cached
                                              (let [db (db/restore-db
                                                        {:schema  schema
-                                                        :eavt    (restore-set-by db/cmp-datoms-eavt eavt wrapper (assoc opts :index-type "eavt"))
-                                                        :aevt    (restore-set-by db/cmp-datoms-aevt aevt wrapper (assoc opts :index-type "aevt"))
-                                                        :avet    (restore-set-by db/cmp-datoms-avet avet wrapper (assoc opts :index-type "avet"))
+                                                        :eavt    (restore-set-by db/cmp-datoms-eavt eavt wrapper (assoc set-opts :index-type "eavt"))
+                                                        :aevt    (restore-set-by db/cmp-datoms-aevt aevt wrapper (assoc set-opts :index-type "aevt"))
+                                                        :avet    (restore-set-by db/cmp-datoms-avet avet wrapper (assoc set-opts :index-type "avet"))
                                                         :max-eid max-eid
                                                         :max-tx  max-tx})]
                                                (remember-db db)
@@ -308,33 +314,37 @@
                  (js/Promise.resolve nil))))))
 
 (defn store-impl-sync!
-  "Store DB using sync wrapper with flush. Returns Promise that resolves to db."
-  [db wrapper force?]
-  (remember-db db)
-  (binding [*store-buffer* (volatile! (transient []))]
-    (let [eavt-addr (store-set (:eavt db) wrapper)
-          aevt-addr (store-set (:aevt db) wrapper)
-          avet-addr (store-set (:avet db) wrapper)
-          meta (merge
-                {:schema   (:schema db)
-                 :max-eid  (:max-eid db)
-                 :max-tx   (:max-tx db)
-                 :eavt     eavt-addr
-                 :aevt     aevt-addr
-                 :avet     avet-addr
-                 :max-addr @*max-addr
-                 :branching-factor (.-branching-factor wrapper)})]
-      (if (or force? (pos? (count @*store-buffer*)))
-        (do
-          (vswap! *store-buffer* conj! [root-addr meta])
-          (vswap! *store-buffer* conj! [tail-addr []])
-          ;; First store buffered nodes
-          (-> (proto/-store (.-storage (.-async-adapter wrapper)) (persistent! @*store-buffer*))
-              (.then (fn [_]
-                       ;; Then flush any remaining dirty nodes
-                       (flush-dirty! wrapper)))
-              (.then (fn [_] db))))
-        (js/Promise.resolve db)))))
+  "Store DB using sync wrapper with flush. Returns Promise that resolves to db.
+   When db-name is provided, marks metadata with :storage-format :unified
+   so restore knows to use the Rust unified SQLite path."
+  ([db wrapper force?]
+   (store-impl-sync! db wrapper force? nil))
+  ([db wrapper force? db-name]
+   (remember-db db)
+   (binding [*store-buffer* (volatile! (transient []))]
+     (let [eavt-addr (store-set (:eavt db) wrapper)
+           aevt-addr (store-set (:aevt db) wrapper)
+           avet-addr (store-set (:avet db) wrapper)
+           meta (cond-> {:schema   (:schema db)
+                         :max-eid  (:max-eid db)
+                         :max-tx   (:max-tx db)
+                         :eavt     eavt-addr
+                         :aevt     aevt-addr
+                         :avet     avet-addr
+                         :max-addr @*max-addr
+                         :branching-factor (.-branching-factor wrapper)}
+                  db-name (assoc :storage-format :unified))]
+       (if (or force? (pos? (count @*store-buffer*)))
+         (do
+           (vswap! *store-buffer* conj! [root-addr meta])
+           (vswap! *store-buffer* conj! [tail-addr []])
+           ;; First store buffered nodes
+           (-> (proto/-store (.-storage (.-async-adapter wrapper)) (persistent! @*store-buffer*))
+               (.then (fn [_]
+                        ;; Then flush any remaining dirty nodes
+                        (flush-dirty! wrapper)))
+               (.then (fn [_] db))))
+         (js/Promise.resolve db))))))
 
 (defn db-with-tail [db tail]
   (reduce

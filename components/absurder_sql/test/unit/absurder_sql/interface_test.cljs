@@ -2,7 +2,7 @@
   (:require [absurder-sql.interface :as sut]
             [cljs.core.async :refer [go]]
             [cljs.core.async.interop :refer-macros [<p!]]
-            ["../js/absurder_sql/index.js" :refer [Database]]
+            ["datascript-rs" :refer [Database]]
             [cljs.test :as t :include-macros true :refer [async deftest is use-fixtures]]))
 
 (defn- with-sqlite []

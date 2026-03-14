@@ -1,9 +1,12 @@
 (ns absurder-sql.core
   (:require
-   ["../js/absurder_sql/index.js" :as sqlite :refer [Database]]
+   ["datascript-rs" :refer [Database] :default init-wasm]
    [promesa.core :as p]
    [cljs.core.async :refer [<! go go-loop put! chan sliding-buffer]]
    [cljs.core.async.interop :refer-macros [<p!]]))
+
+;; WASM URL — overridden per build via :closure-defines in shadow-cljs.edn.
+(goog-define ^string WASM_URL "/js/datascript_rs_bg.wasm")
 
 ;;; State
 (defonce ^:private initialized? (atom false))
@@ -61,12 +64,12 @@
 ;;; Public API
 
 (defn init!
-  "Initializes in-browser SQLite via ES module dynamic import.
-   Safe to call multiple times; returns immediately if already initialized."
+  "Initializes the unified WASM module (AbsurderSQL + PSS).
+   Safe to call multiple times; the wasm-pack init function is idempotent."
   []
   (if @initialized?
     (p/resolved true)
-    (-> (.load sqlite #js {:module_or_path "/js/absurder_sql_bg.wasm"})
+    (-> (init-wasm WASM_URL)
         (p/then (fn [_]
                   (reset! initialized? true))))))
 

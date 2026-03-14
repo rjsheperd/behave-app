@@ -2,7 +2,8 @@
   (:require [clojure.java.io :as io]
             [clojure.java.shell :as sh]))
 
-(def ^:private pss-dir "rust/persistent-sorted-set")
+(def ^:private wasm-crate-dir "rust/datascript-rs")
+(def ^:private wasm-pkg-name "datascript_rs")
 
 (defn- newest-mtime
   "Return the newest last-modified time (ms) among files matching `pred`
@@ -13,36 +14,40 @@
        (map #(.lastModified %))
        (reduce max 0)))
 
-(defn- pss-wasm-stale?
+(defn- wasm-stale?
   "True when any Rust source file is newer than the compiled WASM binary."
   []
-  (let [wasm-file (io/file pss-dir "pkg/persistent_sorted_set_bg.wasm")]
+  (let [wasm-file (io/file wasm-crate-dir (str "pkg/" wasm-pkg-name "_bg.wasm"))]
     (or (not (.exists wasm-file))
         (let [wasm-mtime (.lastModified wasm-file)
-              src-mtime  (newest-mtime (io/file pss-dir "src")
+              ;; Check both PSS and datascript-rs sources
+              pss-mtime  (newest-mtime (io/file "rust/persistent-sorted-set/src")
+                                       #(.endsWith % ".rs"))
+              ds-mtime   (newest-mtime (io/file wasm-crate-dir "src")
                                        #(.endsWith % ".rs"))]
-          (> src-mtime wasm-mtime)))))
+          (or (> pss-mtime wasm-mtime)
+              (> ds-mtime wasm-mtime))))))
 
 (defn- patch-import-meta!
   "Replace `import.meta.url` in wasm-pack output with a dummy string.
    Closure Compiler cannot transpile import.meta, but we never hit that
    code path because CLJS always passes an explicit WASM URL."
   []
-  (let [f   (io/file pss-dir "pkg/persistent_sorted_set.js")
+  (let [f   (io/file wasm-crate-dir (str "pkg/" wasm-pkg-name ".js"))
         src (slurp f)]
     (when (.contains src "import.meta.url")
       (spit f (.replace src
-                        "new URL('persistent_sorted_set_bg.wasm', import.meta.url)"
-                        "'persistent_sorted_set_bg.wasm'")))))
+                        (str "new URL('" wasm-pkg-name "_bg.wasm', import.meta.url)")
+                        (str "'" wasm-pkg-name "_bg.wasm'"))))))
 
-(defn- build-pss-wasm!
-  "Run wasm-pack build for the persistent-sorted-set crate.
+(defn- build-wasm!
+  "Run wasm-pack build for the datascript-rs unified crate.
    Returns true on success."
   []
-  (println "Building PSS WASM (rust sources changed)...")
+  (println "Building unified WASM (rust sources changed)...")
   (let [{:keys [exit out err]}
         (sh/sh "wasm-pack" "build" "--target" "web" "--no-typescript"
-               :dir pss-dir)]
+               :dir wasm-crate-dir)]
     (when (seq out) (println out))
     (when (seq err) (println err))
     (when-not (zero? exit)
@@ -52,20 +57,20 @@
 
 (defn wasm-hook
   "Shadow-cljs build hook (:compile-prepare stage).
-   Rebuilds the PSS WASM binary when Rust sources have changed."
+   Rebuilds the unified WASM binary when Rust sources have changed."
   {:shadow.build/stage :compile-prepare}
   [build-state & _args]
-  (when (pss-wasm-stale?)
-    (build-pss-wasm!))
+  (when (wasm-stale?)
+    (build-wasm!))
   build-state)
 
 (defn- copy-wasm-pkg!
-  "Copy persistent-sorted-set WASM binary to the given output directory."
+  "Copy unified WASM binary to the given output directory."
   [output-dir]
-  (let [wasm-src (io/file "rust/persistent-sorted-set/pkg/persistent_sorted_set_bg.wasm")
-        wasm-dst (io/file output-dir "persistent_sorted_set_bg.wasm")]
+  (let [wasm-src (io/file wasm-crate-dir (str "pkg/" wasm-pkg-name "_bg.wasm"))
+        wasm-dst (io/file output-dir (str wasm-pkg-name "_bg.wasm"))]
     (when (.exists wasm-src)
-      (println "Copying PSS WASM binary to" (str output-dir))
+      (println "Copying unified WASM binary to" (str output-dir))
       (.mkdirs (io/file output-dir))
       (io/copy wasm-src wasm-dst))))
 
@@ -73,14 +78,8 @@
   {:shadow.build/stage :flush}
   [build-state & _args]
   (let [test-dir (get-in build-state [:shadow.build/config :test-dir] "target/test")
-        js-dir (io/file test-dir "js")
-        src-dir (io/file "resources/public/js")]
-    (println "Copying SQLite Files to" test-dir)
+        js-dir (io/file test-dir "js")]
     (.mkdirs js-dir)
-    (doseq [f ["sqlite.js" "sqlite.wasm" "users.db"]]
-      (let [src (io/file src-dir f)]
-        (when (.exists src)
-          (io/copy src (io/file js-dir f)))))
     (copy-wasm-pkg! js-dir))
   build-state)
 

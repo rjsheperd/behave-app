@@ -1,0 +1,4 @@
+[workspace]
+members = ["persistent-sorted-set", "datascript-rs"]
+default-members = ["persistent-sorted-set"]
+resolver = "2"

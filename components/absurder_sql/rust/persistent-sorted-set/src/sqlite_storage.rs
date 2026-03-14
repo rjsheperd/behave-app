@@ -71,17 +71,11 @@ impl SQLiteStorage {
     }
 
     fn serialize_addrs(addrs: &[i64]) -> Vec<u8> {
-        let mut buf = Vec::with_capacity(addrs.len() * 8);
-        for &a in addrs {
-            buf.extend_from_slice(&a.to_le_bytes());
-        }
-        buf
+        crate::datom_serde::serialize_addrs(addrs)
     }
 
     fn deserialize_addrs(blob: &[u8]) -> Vec<i64> {
-        blob.chunks_exact(8)
-            .map(|chunk| i64::from_le_bytes(chunk.try_into().unwrap()))
-            .collect()
+        crate::datom_serde::deserialize_addrs(blob)
     }
 }
 

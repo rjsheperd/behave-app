@@ -4,21 +4,21 @@ version = "0.1.0"
 edition = "2021"
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["rlib"]
 
 [dependencies]
-wasm-bindgen = "0.2"
-js-sys = "0.3"
+wasm-bindgen = "=0.2.105"
+js-sys = "=0.3.82"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 lru = "0.12"
+edn = "0.3"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 rusqlite = { version = "0.30", features = ["bundled"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-sqlite-wasm-rs = { version = "0.4", default-features = false, features = ["precompiled"] }
-console_error_panic_hook = "0.1"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
+tempfile = "3"

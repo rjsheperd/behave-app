@@ -15,6 +15,7 @@ use crate::node::Comparator;
 use crate::seq::Seq as InnerSeq;
 use crate::set::PersistentSortedSet;
 use crate::settings::Settings;
+use crate::storage::IStorage;
 
 // ---------------------------------------------------------------------------
 // Datom ↔ JsValue conversion
@@ -73,7 +74,7 @@ pub fn datom_to_js(d: &Datom) -> JsValue {
 
 /// Parse a JS value into an Attr.
 /// Handles CLJS keywords (strings like ":ns/name" or "ns/name") and plain strings.
-fn attr_from_js(val: &JsValue) -> Option<Attr> {
+pub fn attr_from_js(val: &JsValue) -> Option<Attr> {
     if val.is_null() || val.is_undefined() {
         return None;
     }
@@ -125,7 +126,7 @@ fn attr_to_js(attr: &Attr) -> JsValue {
 }
 
 /// Parse a JS value into a Value.
-fn value_from_js(val: &JsValue) -> Value {
+pub fn value_from_js(val: &JsValue) -> Value {
     if val.is_null() || val.is_undefined() {
         return Value::Nil;
     }
@@ -278,12 +279,6 @@ pub struct WasmPSS {
 
 #[wasm_bindgen]
 impl WasmPSS {
-    /// Install the panic hook for better error messages.
-    #[wasm_bindgen(js_name = "setPanicHook")]
-    pub fn set_panic_hook() {
-        console_error_panic_hook::set_once();
-    }
-
     // --- New constructors (fast path, pure Rust comparisons) ---
 
     /// Create an empty set with a Rust-native IndexType comparator.
@@ -576,6 +571,45 @@ impl WasmPSS {
     #[wasm_bindgen(js_name = "branchingFactor")]
     pub fn branching_factor(&self) -> usize {
         self.inner.settings().branching_factor()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Rust-only constructors (not wasm_bindgen) for use by datascript-rs
+// ---------------------------------------------------------------------------
+
+impl WasmPSS {
+    /// Create an empty PSS with the given IndexType and storage backend.
+    /// Called from datascript-rs to wire up UnifiedSQLiteStorage.
+    pub fn new_with_storage(
+        index_type: IndexType,
+        storage: Box<dyn IStorage>,
+        settings: Settings,
+    ) -> WasmPSS {
+        let cmp = comparator_for_index(index_type);
+        WasmPSS {
+            inner: PersistentSortedSet::with_storage(cmp, storage, settings),
+            index_type: Some(index_type),
+        }
+    }
+
+    /// Restore a PSS from storage by root address.
+    /// Called from datascript-rs to wire up UnifiedSQLiteStorage.
+    pub fn new_restored(
+        index_type: IndexType,
+        address: i64,
+        storage: Box<dyn IStorage>,
+        settings: Settings,
+    ) -> WasmPSS {
+        WasmPSS {
+            inner: PersistentSortedSet::restore(
+                comparator_for_index(index_type),
+                address,
+                storage,
+                settings,
+            ),
+            index_type: Some(index_type),
+        }
     }
 }
 

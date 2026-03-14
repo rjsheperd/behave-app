@@ -15,13 +15,19 @@ pub mod storage;
 pub mod sqlite_storage;
 pub mod set;
 pub mod datom;
+pub mod datom_serde;
 pub mod comparator;
+pub mod schema;
+pub mod db;
+pub mod legacy_edn;
 
 #[cfg(target_arch = "wasm32")]
 pub mod wasm;
 
 #[cfg(target_arch = "wasm32")]
 pub mod js_storage;
+
+// wasm_sqlite_storage is now in datascript-rs as unified_storage
 
 
 // Re-export main types

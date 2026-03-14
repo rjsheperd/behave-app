@@ -4,36 +4,42 @@
                 8022 ["target/kaocha-test" "resources/public"]}
  :nrepl        {:port       9000
                 :middleware [cider.nrepl/cider-middleware]}
- :builds       {:browser         {:target     :browser
-                                  :output-dir "out/js"
-                                  :asset-path "/js"
-                                  :modules    {:main {:entries [absurder-sql.client]
-                                                      :init-fn absurder-sql.client/init}}}
-                :test-kaocha     {:target       :browser-test
-                                  :runner-ns    kaocha.cljs2.shadow-runner
-                                  :test-dir     "target/kaocha-test"
-                                  :ns-regexp    ".*-test$"
-                                  :js-options   {:js-provider :shadow
-                                                 :resolve {"persistent-sorted-set"
+ :builds       {:browser    {:target     :browser
+                              :output-dir "out/js"
+                              :asset-path "/js"
+                              :js-options {:js-provider :shadow
+                                           :resolve {"datascript-rs"
+                                                     {:target :file
+                                                      :file   "rust/datascript-rs/pkg/datascript_rs.js"}}}
+                              :modules    {:main {:entries [absurder-sql.client]
+                                                  :init-fn absurder-sql.client/init}}}
+                :test-kaocha {:target       :browser-test
+                              :runner-ns    kaocha.cljs2.shadow-runner
+                              :test-dir     "target/kaocha-test"
+                              :ns-regexp    ".*-test$"
+                              :js-options   {:js-provider :shadow
+                                             :resolve {"datascript-rs"
+                                                       {:target :file
+                                                        :file   "rust/datascript-rs/pkg/datascript_rs.js"}}}
+                              :compiler-options {:closure-defines {absurder-sql.datascript.persistent-sorted-set/WASM_URL
+                                                                  "/js/datascript_rs_bg.wasm"
+                                                                  absurder-sql.core/WASM_URL
+                                                                  "/js/datascript_rs_bg.wasm"}}
+                              :build-hooks  [(absurder-sql.build/wasm-hook)
+                                             (absurder-sql.build/test-hook)]
+                              :devtools     {:http-port 1818
+                                             :http-root "target/kaocha-test"
+                                             :preloads  [absurder-sql.test-preloads
+                                                         lambdaisland.chui.remote]}}
+                :datascript  {:target           :browser
+                              :output-dir       "out/ds"
+                              :asset-path       "/ds"
+                              :js-options       {:js-provider :shadow
+                                                 :resolve {"datascript-rs"
                                                            {:target :file
-                                                            :file   "rust/persistent-sorted-set/pkg/persistent_sorted_set.js"}}}
-                                  :compiler-options {:closure-defines {absurder-sql.datascript.persistent-sorted-set/WASM_URL
-                                                                      "/js/persistent_sorted_set_bg.wasm"}}
-                                  :build-hooks  [(absurder-sql.build/wasm-hook)
-                               (absurder-sql.build/test-hook)]
-                                  :devtools     {:http-port 1818
-                                                 :http-root "target/kaocha-test"
-                                                 :preloads  [absurder-sql.test-preloads
-                                                        lambdaisland.chui.remote]}}
-                :datascript      {:target           :browser
-                                  :output-dir       "out/ds"
-                                  :asset-path       "/ds"
-                                  :js-options       {:js-provider :shadow
-                                                     :resolve {"persistent-sorted-set"
-                                                               {:target :file
-                                                                :file   "rust/persistent-sorted-set/pkg/persistent_sorted_set.js"}}}
-                                  :compiler-options {:externs ["resources/externs.js"]}
-                                  :build-hooks      [(absurder-sql.build/wasm-hook)
-                                                     (absurder-sql.build/datascript-hook)]
-                                  :modules          {:main {:entries [absurder-sql.datascript-client]
-                                                            :init-fn absurder-sql.datascript-client/init}}}}}
+                                                            :file   "rust/datascript-rs/pkg/datascript_rs.js"}}}
+                              :compiler-options {:externs ["resources/externs.js"]}
+                              :build-hooks      [(absurder-sql.build/wasm-hook)
+                                                 (absurder-sql.build/datascript-hook)]
+                              :modules          {:main {:entries [absurder-sql.datascript-client]
+                                                        :init-fn absurder-sql.datascript-client/init}}}}}

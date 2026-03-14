@@ -3,11 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>DataScript + SQLite Test</title>
+    <title>DataScript + SQLite (Rust Backend)</title>
     <style>
       * { box-sizing: border-box; margin: 0; padding: 0; }
       body { font-family: monospace; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
-      h1 { margin-bottom: 1rem; }
+      h1 { margin-bottom: 0.5rem; }
+      h1 + p { font-size: 0.8rem; color: #666; margin-bottom: 1rem; }
       h2 { margin: 1rem 0 0.5rem; font-size: 1rem; }
       #status { padding: 0.5rem; margin-bottom: 1rem; background: #eee; }
       textarea { width: 100%; font-family: monospace; font-size: 0.9rem; padding: 0.5rem; margin-bottom: 0.5rem; }
@@ -20,6 +21,7 @@
   </head>
   <body>
     <h1>DataScript + SQLite</h1>
+    <p>Rust backend: WasmDataScript for persistence, CLJS DataScript for transactions and queries.</p>
     <div id="status">Status: loading...</div>
 
     <h2>Transact</h2>
@@ -29,6 +31,7 @@
     <div>
       <button id="btn-transact">Transact</button>
       <button id="btn-save">Save</button>
+      <button id="btn-restore">Restore</button>
     </div>
 
     <h2>Query</h2>
@@ -42,6 +45,7 @@
     <div>
       <button id="btn-export">Export .db</button>
       <button id="btn-import">Import .db</button>
+      <button id="btn-gc">GC</button>
       <button id="btn-clear">Clear Log</button>
     </div>
 

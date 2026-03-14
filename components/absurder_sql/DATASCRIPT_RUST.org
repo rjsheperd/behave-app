@@ -1,10 +1,12 @@
 #+TITLE: Unified Rust DataScript Core
-#+AUTHOR: rsheperd
+#+AUTHOR: RJ Sheperd
 #+DATE: 2026-03-12
 
 * Context
 
-The CLJS/Rust interop boundary is broken: =._storage= inaccessible on WasmPSS, =equals= always false, JsStorage double-crossing the WASM boundary. Move the datascript core into Rust to eliminate these problems.
+The CLJS/Rust interop boundary is broken: =._storage= inaccessible on
+WasmPSS, =equals= always false, JsStorage double-crossing the WASM
+boundary. Move the datascript core into Rust to eliminate these problems.
 
 * Phase 1: Native Datom Keys
 
@@ -67,59 +69,110 @@ The CLJS/Rust interop boundary is broken: =._storage= inaccessible on WasmPSS, =
 
 * Phase 2: WASM SQLiteStorage
 
+** Context
+
+Phase 1 established Rust-native datom keys and comparators, but storage
+still crosses the WASM boundary twice per node (Rust → JS → CLJS → JS →
+Rust) via JsStorage. Phase 2 gives Rust direct SQLite access on WASM so
+that B+ tree node persistence happens entirely in Rust, eliminating the
+JsStorage bridge.
+
+*Key constraint:* =sqlite-wasm-rs= is a low-level C FFI binding
+(synchronous, ~unsafe~), NOT API-compatible with =rusqlite=. The WASM
+implementation must use raw ~sqlite3_*~ functions, not rusqlite's
+~Connection~ / ~Statement~ types.
+
+*Approach:* Transitional — Rust handles B+ tree node storage in SQLite
+directly; CLJS metadata (schema, max-eid, max-tx, index root addresses,
+tail) still stored via the existing CLJS StorageAdapter path. This keeps
+the CLJS conn/transact flow unchanged while eliminating the hot-path JS
+boundary crossings for node store/restore.
+
 ** 2.1 Datom binary serialization
 
-- *File:* =rust/persistent-sorted-set/src/sqlite_storage.rs=
-- Add ~serialize_datom(d: &Datom) -> Vec<u8>~ and ~deserialize_datom(bytes: &[u8]) -> Datom~
+- *New file:* =rust/persistent-sorted-set/src/datom_serde.rs=
+- Shared by both native (rusqlite) and WASM (sqlite-wasm-rs) targets
+- ~serialize_datom(d: &Datom) -> Vec<u8>~ and ~deserialize_datom(bytes: &[u8]) -> Datom~
 - Format: ~[e:i64_le][a_type:u8][a_len:u32_le][a_bytes:utf8][v_type:u8][v_data:var][tx:i64_le]~
-- Attribute types: 0=None, 1=Keyword(no ns), 2=Keyword(with ns), 3=Str
-- Value types: 0=Nil, 1=Bool, 2=Long, 3=Double, 4=Str, 5=Keyword, 6=Ref, 7=Instant, 8=Uuid, 9=Bytes
-- *Test:* Round-trip every Value variant through serialize/deserialize
-- *Test:* Round-trip datoms with various attribute types (no ns, with ns, string)
+  - Attribute types: 0=None, 1=Keyword(no ns), 2=Keyword(with ns), 3=Str
+  - Value types: 0=Nil, 1=Bool, 2=Long, 3=Double, 4=Str, 5=Keyword, 6=Ref, 7=Instant, 8=Uuid, 9=Bytes
+- ~serialize_keys(keys: &[Datom]) -> Vec<u8>~ — length-prefixed concatenated datoms
+- ~deserialize_keys(blob: &[u8]) -> Vec<Datom>~ — inverse
+- ~serialize_addrs~ / ~deserialize_addrs~ — packed i64 LE (reuse existing pattern from =sqlite_storage.rs=)
+- *Test:* Round-trip every Value variant; round-trip datoms with various attr types
+- *Reuse:* Existing ~sqlite_storage.rs::{serialize_addrs, deserialize_addrs}~ pattern (promote to shared module)
 
-** 2.2 SQLiteStorage for WASM target
+** 2.2 Refactor native SQLiteStorage to use datom_serde
 
 - *File:* =rust/persistent-sorted-set/src/sqlite_storage.rs=
-- Conditional compilation: ~rusqlite~ on native, ~sqlite-wasm-rs~ on WASM
-- Same table schema: ~pss_nodes(addr INTEGER PRIMARY KEY, level INTEGER, keys BLOB, addrs BLOB)~
-- ~keys BLOB~ = concatenated serialized datoms with length prefixes
-- ~addrs BLOB~ = concatenated i64 little-endian
-- LRU cache (same as native impl)
-- *Test (native):* Store tree of 100 datoms to SQLite, restore, verify all present
-- *Test (WASM):* ~#[wasm_bindgen_test]~ same test with ~sqlite-wasm-rs~
+- Replace inline ~serialize_keys~ / ~deserialize_keys~ (which currently pack i64s for native ~Key = i64~) with calls to ~datom_serde::serialize_keys~ / ~deserialize_keys~
+- *Note:* On native, ~Key = i64~ — this step only applies if we unify Key to Datom on native too. If Key stays i64 on native, keep the existing i64 serialization but still extract ~serialize_addrs~ / ~deserialize_addrs~ to =datom_serde.rs=.
+- *Test:* ~cargo test~ — existing native storage tests still pass
 
-** 2.3 SQLite connection management
+** 2.3 WASM SQLiteStorage
 
-- *File:* =rust/persistent-sorted-set/src/wasm.rs= (or new =connection.rs=)
-- Module-level ~thread_local! { RefCell<HashMap<String, Rc<Connection>>> }~
-- ~open_or_get(db_name: &str) -> Rc<Connection>~
-- *Test:* Open same db twice, get same connection; open different db, get different connection
+- *New file:* =rust/persistent-sorted-set/src/wasm_sqlite_storage.rs= (wasm32-only)
+- Uses ~sqlite_wasm_rs::export::*~ C FFI functions (~sqlite3_open_v2~, ~sqlite3_prepare_v2~, ~sqlite3_step~, ~sqlite3_bind_*~, ~sqlite3_column_*~, ~sqlite3_finalize~, ~sqlite3_close_v2~)
+- Same table schema: ~pss_nodes(addr INTEGER PRIMARY KEY, level INTEGER NOT NULL, keys BLOB NOT NULL, addrs BLOB)~
+- Implements ~IStorage~ trait (same as native ~SQLiteStorage~)
+- ~WasmSQLiteStorage::new(db_path: &str, settings: Settings) -> Self~
+  - Opens with ~sqlite3_open_v2(path, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, ...)~
+  - Creates table if not exists
+  - Queries ~MAX(addr)~ for next_addr
+- ~store(&mut self, node: &Node) -> i64~ — INSERT using ~datom_serde::serialize_keys~, ~datom_serde::serialize_addrs~
+- ~restore(&self, address: i64) -> Rc<Node>~ — SELECT + deserialize
+- ~list_addresses~ / ~delete~ — standard SQL operations
+- Includes LRU cache (reuse =lru= crate, same pattern as native)
+- *Test:* ~#[wasm_bindgen_test]~ create storage, store nodes, restore, verify
 
-** 2.4 WasmPSS with SQLite storage
+** 2.4 Connection pool
+
+- *File:* =rust/persistent-sorted-set/src/wasm_sqlite_storage.rs= (or new =connection.rs=)
+- ~thread_local! { RefCell<HashMap<String, *mut sqlite3>> }~
+- ~open_or_get(db_path: &str) -> *mut sqlite3~ — reuse open connections
+- ~close_all()~ — cleanup for teardown
+- *Safety:* Raw pointer stored because =sqlite-wasm-rs= returns ~*mut sqlite3~
+- *Test:* Open same path twice → same pointer; different paths → different pointers
+
+** 2.5 New WasmPSS constructors for SQLite
 
 - *File:* =rust/persistent-sorted-set/src/wasm.rs=
-- ~WasmPSS::with_sqlite(index_type: String, db_name: String, settings: JsValue) -> WasmPSS~
-- ~.store()~ writes to SQLite directly (no JS callbacks)
-- ~WasmPSS::restore_from_sqlite(index_type, address, db_name, settings) -> WasmPSS~
-- *Test (WASM):* Create set with SQLite, conj datoms, store, create new set via restore, verify contents
+- ~WasmPSS::withSqlite(index_type: String, db_path: String, settings: JsValue) -> WasmPSS~
+  - Creates ~WasmSQLiteStorage~, wraps in ~PersistentSortedSet::with_storage~
+- ~WasmPSS::restoreFromSqlite(index_type: String, address: f64, db_path: String, settings: JsValue) -> WasmPSS~
+  - Creates ~WasmSQLiteStorage~, calls ~PersistentSortedSet::restore~
+- Keep existing JsStorage-based constructors as fallback
+- *Test (WASM):* Create set with SQLite, conj datoms, store, restore, verify
 
-** 2.5 Delete JsStorage
+** 2.6 Update CLJS wrappers
 
-- *File:* Delete =rust/persistent-sorted-set/src/js_storage.rs=
-- *File:* =rust/persistent-sorted-set/src/lib.rs= — remove ~pub mod js_storage~
-- *Test:* ~cargo build --target wasm32-unknown-unknown~ succeeds without js_storage
+- *File:* =src/absurder_sql/datascript/persistent_sorted_set.cljs=
+- Add ~sorted-set-sqlite*~ that calls ~.withSqlite~ instead of ~.emptyWithIndexAndStorage~
+- Add ~restore-by-sqlite~ that calls ~.restoreFromSqlite~
+- *File:* =src/absurder_sql/datascript/storage.cljs=
+- Update ~StorageAdapter~ to use new SQLite-backed PSS constructors when a SQLite db-path is available in opts
+- Metadata (schema, max-eid, max-tx, root addrs, tail) still stored via CLJS IStorage path
+- *File:* =src/absurder_sql/datascript/db.cljc=
+- ~empty-db~ passes =:db-path= through opts when SQLite storage requested
 
-** Phase 2 integration test
+** 2.7 Delete JsStorage (deferred)
 
-- ~cargo test~ passes
-- ~wasm-pack build~ succeeds
-- CLJS storage tests pass using SQLite backend
+- *DO NOT delete yet* — JsStorage is still needed as fallback for non-SQLite storage (e.g. memory-storage in tests, localStorage)
+- Mark ~JsStorage~ methods as deprecated
+- Delete in Phase 3 when all storage goes through Rust
+
+** Phase 2 verification
+
+1. ~cargo test~ — native tests pass (datom_serde round-trips)
+2. ~wasm-pack build --target web --no-typescript~ — WASM builds
+3. ~bun shadow-cljs compile :test-kaocha && ./bin/kaocha~ — storage_test passes (JsStorage fallback)
+4. Manual test: datascript_client with SQLite storage → create db, transact, store, restore
 
 * Phase 3: WasmDB
 
 ** 3.1 Schema types in Rust
 
-- *File:* New =rust/persistent-sorted-set/src/schema.rs=
+- *New file:* =rust/persistent-sorted-set/src/schema.rs=
 - ~Schema = HashMap<Attr, AttrSchema>~ where ~AttrSchema~ has fields for =:db/cardinality=, =:db/valueType=, =:db/unique=, =:db/index=, =:db/isComponent=
 - ~ReverseSchema~ groups attrs by property (e.g., ~multival_attrs: HashSet<Attr>~, ~ref_attrs: HashSet<Attr>~, ~indexed_attrs: HashSet<Attr>~)
 - ~schema_from_js(JsValue) -> Schema~ — parses CLJS schema map
@@ -127,7 +180,7 @@ The CLJS/Rust interop boundary is broken: =._storage= inaccessible on WasmPSS, =
 
 ** 3.2 Database struct
 
-- *File:* New =rust/persistent-sorted-set/src/db.rs=
+- *New file:* =rust/persistent-sorted-set/src/db.rs=
 - ~Database { schema, eavt, aevt, avet, max_eid, max_tx, rschema }~
 - ~Database::empty(schema) -> Database~ — creates 3 empty PSS indexes
 - ~Database::with_datom(datom, added) -> Database~ — conj/disj into appropriate indexes based on schema (indexed attrs go into avet)

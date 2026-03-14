@@ -5,13 +5,17 @@
  absurder-sql.datascript.persistent-sorted-set
   (:refer-clojure :exclude [conj disj sorted-set sorted-set-by])
   (:require
-   ["persistent-sorted-set" :as pss :refer [WasmPSS WasmSeq] :default init-wasm]))
+   ["datascript-rs" :as ds-rs
+    :refer [WasmPSS WasmSeq WasmDataScript withUnifiedSqlite restoreFromUnifiedSqlite closeUnifiedConnections setPanicHook]
+    :default init-wasm]))
 
 ;; WASM initialization — must complete before any PSS operations.
 ;; Override per build via :closure-defines in shadow-cljs.edn.
-(goog-define ^string WASM_URL "/ds/persistent_sorted_set_bg.wasm")
+(goog-define ^string WASM_URL "/ds/datascript_rs_bg.wasm")
 
-(defonce init-promise (init-wasm WASM_URL))
+(defonce init-promise
+  (-> (init-wasm WASM_URL)
+      (.then (fn [_] (setPanicHook)))))
 
 (defn ensure-initialized!
   "Returns a promise that resolves when WASM is ready."
@@ -136,23 +140,43 @@
 (defn sorted-set*
   "Create a set with custom comparator, metadata and settings.
    When `:index-type` is provided (\"eavt\", \"aevt\", \"avet\"),
-   uses fast Rust-native comparator instead of JS callback."
+   uses fast Rust-native comparator instead of JS callback.
+   When `:db-name` is also provided, uses unified SQLite storage
+   (PSS nodes stored in AbsurderSQL's IndexedDB-backed SQLite)."
   [opts]
-  (let [storage (:storage opts)]
+  (let [storage (:storage opts)
+        db-name (:db-name opts)]
     (if-let [index-type (:index-type opts)]
-      ;; Fast path: Rust-native comparator, no JS boundary crossings
-      (let [settings #js {:branchingFactor (or (:branching-factor opts) 512)}]
-        (if (or (nil? storage) (undefined? storage))
-          (.emptyWithIndex WasmPSS index-type)
-          (attach-storage
-           (.emptyWithIndexAndStorage WasmPSS index-type storage settings)
-           storage)))
+      (if db-name
+        ;; Unified SQLite path: PSS nodes in AbsurderSQL's database
+        (let [settings #js {:branchingFactor (or (:branching-factor opts) 512)
+                            :cacheSize       (or (:cache-size opts) 1024)}]
+          (withUnifiedSqlite index-type db-name settings))
+        ;; Fast path: Rust-native comparator, JsStorage bridge for persistence
+        (let [settings #js {:branchingFactor (or (:branching-factor opts) 512)}]
+          (if (or (nil? storage) (undefined? storage))
+            (.emptyWithIndex WasmPSS index-type)
+            (attach-storage
+             (.emptyWithIndexAndStorage WasmPSS index-type storage settings)
+             storage))))
       ;; Legacy path: JS comparator callback
       (let [js-cmp   (js-comparator (or (:cmp opts) compare))
             settings #js {:branchingFactor (or (:branching-factor opts) 512)}]
         (attach-storage
          (.withComparatorAndStorage WasmPSS js-cmp storage settings)
          storage)))))
+
+(defn restore-by-unified-sqlite
+  "Restore a set from unified SQLite storage by root address."
+  [index-type address db-name opts]
+  (let [settings #js {:branchingFactor (or (:branching-factor opts) 512)
+                      :cacheSize       (or (:cache-size opts) 1024)}]
+    (restoreFromUnifiedSqlite index-type address db-name settings)))
+
+(defn close-unified-connections!
+  "Release all PSS-held SQLite connection references."
+  []
+  (closeUnifiedConnections))
 
 (defn sorted-set-by
   "Create a set with custom comparator."
@@ -172,20 +196,24 @@
   "Constructs lazily-loaded set from storage, root address and custom comparator.
    Supports all operations that normal in-memory impl would,
    will fetch missing nodes by calling IStorage::restore when needed.
-   When `:index-type` is in opts, uses fast Rust-native comparator."
+   When `:index-type` is in opts, uses fast Rust-native comparator.
+   When `:db-name` is in opts, restores from unified SQLite storage."
   ([cmp address storage]
    (restore-by cmp address storage {}))
   ([cmp address storage opts]
-   (if-let [index-type (:index-type opts)]
-     (let [settings #js {:branchingFactor (or (:branching-factor opts) 512)}]
-       (attach-storage
-        (.restoreWithIndex WasmPSS index-type address storage settings)
-        storage))
-     (let [js-cmp   (js-comparator cmp)
-           settings #js {:branchingFactor (or (:branching-factor opts) 512)}]
-       (attach-storage
-        (.restore WasmPSS js-cmp address storage settings)
-        storage)))))
+   (if-let [db-name (:db-name opts)]
+     ;; Unified SQLite path: restore from AbsurderSQL's database
+     (restore-by-unified-sqlite (:index-type opts) address db-name opts)
+     (if-let [index-type (:index-type opts)]
+       (let [settings #js {:branchingFactor (or (:branching-factor opts) 512)}]
+         (attach-storage
+          (.restoreWithIndex WasmPSS index-type address storage settings)
+          storage))
+       (let [js-cmp   (js-comparator cmp)
+             settings #js {:branchingFactor (or (:branching-factor opts) 512)}]
+         (attach-storage
+          (.restore WasmPSS js-cmp address storage settings)
+          storage))))))
 
 (defn restore
   "Constructs lazily-loaded set from storage and root address.

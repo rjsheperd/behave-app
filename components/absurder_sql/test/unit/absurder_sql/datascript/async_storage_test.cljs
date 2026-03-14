@@ -302,5 +302,5 @@
                      (<p! (sql/close! sql-conn))
                      (done))))
                (catch :default e
-                 (is (nil? e) (str "Error: " (.getMessage e)))
+                 (is (nil? e) (str "Error: " (.-message e)))
                  (done)))))))
