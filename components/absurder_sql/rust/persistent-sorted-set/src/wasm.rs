@@ -183,7 +183,7 @@ pub fn value_from_js(val: &JsValue) -> Value {
 }
 
 /// Convert a Value to a JsValue.
-fn value_to_js(v: &Value) -> JsValue {
+pub fn value_to_js(v: &Value) -> JsValue {
     match v {
         Value::Nil => JsValue::NULL,
         Value::Bool(b) => JsValue::from_bool(*b),

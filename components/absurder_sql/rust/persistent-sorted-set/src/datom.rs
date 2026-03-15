@@ -4,6 +4,8 @@
 //! storage serialization, and index slicing can happen entirely in Rust
 //! without crossing the WASM boundary.
 
+use std::hash::{Hash, Hasher};
+
 /// Attribute — keyword (ns/name) or plain string.
 /// Matches DataScript's keyword attributes (e.g. :db/id, :person/name).
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -94,6 +96,24 @@ impl PartialEq for Value {
 }
 
 impl Eq for Value {}
+
+impl Hash for Value {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        std::mem::discriminant(self).hash(state);
+        match self {
+            Value::Nil => {}
+            Value::Bool(b) => b.hash(state),
+            Value::Long(n) => n.hash(state),
+            Value::Double(f) => f.to_bits().hash(state),
+            Value::Str(s) => s.hash(state),
+            Value::Keyword(a) => a.hash(state),
+            Value::Ref(n) => n.hash(state),
+            Value::Instant(n) => n.hash(state),
+            Value::Uuid(b) => b.hash(state),
+            Value::Bytes(b) => b.hash(state),
+        }
+    }
+}
 
 /// A single datom: [entity, attribute, value, transaction].
 #[derive(Clone, Debug)]

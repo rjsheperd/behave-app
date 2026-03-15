@@ -21,7 +21,7 @@ use persistent_sorted_set::schema::{
 use persistent_sorted_set::set::PersistentSortedSet;
 use persistent_sorted_set::settings::Settings;
 use persistent_sorted_set::storage::IStorage;
-use persistent_sorted_set::wasm::{attr_from_js, datom_from_js, datom_to_js, value_from_js};
+use persistent_sorted_set::wasm::{attr_from_js, datom_from_js, datom_to_js, value_from_js, value_to_js};
 
 use crate::unified_storage::UnifiedSQLiteStorage;
 
@@ -197,6 +197,23 @@ pub struct WasmDataScript {
 impl WasmDataScript {
     fn is_indexed(&self, attr: &Attr) -> bool {
         self.rschema.is_indexed(attr)
+    }
+
+    /// Public accessor for query module.
+    pub fn is_indexed_pub(&self, attr: &Attr) -> bool {
+        self.rschema.is_indexed(attr)
+    }
+
+    pub fn eavt(&self) -> &PersistentSortedSet {
+        &self.eavt
+    }
+
+    pub fn aevt(&self) -> &PersistentSortedSet {
+        &self.aevt
+    }
+
+    pub fn avet(&self) -> &PersistentSortedSet {
+        &self.avet
     }
 
     fn advance_max_eid(&mut self, e: i64) {
@@ -552,6 +569,78 @@ impl WasmDataScript {
                 Self::all_to_array(pss)
             }
         }
+    }
+
+    /// Resolve WHERE pattern clauses entirely in Rust and return result tuples.
+    ///
+    /// `patterns` is a JS Array of pattern arrays. Each pattern is `[e, a, v, tx]`
+    /// where variables are strings starting with "?" and constants are concrete values.
+    /// The string "_" is a wildcard (match but don't bind).
+    ///
+    /// `find_vars` is a JS Array of variable name strings (e.g. `["?name", "?age"]`).
+    ///
+    /// Returns a JS Array of result tuples (each tuple is a JS Array of values).
+    /// All pattern lookups and joins happen in Rust — no per-clause WASM boundary crossings.
+    #[wasm_bindgen(js_name = "queryPatterns")]
+    pub fn query_patterns(
+        &self,
+        patterns: js_sys::Array,
+        find_vars: js_sys::Array,
+    ) -> js_sys::Array {
+        use crate::query::{PatternEl, resolve_patterns, collect_results};
+        use persistent_sorted_set::relation::Var;
+
+        // Parse patterns from JS
+        let mut rust_patterns: Vec<[PatternEl; 4]> = Vec::with_capacity(patterns.length() as usize);
+        for i in 0..patterns.length() {
+            let pat = js_sys::Array::from(&patterns.get(i));
+            let mut els = [PatternEl::Blank, PatternEl::Blank, PatternEl::Blank, PatternEl::Blank];
+            for j in 0..4.min(pat.length()) {
+                let el = pat.get(j);
+                els[j as usize] = if el.is_null() || el.is_undefined() {
+                    PatternEl::Blank
+                } else if let Some(s) = el.as_string() {
+                    if s.starts_with('?') {
+                        PatternEl::Var(s)
+                    } else if s == "_" {
+                        PatternEl::Blank
+                    } else if s.starts_with(':') {
+                        // Keyword attr or value
+                        PatternEl::Const(Value::Keyword(attr_from_keyword_str(&s)))
+                    } else {
+                        PatternEl::Const(Value::Str(s))
+                    }
+                } else if let Some(n) = el.as_f64() {
+                    let n_i64 = n as i64;
+                    PatternEl::Const(if n.fract() == 0.0 { Value::Long(n_i64) } else { Value::Double(n) })
+                } else if let Some(b) = el.as_bool() {
+                    PatternEl::Const(Value::Bool(b))
+                } else {
+                    PatternEl::Blank
+                };
+            }
+            rust_patterns.push(els);
+        }
+
+        // Parse find vars
+        let rust_find: Vec<Var> = (0..find_vars.length())
+            .filter_map(|i| find_vars.get(i).as_string())
+            .collect();
+
+        // Resolve patterns + join entirely in Rust
+        let result_rel = resolve_patterns(self, &rust_patterns);
+        let result_tuples = collect_results(&result_rel, &rust_find);
+
+        // Convert to JS
+        let outer = js_sys::Array::new_with_length(result_tuples.len() as u32);
+        for (i, tuple) in result_tuples.iter().enumerate() {
+            let inner = js_sys::Array::new_with_length(tuple.len() as u32);
+            for (j, val) in tuple.iter().enumerate() {
+                inner.set(j as u32, value_to_js(val));
+            }
+            outer.set(i as u32, inner.into());
+        }
+        outer
     }
 
     /// Store the database to unified SQLite storage.

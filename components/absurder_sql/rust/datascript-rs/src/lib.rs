@@ -23,6 +23,7 @@ pub use persistent_sorted_set::wasm::{WasmPSS, WasmSeq};
 pub mod unified_storage;
 pub mod wasm_datascript;
 pub mod legacy_datascript;
+pub mod query;
 
 // Re-export WasmDataScript so its wasm-bindgen exports are linked.
 pub use wasm_datascript::WasmDataScript;

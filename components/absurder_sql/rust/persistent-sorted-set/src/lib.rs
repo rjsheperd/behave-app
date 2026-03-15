@@ -20,6 +20,7 @@ pub mod comparator;
 pub mod schema;
 pub mod db;
 pub mod legacy_edn;
+pub mod relation;
 
 #[cfg(target_arch = "wasm32")]
 pub mod wasm;
