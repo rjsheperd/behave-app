@@ -3,10 +3,13 @@
 //! On native targets this uses `Vec<Datom>` for indexes (for testing).
 //! On WASM targets this will use `PersistentSortedSet` with `Key = Datom`.
 
+use std::collections::HashMap;
 use std::cmp::Ordering;
 
 use crate::comparator::{cmp_datoms, IndexType, value_cmp};
 use crate::datom::{Attr, Datom, Value};
+use crate::pull::PullSource;
+use crate::relation::{PatternEl, PatternResolver, Relation, Tuple};
 use crate::schema::{ReverseSchema, Schema, build_rschema};
 
 /// DataScript constants matching CLJS `db.cljc`.
@@ -377,6 +380,111 @@ impl DataScriptDB {
         let from = Datom::new(E0, Some(attr.clone()), start.clone(), TX0);
         let to = Datom::new(EMAX, Some(attr.clone()), end.clone(), TXMAX);
         self.avet.slice(&from, &to)
+    }
+}
+
+impl PatternResolver for DataScriptDB {
+    fn resolve_pattern(&self, pattern: &[PatternEl; 4]) -> Relation {
+        let e = match &pattern[0] {
+            PatternEl::Const(Value::Long(n)) | PatternEl::Const(Value::Ref(n)) => Some(*n),
+            _ => None,
+        };
+        let a = match &pattern[1] {
+            PatternEl::Const(Value::Keyword(attr)) => Some(attr),
+            _ => None,
+        };
+        // For the value position: if the attribute is ref-typed and the constant
+        // is Long(n), search with Ref(n) instead (DataScript stores refs as Ref).
+        // Also handle the reverse: if Ref(n) is given, try both.
+        let v = match &pattern[2] {
+            PatternEl::Const(Value::Long(n)) if a.map_or(false, |a| self.rschema.is_ref(a)) => {
+                Some(Value::Ref(*n))
+            }
+            PatternEl::Const(val) => Some(val.clone()),
+            _ => None,
+        };
+        let v_ref = v.as_ref();
+        let tx = match &pattern[3] {
+            PatternEl::Const(Value::Long(n)) => Some(*n),
+            _ => None,
+        };
+
+        let datoms = self.search(e, a, v_ref, tx);
+
+        let mut attrs = HashMap::new();
+        let mut col = 0usize;
+        for el in pattern.iter() {
+            if let PatternEl::Var(name) = el {
+                if !attrs.contains_key(name) {
+                    attrs.insert(name.clone(), col);
+                    col += 1;
+                }
+            }
+        }
+
+        let tuples: Vec<Tuple> = datoms
+            .into_iter()
+            .map(|d| {
+                let mut tuple = Vec::with_capacity(col);
+                let mut seen = std::collections::HashSet::new();
+                for (i, el) in pattern.iter().enumerate() {
+                    if let PatternEl::Var(name) = el {
+                        if seen.insert(name.clone()) {
+                            tuple.push(match i {
+                                0 => Value::Long(d.e),
+                                1 => match &d.a {
+                                    Some(attr) => Value::Keyword(attr.clone()),
+                                    None => Value::Nil,
+                                },
+                                2 => match &d.v {
+                                    // Normalize Ref(n) → Long(n) so entity references
+                                    // and entity IDs are interchangeable in joins.
+                                    // This matches DataScript semantics where refs are
+                                    // just numbers.
+                                    Value::Ref(n) => Value::Long(*n),
+                                    other => other.clone(),
+                                },
+                                3 => Value::Long(d.tx_id()),
+                                _ => unreachable!(),
+                            });
+                        }
+                    }
+                }
+                tuple
+            })
+            .collect();
+
+        Relation::new(attrs, tuples)
+    }
+}
+
+impl PullSource for DataScriptDB {
+    fn entity_datoms(&self, eid: i64) -> Vec<Datom> {
+        let from = Datom::new(eid, None, Value::Nil, TX_MIN);
+        let to = Datom::new(eid, None, Value::Nil, TXMAX);
+        self.eavt.slice(&from, &to).into_iter().cloned().collect()
+    }
+
+    fn reverse_datoms(&self, attr: &Attr, eid: i64) -> Vec<Datom> {
+        // Reverse lookup: find all datoms where a=attr and v=Ref(eid).
+        // Ref attrs are always indexed, so use AVET.
+        let from = Datom::new(E0, Some(attr.clone()), Value::Ref(eid), TX_MIN);
+        let to = Datom::new(EMAX, Some(attr.clone()), Value::Ref(eid), TXMAX);
+        self.avet.slice(&from, &to).into_iter().cloned().collect()
+    }
+
+    fn resolve_lookup_ref(&self, attr: &Attr, v: &Value) -> Option<i64> {
+        let from = Datom::new(E0, Some(attr.clone()), v.clone(), TX_MIN);
+        let to = Datom::new(EMAX, Some(attr.clone()), v.clone(), TXMAX);
+        self.avet.slice(&from, &to).first().map(|d| d.e)
+    }
+
+    fn schema(&self) -> &Schema {
+        &self.schema
+    }
+
+    fn rschema(&self) -> &ReverseSchema {
+        &self.rschema
     }
 }
 

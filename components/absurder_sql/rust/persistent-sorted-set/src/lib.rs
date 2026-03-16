@@ -21,6 +21,9 @@ pub mod schema;
 pub mod db;
 pub mod legacy_edn;
 pub mod relation;
+pub mod query_parser;
+pub mod pull_parser;
+pub mod pull;
 
 #[cfg(target_arch = "wasm32")]
 pub mod wasm;

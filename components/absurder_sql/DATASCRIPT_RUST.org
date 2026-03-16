@@ -244,3 +244,147 @@ boundary crossings for node store/restore.
 - ~wasm-pack build~ succeeds
 - All kaocha tests pass: storage_test, async_storage_test, interface_test
 - Test: transact 1000 datoms, store to SQLite, restore, query, verify results match
+
+* Phase 4: Feature Parity
+
+Phase 4 closes the gap between the Rust engine and the CLJS DataScript engine so
+that Rust can serve as a complete drop-in replacement. Tasks are ordered by
+production impact.
+
+** 4.1 Aggregates in Rust [HIGH]
+
+- *Files:* =rust/persistent-sorted-set/src/relation.rs=, =query_parser.rs=, =wasm_datascript.rs=
+- This is the *only* feature that currently triggers CLJS fallback in =impl_rust.cljs=
+- CLJS provides 12 built-in aggregates: =sum=, =avg=, =median=, =variance=,
+  =stddev=, =min=, =max=, =rand=, =sample=, =count=, =count-distinct=, =distinct=
+- Parse =:find= aggregate expressions: =(sum ?x)=, =(avg ?y)=, etc.
+- Apply aggregation after =project= in =resolve_query=
+- Support =-with= vars for correct grouping (see 4.4)
+- *Test:* Each aggregate against known datasets; edge cases (empty, single-row, NaN)
+
+** 4.2 fn-expr support [HIGH]
+
+- *Files:* =rust/persistent-sorted-set/src/relation.rs=, =query_parser.rs=
+- CLJS supports =[(str ?a " " ?b) ?result]= binding expressions in =:where=
+- Parser already recognizes fn-exprs but skips them (line 262 of =query_parser.rs=)
+- Implement ~60 built-in query functions matching CLJS:
+  - String: =str=, =subs=, =re-find=, =re-pattern=, =name=, =namespace=, =keyword=
+  - Math: =+=, =-=, =*=, =/=, =quot=, =rem=, =mod=, =inc=, =dec=, =abs=
+  - Collection: =get=, =count=, =range=, =contains?=, =keys=, =vals=, =first=, =last=, =nth=, =concat=
+  - Type: =long=, =double=, =str= (cast), =keyword= (cast)
+  - Other: =ground=, =get-else=, =get-some=, =missing?=, =tuple=, =untuple=
+- Evaluate fn-expr, bind result to output variable, add to relation
+- *Test:* Each function category; chained fn-exprs; fn-expr + predicate combos
+
+** 4.3 Extended predicates [MEDIUM]
+
+- *File:* =rust/persistent-sorted-set/src/relation.rs=
+- Current Rust predicates (8): =>= =<= =>== =<== === =!== =number?= =-differ?=
+- Add ~30 missing predicates matching CLJS:
+  - Numeric: =zero?=, =pos?=, =neg?=, =even?=, =odd?=, =int?=
+  - Type checks: =true?=, =false?=, =nil?=, =some?=, =string?=, =keyword?=
+  - Logic: =not=, =identical?=
+  - Collection: =empty?=, =contains?=, =seq?=
+  - String: =re-find=, =re-matches=, =clojure.string/starts-with?=,
+    =clojure.string/ends-with?=, =clojure.string/includes?=,
+    =clojure.string/blank?=
+- *IMPORTANT:* Unknown predicates currently pass through silently (line 561 of
+  =relation.rs=). Change to emit a warning or error for unrecognized predicates.
+- *Test:* Each new predicate; unknown predicate behavior
+
+** 4.4 Query features: =:with=, return maps, binding forms [MEDIUM]
+
+- *Files:* =rust/persistent-sorted-set/src/query_parser.rs=, =relation.rs=, =wasm_datascript.rs=
+
+*** =:with= clause
+
+- =:with [?vars]= includes variables in joins but excludes from final results
+- Required for correct aggregate grouping (4.1)
+- Parse =:with= in =parse_query=; pass through to =resolve_query=; strip after aggregation
+
+*** Return maps
+
+- CLJS supports =:keys=, =:syms=, =:strs= in queries to return maps instead of tuples
+- Parse in =parse_query=; apply in =tuples_to_js= (wrap tuples as JS objects)
+
+*** Input binding forms
+
+- Current =bind_inputs= only handles scalar bindings
+- Add support for:
+  - Tuple binding: =[[?a ?b]]= — destructures a single tuple input
+  - Collection binding: =[?a ...]= — binds each element, creating multiple bindings
+  - Relation binding: =[[?a ?b ...]]= — binds a relation (set of tuples)
+- *Test:* Each binding form; combined with queries
+
+** 4.5 Pull attribute options [MEDIUM]
+
+- *Files:* =rust/persistent-sorted-set/src/pull_parser.rs=, =pull.rs=
+- CLJS pull supports per-attribute options:
+  - =:as= — rename attribute in result
+  - =:default= — provide default when attribute missing
+  - =:limit= — limit cardinality-many results
+  - =:xform= — transform function on results (may require JS callback)
+- Parse options in =pull_parser.rs=; apply in =pull.rs= during result construction
+- *Test:* Each option individually; combined options; edge cases (empty, nil default)
+
+** 4.6 Pull recursion depth control [LOW]
+
+- *Files:* =rust/persistent-sorted-set/src/pull_parser.rs=, =pull.rs=
+- CLJS supports integer recursion limits (e.g., =3=) and =...= (unlimited)
+- Parser already recognizes these but treats them as wildcard
+- Implement depth tracking during recursive pull resolution
+- *Test:* Depth-limited pull; unlimited pull; pull on cyclic data
+
+** 4.7 Entity API [LOW]
+
+- *New file:* =rust/persistent-sorted-set/src/entity.rs=
+- =d/entity= returns a lazy map-like object for an entity ID
+- =d/touch= eagerly loads all attributes
+- Implement as Rust struct with =PatternResolver= for lazy attribute lookup
+- Expose via WASM: =WasmDB::entity(eid) -> WasmEntity=
+- =WasmEntity::get(attr) -> JsValue=, =WasmEntity::touch() -> JsValue= (JS object)
+- *Test:* Entity lookup; touch; reverse refs; component entities
+
+** 4.8 Transact in Rust [HIGH]
+
+- *New file:* =rust/persistent-sorted-set/src/transact.rs=
+- CLJS handles all mutations: =d/transact!=, =d/with=, =d/db-with=
+- Implement in Rust:
+  - Temp-id resolution (negative IDs → allocated positive IDs)
+  - =:db/add=, =:db/retract= datom operations
+  - =:db.fn/retractEntity=, =:db.fn/retractAttribute= entity operations
+  - Map transaction forms (expand to =:db/add= assertions)
+  - Schema validation (cardinality, uniqueness, value types)
+- Expose via WASM: =WasmDB::transact(tx_data: JsValue) -> WasmDB=
+- Returns new DB + tx-report (tempids map, tx-data datoms)
+- *Test:* Basic add/retract; temp-ids; map forms; schema violations; entity retraction
+
+** 4.9 FilteredDB [LOW]
+
+- *New file:* =rust/persistent-sorted-set/src/filtered_db.rs=
+- =d/filter= creates a filtered view of a database
+- Implement =FilteredDB= wrapping =Database= with a predicate function
+- =FilteredDB= implements =PatternResolver=, filtering results through the predicate
+- *Challenge:* Predicate is a CLJS function — requires JS callback mechanism
+- *Test:* Filter by attribute; filter by entity; nested filters; query against filtered DB
+
+** 4.10 Incremental sync [HIGH]
+
+- *File:* =src/absurder_sql/datascript/impl_rust.cljs=
+- Current =sync-to-rust!= rebuilds the entire Rust DB from scratch after every CLJS transact
+- Replace with incremental approach:
+  - Extract tx-report datoms (=:tx-data=) from CLJS transact result
+  - Send only new/retracted datoms to Rust via =WasmDB::with_datoms=
+  - Avoids O(n) full rebuild on every transaction
+- Prerequisite: 4.8 (Rust transact) makes this obsolete — once transact is in
+  Rust, there's no CLJS→Rust sync needed at all
+- *Interim step:* Before 4.8, implement incremental sync to improve performance
+- *Test:* Transact → sync → query matches full rebuild; retraction sync; large DB perf
+
+** Phase 4 verification
+
+1. Each sub-task has its own unit tests (=cargo test=)
+2. WASM builds: =wasm-pack build --target web --no-typescript=
+3. Full kaocha test suite passes with Rust engine handling all queries (no CLJS fallback)
+4. Remove CLJS fallback path in =impl_rust.cljs= — all queries route through Rust
+5. Performance benchmark: Rust-only path vs mixed CLJS/Rust path on production-scale data

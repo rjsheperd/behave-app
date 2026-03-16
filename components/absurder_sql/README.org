@@ -13,12 +13,16 @@ datoms.
 
 #+begin_example
 ┌─────────────────────────────────────────────────┐
-│  CLJS (DataScript)                              │
+│  CLJS                                           │
+│                                                 │
+│  App / UI  ──▸  impl_rust.cljs (q, pull, sync) │
+│                     │                           │
 │  db.cljc  ──▸  persistent_sorted_set.cljs       │
 │                     │                           │
 │                     ▼                           │
 │              ┌─────────────┐                    │
-│              │  WasmPSS    │  (wasm-bindgen)    │
+│              │  WasmPSS /  │  (wasm-bindgen)    │
+│              │  WasmDS     │                    │
 │              └──────┬──────┘                    │
 ├─────────────────────┼───────────────────────────┤
 │  Rust/WASM          │                           │
@@ -62,6 +66,7 @@ datoms.
 | ~src/absurder_sql/datascript/storage_async.cljs~ | Async storage with prefetch/sync wrapper   |
 | ~src/absurder_sql/datascript/conn.cljc~       | Connection management, transact!, restore      |
 | ~src/absurder_sql/datascript/core.cljc~       | Public API (create-conn, transact!, q, etc.)  |
+| ~src/absurder_sql/datascript/impl_rust.cljs~  | Rust bridge: ~q~, ~pull~, ~pull-many~, sync   |
 | ~src/absurder_sql/datascript_client.cljs~     | Demo UI client (browser)                      |
 | ~src/absurder_sql/datascript/sqlite.cljs~     | SQLite-backed IStorage for browser            |
 | ~src/absurder_sql/build.clj~                  | shadow-cljs build hooks (wasm-pack, copy)     |
@@ -158,6 +163,62 @@ converting string attributes (e.g. ~":person/name"~) back to keywords.
 5. ~-transact!~ calls ~-ds-store!~ / ~-ds-store-tail!~ through the adapter
 6. The adapter's ~store~/~restore~ methods serialize datoms as ~[e a v tx]~
    vectors via ~serializable-datom~ and delegate to the underlying ~IStorage~
+
+** Rust query/pull bridge (~impl_rust~)
+
+~absurder-sql.datascript.impl-rust~ is a standalone namespace that routes
+~q~, ~pull~, and ~pull-many~ through the Rust/WASM ~WasmDataScript~ engine,
+falling back to the CLJS DataScript engine when no Rust DB is available or
+the query uses unsupported features (e.g. aggregates in ~:find~).
+
+The namespace manages its own state — a ~WasmDataScript~ instance set via
+~set-rust-db!~. Callers (the demo UI, the production app, etc.) set this
+once after restoring or syncing a DB.
+
+#+begin_src clojure
+(require '[absurder-sql.datascript.impl-rust :as impl-rust])
+
+;; Sync a CLJS DB to Rust and activate the engine
+(impl-rust/set-rust-db! (impl-rust/sync-to-rust! cljs-db))
+
+;; Query — same signature as d/q, routes through Rust automatically
+(impl-rust/q '[:find ?n :where [?e :name ?n]] db)
+
+;; Pull — same signatures as d/pull, d/pull-many
+(impl-rust/pull db '[*] 1)
+(impl-rust/pull-many db '[:name] [1 2 3])
+
+;; Sync back to CLJS when needed
+(impl-rust/sync-from-rust (impl-rust/rust-db))
+#+end_src
+
+*** API
+
+| Function              | Description                                              |
+|-----------------------+----------------------------------------------------------|
+| ~set-rust-db!~        | Set the active ~WasmDataScript~ instance                 |
+| ~rust-db~             | Get the current instance (or nil)                        |
+| ~q~                   | Query (same signature as ~d/q~), auto-routes through Rust |
+| ~pull~                | Pull entity (same signature as ~d/pull~)                 |
+| ~pull-many~           | Pull entities (same signature as ~d/pull-many~)          |
+| ~sync-to-rust!~       | Convert a CLJS DB → ~WasmDataScript~                     |
+| ~sync-from-rust~      | Convert a ~WasmDataScript~ → CLJS DB                     |
+
+*** Fallback behavior
+
+~q~ falls back to ~d/q~ when:
+- No ~rust-db~ is set (returns nil from ~rust-db~)
+- The query uses aggregates in ~:find~ (not yet supported by the Rust engine)
+
+~pull~ and ~pull-many~ fall back to ~d/pull~ / ~d/pull-many~ when no ~rust-db~
+is set.
+
+*** Relationship to ~datascript_client~
+
+~datascript_client.cljs~ is a thin demo UI that requires ~impl-rust~ and
+delegates all Rust engine calls to it. It no longer contains any
+marshalling or bridge logic — only UI event handlers and persistence
+operations.
 
 * Roadmap
 

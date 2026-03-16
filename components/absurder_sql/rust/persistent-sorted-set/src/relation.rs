@@ -7,9 +7,12 @@
 //! - `prod_rel`: cartesian product
 //! - `subtract_rel`: set difference on shared variables
 //! - `collapse_rels`: fold a new relation into an accumulator via hash-joins
+//! - `solve_rule`: stack-based Datalog rule evaluation
+//! - `resolve_clause`: dispatches Pattern, RuleCall, And, Or, Not, Predicate
 
 use std::collections::HashMap;
 
+use crate::comparator::value_cmp;
 use crate::datom::Value;
 
 /// A query variable, e.g. `?name` or `?e`.
@@ -45,6 +48,49 @@ impl Relation {
     pub fn width(&self) -> usize {
         self.attrs.len()
     }
+}
+
+// ---------------------------------------------------------------------------
+// Pattern elements and clause types for Datalog evaluation
+// ---------------------------------------------------------------------------
+
+/// A pattern element: either a concrete value or a variable to bind.
+#[derive(Clone, Debug, PartialEq)]
+pub enum PatternEl {
+    /// A bound variable name (e.g. "?e", "?name")
+    Var(String),
+    /// A concrete value to match
+    Const(Value),
+    /// Wildcard — match anything, don't bind
+    Blank,
+}
+
+/// A clause in a query WHERE or rule body.
+#[derive(Clone, Debug)]
+pub enum Clause {
+    Pattern([PatternEl; 4]),
+    RuleCall { name: String, args: Vec<PatternEl> },
+    Predicate { name: String, args: Vec<PatternEl> },
+    And(Vec<Clause>),
+    Or(Vec<Vec<Clause>>),
+    Not(Vec<Clause>),
+}
+
+/// A single rule branch: head args + body clauses.
+#[derive(Clone, Debug)]
+pub struct RuleBranch {
+    pub head_args: Vec<Var>,
+    pub body: Vec<Clause>,
+}
+
+/// Named rules: maps rule name → branches.
+pub type Rules = HashMap<String, Vec<RuleBranch>>;
+
+/// Trait for resolving patterns against a database.
+/// Allows the rule engine to be tested with `DataScriptDB` (native)
+/// and used with `WasmDataScript` (WASM) without coupling.
+pub trait PatternResolver {
+    fn resolve_pattern(&self, pattern: &[PatternEl; 4]) -> Relation;
 }
 
 /// A unit relation — no variables, one empty tuple. Identity for `prod_rel`.
@@ -352,6 +398,337 @@ pub fn project(rel: &Relation, vars: &[Var]) -> Relation {
         attrs: out_attrs,
         tuples,
     }
+}
+
+// ---------------------------------------------------------------------------
+// Rule evaluation: alpha-rename, guards, solve_rule, resolve_clause
+// ---------------------------------------------------------------------------
+
+/// Alpha-rename a rule branch: substitute head args with call args,
+/// and rename internal variables with `__auto__N` suffix to prevent capture.
+fn alpha_rename(
+    branch: &RuleBranch,
+    call_args: &[PatternEl],
+    seq_id: usize,
+) -> Vec<Clause> {
+    // Build substitution map: head_arg → call_arg
+    let mut subst: HashMap<String, PatternEl> = HashMap::new();
+    for (head_var, call_el) in branch.head_args.iter().zip(call_args.iter()) {
+        subst.insert(head_var.clone(), call_el.clone());
+    }
+
+    let suffix = format!("__auto__{}", seq_id);
+
+    fn rename_el(
+        el: &PatternEl,
+        subst: &HashMap<String, PatternEl>,
+        suffix: &str,
+    ) -> PatternEl {
+        match el {
+            PatternEl::Var(v) => {
+                if let Some(replacement) = subst.get(v) {
+                    replacement.clone()
+                } else {
+                    // Internal variable — alpha-rename
+                    PatternEl::Var(format!("{}{}", v, suffix))
+                }
+            }
+            other => other.clone(),
+        }
+    }
+
+    fn rename_clause(
+        clause: &Clause,
+        subst: &HashMap<String, PatternEl>,
+        suffix: &str,
+    ) -> Clause {
+        match clause {
+            Clause::Pattern(p) => Clause::Pattern([
+                rename_el(&p[0], subst, suffix),
+                rename_el(&p[1], subst, suffix),
+                rename_el(&p[2], subst, suffix),
+                rename_el(&p[3], subst, suffix),
+            ]),
+            Clause::RuleCall { name, args } => Clause::RuleCall {
+                name: name.clone(),
+                args: args.iter().map(|a| rename_el(a, subst, suffix)).collect(),
+            },
+            Clause::Predicate { name, args } => Clause::Predicate {
+                name: name.clone(),
+                args: args.iter().map(|a| rename_el(a, subst, suffix)).collect(),
+            },
+            Clause::And(cs) => Clause::And(
+                cs.iter().map(|c| rename_clause(c, subst, suffix)).collect(),
+            ),
+            Clause::Or(branches) => Clause::Or(
+                branches
+                    .iter()
+                    .map(|b| b.iter().map(|c| rename_clause(c, subst, suffix)).collect())
+                    .collect(),
+            ),
+            Clause::Not(cs) => Clause::Not(
+                cs.iter().map(|c| rename_clause(c, subst, suffix)).collect(),
+            ),
+        }
+    }
+
+    branch
+        .body
+        .iter()
+        .map(|c| rename_clause(c, &subst, &suffix))
+        .collect()
+}
+
+/// Maximum recursion depth for rule evaluation.
+/// Prevents infinite loops on cyclic data. Sufficient for deep hierarchies.
+const MAX_RULE_DEPTH: usize = 64;
+
+/// Apply a predicate filter to the context relations.
+fn apply_predicate(ctx: &mut Vec<Relation>, name: &str, args: &[PatternEl]) {
+    // Find the relation that contains the vars referenced by the predicate
+    let pred_vars: Vec<&str> = args
+        .iter()
+        .filter_map(|el| match el {
+            PatternEl::Var(v) => Some(v.as_str()),
+            _ => None,
+        })
+        .collect();
+
+    if pred_vars.is_empty() {
+        return;
+    }
+
+    // Find which relation(s) contain these vars and apply filter in-place
+    for rel in ctx.iter_mut() {
+        let has_all = pred_vars.iter().all(|v| rel.attrs.contains_key(*v));
+        if !has_all {
+            continue;
+        }
+
+        let filtered = apply_predicate_filter(rel, name, args);
+        *rel = filtered;
+    }
+}
+
+/// Apply a predicate filter to a single relation.
+fn apply_predicate_filter(rel: &Relation, name: &str, args: &[PatternEl]) -> Relation {
+    use std::cmp::Ordering;
+
+    let tuples: Vec<Tuple> = rel
+        .tuples
+        .iter()
+        .filter(|tuple| {
+            // Resolve predicate arguments to actual values
+            let resolved: Vec<Value> = args
+                .iter()
+                .map(|el| match el {
+                    PatternEl::Var(v) => {
+                        if let Some(&idx) = rel.attrs.get(v) {
+                            tuple[idx].clone()
+                        } else {
+                            Value::Nil
+                        }
+                    }
+                    PatternEl::Const(v) => v.clone(),
+                    PatternEl::Blank => Value::Nil,
+                })
+                .collect();
+
+            match name {
+                "number?" => matches!(
+                    &resolved[0],
+                    Value::Long(_) | Value::Double(_) | Value::Ref(_)
+                ),
+                ">" => resolved.len() >= 2
+                    && value_cmp(&resolved[0], &resolved[1]) == Ordering::Greater,
+                "<" => resolved.len() >= 2
+                    && value_cmp(&resolved[0], &resolved[1]) == Ordering::Less,
+                ">=" => resolved.len() >= 2
+                    && value_cmp(&resolved[0], &resolved[1]) != Ordering::Less,
+                "<=" => resolved.len() >= 2
+                    && value_cmp(&resolved[0], &resolved[1]) != Ordering::Greater,
+                "=" => resolved.len() >= 2 && resolved[0] == resolved[1],
+                "!=" => resolved.len() >= 2 && resolved[0] != resolved[1],
+                "-differ?" => {
+                    // At least one pair of args differs
+                    if resolved.len() < 2 {
+                        true
+                    } else {
+                        let half = resolved.len() / 2;
+                        (0..half).any(|i| resolved[i] != resolved[half + i])
+                    }
+                }
+                _ => true, // Unknown predicate — pass through
+            }
+        })
+        .cloned()
+        .collect();
+
+    Relation::new(rel.attrs.clone(), tuples)
+}
+
+/// Collapse a context of relations into a single relation.
+fn collapse_ctx(ctx: Vec<Relation>) -> Relation {
+    if ctx.is_empty() {
+        unit_rel()
+    } else if ctx.len() == 1 {
+        ctx.into_iter().next().unwrap()
+    } else {
+        ctx.into_iter()
+            .reduce(|a, b| hash_join(&a, &b))
+            .unwrap()
+    }
+}
+
+/// Depth-limited rule evaluation. For each branch of the rule, alpha-renames
+/// the body and resolves all clauses (including nested rule calls) recursively.
+///
+/// Termination is guaranteed by:
+/// 1. Depth limit (`MAX_RULE_DEPTH`) prevents infinite recursion
+/// 2. On finite data, pattern resolution eventually yields empty relations
+pub fn solve_rule<R: PatternResolver>(
+    resolver: &R,
+    rule_name: &str,
+    call_args: &[PatternEl],
+    rules: &Rules,
+) -> Relation {
+    solve_rule_depth(resolver, rule_name, call_args, rules, 0, &mut 0)
+}
+
+fn solve_rule_depth<R: PatternResolver>(
+    resolver: &R,
+    rule_name: &str,
+    call_args: &[PatternEl],
+    rules: &Rules,
+    depth: usize,
+    seq_id: &mut usize,
+) -> Relation {
+    if depth >= MAX_RULE_DEPTH {
+        return Relation::empty(&[]);
+    }
+
+    let branches = match rules.get(rule_name) {
+        Some(b) => b,
+        None => return Relation::empty(&[]),
+    };
+
+    let final_vars: Vec<Var> = call_args
+        .iter()
+        .filter_map(|el| match el {
+            PatternEl::Var(v) => Some(v.clone()),
+            _ => None,
+        })
+        .collect();
+
+    let mut result = Relation::empty(&final_vars);
+
+    for branch in branches {
+        let renamed = alpha_rename(branch, call_args, *seq_id);
+        *seq_id += 1;
+
+        let mut ctx: Vec<Relation> = Vec::new();
+        let mut dead = false;
+
+        for clause in &renamed {
+            resolve_clause_depth(resolver, &mut ctx, clause, rules, depth, seq_id);
+            if ctx.iter().any(|r| r.is_empty() && !r.attrs.is_empty()) {
+                dead = true;
+                break;
+            }
+        }
+
+        if !dead {
+            let resolved = collapse_ctx(ctx);
+            if !resolved.is_empty() {
+                let projected = project(&resolved, &final_vars);
+                result = sum_rel(&result, &projected);
+            }
+        }
+    }
+
+    result
+}
+
+/// Dispatch a single clause, updating the context relations.
+///
+/// Handles all clause types: Pattern, RuleCall, And, Or, Not, Predicate.
+pub fn resolve_clause<R: PatternResolver>(
+    resolver: &R,
+    ctx: &mut Vec<Relation>,
+    clause: &Clause,
+    rules: &Rules,
+) {
+    resolve_clause_depth(resolver, ctx, clause, rules, 0, &mut 0);
+}
+
+fn resolve_clause_depth<R: PatternResolver>(
+    resolver: &R,
+    ctx: &mut Vec<Relation>,
+    clause: &Clause,
+    rules: &Rules,
+    depth: usize,
+    seq_id: &mut usize,
+) {
+    match clause {
+        Clause::Pattern(p) => {
+            let rel = resolver.resolve_pattern(p);
+            *ctx = collapse_rels(ctx, rel);
+        }
+        Clause::RuleCall { name, args } => {
+            let rel = solve_rule_depth(resolver, name, args, rules, depth + 1, seq_id);
+            *ctx = collapse_rels(ctx, rel);
+        }
+        Clause::And(cs) => {
+            for c in cs {
+                resolve_clause_depth(resolver, ctx, c, rules, depth, seq_id);
+            }
+        }
+        Clause::Or(branches) => {
+            let mut union = Relation::empty(&[]);
+            let mut first = true;
+            for branch in branches {
+                let mut branch_ctx = ctx.clone();
+                for c in branch {
+                    resolve_clause_depth(resolver, &mut branch_ctx, c, rules, depth, seq_id);
+                }
+                let branch_rel = collapse_ctx(branch_ctx);
+                if first {
+                    union = branch_rel;
+                    first = false;
+                } else {
+                    union = sum_rel(&union, &branch_rel);
+                }
+            }
+            *ctx = vec![union];
+        }
+        Clause::Not(cs) => {
+            let mut neg_ctx = ctx.clone();
+            for c in cs {
+                resolve_clause_depth(resolver, &mut neg_ctx, c, rules, depth, seq_id);
+            }
+            let negation = collapse_ctx(neg_ctx);
+            let combined = collapse_ctx(ctx.clone());
+            *ctx = vec![subtract_rel(&combined, &negation)];
+        }
+        Clause::Predicate { name, args } => {
+            apply_predicate(ctx, name, args);
+        }
+    }
+}
+
+/// Resolve a full query: a list of clauses (which may include rule calls)
+/// against a resolver and a set of rules.
+pub fn resolve_query<R: PatternResolver>(
+    resolver: &R,
+    clauses: &[Clause],
+    rules: &Rules,
+) -> Relation {
+    let mut ctx: Vec<Relation> = Vec::new();
+    let mut seq_id: usize = 0;
+    for clause in clauses {
+        resolve_clause_depth(resolver, &mut ctx, clause, rules, 0, &mut seq_id);
+    }
+    collapse_ctx(ctx)
 }
 
 // ---------------------------------------------------------------------------

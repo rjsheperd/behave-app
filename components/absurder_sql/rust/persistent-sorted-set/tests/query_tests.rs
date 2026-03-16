@@ -11,7 +11,9 @@ use std::collections::HashMap;
 use persistent_sorted_set::datom::{Datom, Value};
 use persistent_sorted_set::db::{DataScriptDB, TX0};
 use persistent_sorted_set::relation::{
-    collapse_rels, hash_join, project, subtract_rel, sum_rel, Relation, Tuple, Var,
+    collapse_rels, hash_join, project, subtract_rel, sum_rel,
+    Clause, PatternEl, Relation, RuleBranch, Rules, Tuple, Var,
+    resolve_query, solve_rule,
 };
 use persistent_sorted_set::schema::{
     kw, kw_ns, AttrSchema, Cardinality, Schema, Unique, ValueType,
@@ -431,16 +433,14 @@ fn query_ref_join() {
     let joined_12 = hash_join(&r1, &r2);
     assert_eq!(joined_12.tuples.len(), 2); // Bob and Carol have parents
 
-    // For the final join on ?p, we need ?p in joined_12 (Ref values)
-    // to match ?p in r3 (Long values from entity position).
-    // This is the core Ref→Long resolution. In a full query engine,
-    // ref attrs are detected and values are normalized. For this test,
-    // let's verify the intermediate results are correct.
+    // With the PatternResolver trait, Ref(n) is normalized to Long(n) so
+    // ref values and entity IDs join correctly. The test's local lookup_pattern
+    // still uses raw values. Verify we get the parent entity.
     let p_idx = joined_12.attrs["?p"];
     for t in &joined_12.tuples {
         match &t[p_idx] {
-            Value::Ref(1) => {} // parent is Alice
-            other => panic!("expected Ref(1), got {:?}", other),
+            Value::Ref(1) | Value::Long(1) => {} // parent is Alice
+            other => panic!("expected Ref(1) or Long(1), got {:?}", other),
         }
     }
 }
@@ -798,4 +798,511 @@ fn query_keyword_values() {
         Pat::Blank,
     ]);
     assert_eq!(rel.tuples.len(), 2);
+}
+
+// ===================================================================
+// Rule evaluation tests
+// ===================================================================
+
+// Helper: PatternEl shortcuts
+fn pe_var(s: &str) -> PatternEl {
+    PatternEl::Var(s.into())
+}
+fn pe_const(v: Value) -> PatternEl {
+    PatternEl::Const(v)
+}
+fn pe_kw(name: &str) -> PatternEl {
+    PatternEl::Const(Value::Keyword(kw(name)))
+}
+fn pe_blank() -> PatternEl {
+    PatternEl::Blank
+}
+
+/// Helper: DB with hierarchical groups for recursive rule testing.
+/// Group hierarchy: root(1) → child_a(2), child_b(3) → grandchild(4)
+fn hierarchy_db() -> DataScriptDB {
+    let mut schema = Schema::default();
+    schema.attrs.insert(kw("name"), AttrSchema { index: true, ..Default::default() });
+    schema.attrs.insert(kw("groups"), AttrSchema { value_type: Some(ValueType::Ref), cardinality: Cardinality::Many, ..Default::default() });
+    schema.attrs.insert(kw("uuid"), AttrSchema { index: true, unique: Some(Unique::Identity), ..Default::default() });
+    schema.attrs.insert(kw("type"), AttrSchema { index: true, ..Default::default() });
+    schema.attrs.insert(kw("val"), AttrSchema::default());
+
+    let mut db = DataScriptDB::empty(schema);
+    db.with_datoms(vec![
+        d(1, "name", Value::Str("root".into()), 1),
+        d(1, "groups", Value::Ref(2), 1),
+        d(1, "groups", Value::Ref(3), 1),
+        d(2, "name", Value::Str("child_a".into()), 1),
+        d(2, "groups", Value::Ref(4), 1),
+        d(3, "name", Value::Str("child_b".into()), 1),
+        d(4, "name", Value::Str("grandchild".into()), 1),
+        // UUID-based entities
+        d(10, "uuid", Value::Str("uuid-10".into()), 1),
+        d(10, "name", Value::Str("entity-10".into()), 1),
+        d(10, "type", Value::Keyword(kw("group")), 1),
+        d(11, "uuid", Value::Str("uuid-11".into()), 1),
+        d(11, "name", Value::Str("entity-11".into()), 1),
+        d(11, "type", Value::Keyword(kw("variable")), 1),
+        d(11, "val", Value::Long(42), 1),
+        d(12, "uuid", Value::Str("uuid-12".into()), 1),
+        d(12, "name", Value::Str("entity-12".into()), 1),
+        d(12, "type", Value::Keyword(kw("variable")), 1),
+        d(12, "val", Value::Str("not-a-number".into()), 1),
+    ]);
+    db
+}
+
+#[test]
+fn rule_simple_lookup() {
+    // Rule: [(lookup ?uuid ?e) [?e :uuid ?uuid]]
+    // Models the simplest delegation pattern from rules.cljc
+    let db = hierarchy_db();
+    let mut rules: Rules = HashMap::new();
+    rules.insert("lookup".into(), vec![RuleBranch {
+        head_args: vec!["?uuid".into(), "?e".into()],
+        body: vec![Clause::Pattern([
+            pe_var("?e"), pe_kw("uuid"), pe_var("?uuid"), pe_blank(),
+        ])],
+    }]);
+
+    let result = solve_rule(
+        &db,
+        "lookup",
+        &[pe_const(Value::Str("uuid-10".into())), pe_var("?e")],
+        &rules,
+    );
+
+    assert_eq!(result.tuples.len(), 1);
+    let e_idx = result.attrs["?e"];
+    assert_eq!(result.tuples[0][e_idx], Value::Long(10));
+}
+
+#[test]
+fn rule_multi_clause() {
+    // Rule: [(named-group ?uuid ?name)
+    //        [?e :uuid ?uuid]
+    //        [?e :name ?name]
+    //        [?e :type :group]]
+    let db = hierarchy_db();
+    let mut rules: Rules = HashMap::new();
+    rules.insert("named-group".into(), vec![RuleBranch {
+        head_args: vec!["?uuid".into(), "?name".into()],
+        body: vec![
+            Clause::Pattern([pe_var("?e"), pe_kw("uuid"), pe_var("?uuid"), pe_blank()]),
+            Clause::Pattern([pe_var("?e"), pe_kw("name"), pe_var("?name"), pe_blank()]),
+            Clause::Pattern([pe_var("?e"), pe_kw("type"), pe_const(Value::Keyword(kw("group"))), pe_blank()]),
+        ],
+    }]);
+
+    let result = solve_rule(
+        &db,
+        "named-group",
+        &[pe_var("?uuid"), pe_var("?name")],
+        &rules,
+    );
+
+    assert_eq!(result.tuples.len(), 1);
+    let name_idx = result.attrs["?name"];
+    assert_eq!(result.tuples[0][name_idx], Value::Str("entity-10".into()));
+}
+
+#[test]
+fn rule_multi_branch() {
+    // Rule with multiple branches (OR semantics):
+    // [(typed-entity ?e ?name)
+    //   [?e :type :group] [?e :name ?name]]
+    // [(typed-entity ?e ?name)
+    //   [?e :type :variable] [?e :name ?name]]
+    let db = hierarchy_db();
+    let mut rules: Rules = HashMap::new();
+    rules.insert("typed-entity".into(), vec![
+        RuleBranch {
+            head_args: vec!["?e".into(), "?name".into()],
+            body: vec![
+                Clause::Pattern([pe_var("?e"), pe_kw("type"), pe_const(Value::Keyword(kw("group"))), pe_blank()]),
+                Clause::Pattern([pe_var("?e"), pe_kw("name"), pe_var("?name"), pe_blank()]),
+            ],
+        },
+        RuleBranch {
+            head_args: vec!["?e".into(), "?name".into()],
+            body: vec![
+                Clause::Pattern([pe_var("?e"), pe_kw("type"), pe_const(Value::Keyword(kw("variable"))), pe_blank()]),
+                Clause::Pattern([pe_var("?e"), pe_kw("name"), pe_var("?name"), pe_blank()]),
+            ],
+        },
+    ]);
+
+    let result = solve_rule(
+        &db,
+        "typed-entity",
+        &[pe_var("?e"), pe_var("?name")],
+        &rules,
+    );
+
+    // entity-10 (group) + entity-11 (variable) + entity-12 (variable) = 3
+    assert_eq!(result.tuples.len(), 3);
+    let name_idx = result.attrs["?name"];
+    let names: Vec<&Value> = result.tuples.iter().map(|t| &t[name_idx]).collect();
+    assert!(names.contains(&&Value::Str("entity-10".into())));
+    assert!(names.contains(&&Value::Str("entity-11".into())));
+    assert!(names.contains(&&Value::Str("entity-12".into())));
+}
+
+#[test]
+fn rule_recursive_children() {
+    // Recursive rule: subgroup
+    // [(subgroup ?g ?s)
+    //   [?g :groups ?s]]
+    // [(subgroup ?g ?s)
+    //   [?g :groups ?x]
+    //   (subgroup ?x ?s)]
+    //
+    // This traverses the tree: root(1) has children 2,3. child_a(2) has child 4.
+    let db = hierarchy_db();
+    let mut rules: Rules = HashMap::new();
+    rules.insert("subgroup".into(), vec![
+        // Base case: direct child
+        RuleBranch {
+            head_args: vec!["?g".into(), "?s".into()],
+            body: vec![Clause::Pattern([
+                pe_var("?g"), pe_kw("groups"), pe_var("?s"), pe_blank(),
+            ])],
+        },
+        // Recursive case
+        RuleBranch {
+            head_args: vec!["?g".into(), "?s".into()],
+            body: vec![
+                Clause::Pattern([pe_var("?g"), pe_kw("groups"), pe_var("?x"), pe_blank()]),
+                Clause::RuleCall {
+                    name: "subgroup".into(),
+                    args: vec![pe_var("?x"), pe_var("?s")],
+                },
+            ],
+        },
+    ]);
+
+    let result = solve_rule(
+        &db,
+        "subgroup",
+        &[pe_const(Value::Long(1)), pe_var("?s")],
+        &rules,
+    );
+
+    // root(1) → {2, 3} (direct) + {4} (via 2) = 3 descendants
+    let s_idx = result.attrs["?s"];
+    let subs: Vec<i64> = result.tuples.iter().filter_map(|t| match &t[s_idx] {
+        Value::Ref(n) => Some(*n),
+        Value::Long(n) => Some(*n),
+        _ => None,
+    }).collect();
+    assert_eq!(subs.len(), 3, "expected 3 descendants, got {:?}", subs);
+}
+
+#[test]
+fn rule_recursive_deep() {
+    // 5-level hierarchy: 1 → 2 → 3 → 4 → 5
+    let mut schema = Schema::default();
+    schema.attrs.insert(kw("child"), AttrSchema { value_type: Some(ValueType::Ref), ..Default::default() });
+    let mut db = DataScriptDB::empty(schema);
+    for i in 1..=4 {
+        db.with_datom(d(i, "child", Value::Ref(i + 1), 1));
+    }
+
+    let mut rules: Rules = HashMap::new();
+    rules.insert("descendant".into(), vec![
+        RuleBranch {
+            head_args: vec!["?a".into(), "?d".into()],
+            body: vec![Clause::Pattern([
+                pe_var("?a"), pe_kw("child"), pe_var("?d"), pe_blank(),
+            ])],
+        },
+        RuleBranch {
+            head_args: vec!["?a".into(), "?d".into()],
+            body: vec![
+                Clause::Pattern([pe_var("?a"), pe_kw("child"), pe_var("?x"), pe_blank()]),
+                Clause::RuleCall {
+                    name: "descendant".into(),
+                    args: vec![pe_var("?x"), pe_var("?d")],
+                },
+            ],
+        },
+    ]);
+
+    let result = solve_rule(
+        &db,
+        "descendant",
+        &[pe_const(Value::Long(1)), pe_var("?d")],
+        &rules,
+    );
+
+    // From 1: direct {2}, via 2: {3}, via 3: {4}, via 4: {5} = 4 descendants
+    let d_idx = result.attrs["?d"];
+    let descs: Vec<i64> = result.tuples.iter().filter_map(|t| match &t[d_idx] {
+        Value::Ref(n) => Some(*n),
+        Value::Long(n) => Some(*n),
+        _ => None,
+    }).collect();
+    assert_eq!(descs.len(), 4, "expected 4 descendants of entity 1, got {:?}", descs);
+}
+
+#[test]
+fn rule_calls_rule() {
+    // Rule chaining: (named-sub ?g ?name) calls (subgroup ?g ?s),
+    // then looks up the name of ?s.
+    let db = hierarchy_db();
+    let mut rules: Rules = HashMap::new();
+
+    // subgroup rule (same as above)
+    rules.insert("subgroup".into(), vec![
+        RuleBranch {
+            head_args: vec!["?g".into(), "?s".into()],
+            body: vec![Clause::Pattern([
+                pe_var("?g"), pe_kw("groups"), pe_var("?s"), pe_blank(),
+            ])],
+        },
+        RuleBranch {
+            head_args: vec!["?g".into(), "?s".into()],
+            body: vec![
+                Clause::Pattern([pe_var("?g"), pe_kw("groups"), pe_var("?x"), pe_blank()]),
+                Clause::RuleCall {
+                    name: "subgroup".into(),
+                    args: vec![pe_var("?x"), pe_var("?s")],
+                },
+            ],
+        },
+    ]);
+
+    // named-sub: calls subgroup then looks up name
+    rules.insert("named-sub".into(), vec![RuleBranch {
+        head_args: vec!["?g".into(), "?name".into()],
+        body: vec![
+            Clause::RuleCall {
+                name: "subgroup".into(),
+                args: vec![pe_var("?g"), pe_var("?s")],
+            },
+            Clause::Pattern([pe_var("?s"), pe_kw("name"), pe_var("?name"), pe_blank()]),
+        ],
+    }]);
+
+    let result = solve_rule(
+        &db,
+        "named-sub",
+        &[pe_const(Value::Long(1)), pe_var("?name")],
+        &rules,
+    );
+
+    let name_idx = result.attrs["?name"];
+    let names: Vec<&str> = result.tuples.iter().filter_map(|t| match &t[name_idx] {
+        Value::Str(s) => Some(s.as_str()),
+        _ => None,
+    }).collect();
+    // root(1) has descendants: child_a(2), child_b(3), grandchild(4)
+    assert_eq!(names.len(), 3);
+    assert!(names.contains(&"child_a"));
+    assert!(names.contains(&"child_b"));
+    assert!(names.contains(&"grandchild"));
+}
+
+#[test]
+fn rule_predicate_guard() {
+    // Rule: [(numeric-var ?e ?v)
+    //        [?e :type :variable]
+    //        [?e :val ?v]
+    //        [(number? ?v)]]
+    let db = hierarchy_db();
+    let mut rules: Rules = HashMap::new();
+    rules.insert("numeric-var".into(), vec![RuleBranch {
+        head_args: vec!["?e".into(), "?v".into()],
+        body: vec![
+            Clause::Pattern([pe_var("?e"), pe_kw("type"), pe_const(Value::Keyword(kw("variable"))), pe_blank()]),
+            Clause::Pattern([pe_var("?e"), pe_kw("val"), pe_var("?v"), pe_blank()]),
+            Clause::Predicate {
+                name: "number?".into(),
+                args: vec![pe_var("?v")],
+            },
+        ],
+    }]);
+
+    let result = solve_rule(
+        &db,
+        "numeric-var",
+        &[pe_var("?e"), pe_var("?v")],
+        &rules,
+    );
+
+    // entity 11 has val=42 (Long → passes number?), entity 12 has val="not-a-number" (Str → fails)
+    assert_eq!(result.tuples.len(), 1);
+    let e_idx = result.attrs["?e"];
+    assert_eq!(result.tuples[0][e_idx], Value::Long(11));
+}
+
+#[test]
+fn rule_no_match() {
+    // Rule that matches nothing
+    let db = hierarchy_db();
+    let mut rules: Rules = HashMap::new();
+    rules.insert("nonexistent-type".into(), vec![RuleBranch {
+        head_args: vec!["?e".into()],
+        body: vec![Clause::Pattern([
+            pe_var("?e"), pe_kw("type"), pe_const(Value::Keyword(kw("bogus"))), pe_blank(),
+        ])],
+    }]);
+
+    let result = solve_rule(
+        &db,
+        "nonexistent-type",
+        &[pe_var("?e")],
+        &rules,
+    );
+
+    assert!(result.is_empty());
+}
+
+#[test]
+fn rule_recursive_guard_prevents_loop() {
+    // Create a cycle: 1 → 2 → 1
+    let mut schema = Schema::default();
+    schema.attrs.insert(kw("link"), AttrSchema { value_type: Some(ValueType::Ref), ..Default::default() });
+    let mut db = DataScriptDB::empty(schema);
+    db.with_datom(d(1, "link", Value::Ref(2), 1));
+    db.with_datom(d(2, "link", Value::Ref(1), 1));
+
+    let mut rules: Rules = HashMap::new();
+    rules.insert("reachable".into(), vec![
+        RuleBranch {
+            head_args: vec!["?a".into(), "?b".into()],
+            body: vec![Clause::Pattern([
+                pe_var("?a"), pe_kw("link"), pe_var("?b"), pe_blank(),
+            ])],
+        },
+        RuleBranch {
+            head_args: vec!["?a".into(), "?b".into()],
+            body: vec![
+                Clause::Pattern([pe_var("?a"), pe_kw("link"), pe_var("?x"), pe_blank()]),
+                Clause::RuleCall {
+                    name: "reachable".into(),
+                    args: vec![pe_var("?x"), pe_var("?b")],
+                },
+            ],
+        },
+    ]);
+
+    // This should terminate despite the cycle, thanks to -differ? guards
+    let result = solve_rule(
+        &db,
+        "reachable",
+        &[pe_const(Value::Long(1)), pe_var("?b")],
+        &rules,
+    );
+
+    // From 1: directly reach 2, from 2: directly reach 1
+    // The recursive case should terminate because of differ guards
+    let b_idx = result.attrs["?b"];
+    let reached: Vec<i64> = result.tuples.iter().filter_map(|t| match &t[b_idx] {
+        Value::Ref(n) => Some(*n),
+        Value::Long(n) => Some(*n),
+        _ => None,
+    }).collect();
+    assert!(!reached.is_empty(), "should find at least one reachable node");
+    // Should find both 1 and 2 as reachable from 1
+    assert!(reached.contains(&2), "should reach 2 from 1");
+}
+
+#[test]
+fn resolve_clause_with_rules_in_query() {
+    // Full query using resolve_query:
+    // [:find ?name
+    //  :in $ %
+    //  :where (lookup "uuid-10" ?e)
+    //         [?e :name ?name]]
+    let db = hierarchy_db();
+    let mut rules: Rules = HashMap::new();
+    rules.insert("lookup".into(), vec![RuleBranch {
+        head_args: vec!["?uuid".into(), "?e".into()],
+        body: vec![Clause::Pattern([
+            pe_var("?e"), pe_kw("uuid"), pe_var("?uuid"), pe_blank(),
+        ])],
+    }]);
+
+    let clauses = vec![
+        Clause::RuleCall {
+            name: "lookup".into(),
+            args: vec![pe_const(Value::Str("uuid-10".into())), pe_var("?e")],
+        },
+        Clause::Pattern([pe_var("?e"), pe_kw("name"), pe_var("?name"), pe_blank()]),
+    ];
+
+    let result = resolve_query(&db, &clauses, &rules);
+    let name_idx = result.attrs["?name"];
+    assert_eq!(result.tuples.len(), 1);
+    assert_eq!(result.tuples[0][name_idx], Value::Str("entity-10".into()));
+}
+
+#[test]
+fn resolve_clause_or() {
+    // Or clause: find entities that are either groups or variables
+    let db = hierarchy_db();
+    let rules: Rules = HashMap::new();
+
+    let clauses = vec![
+        Clause::Or(vec![
+            vec![Clause::Pattern([
+                pe_var("?e"), pe_kw("type"), pe_const(Value::Keyword(kw("group"))), pe_blank(),
+            ])],
+            vec![Clause::Pattern([
+                pe_var("?e"), pe_kw("type"), pe_const(Value::Keyword(kw("variable"))), pe_blank(),
+            ])],
+        ]),
+        Clause::Pattern([pe_var("?e"), pe_kw("name"), pe_var("?name"), pe_blank()]),
+    ];
+
+    let result = resolve_query(&db, &clauses, &rules);
+    assert_eq!(result.tuples.len(), 3); // entity-10 (group), entity-11, entity-12 (variables)
+}
+
+#[test]
+fn resolve_clause_not() {
+    // Not clause: find typed entities that are NOT groups
+    let db = hierarchy_db();
+    let rules: Rules = HashMap::new();
+
+    let clauses = vec![
+        Clause::Pattern([pe_var("?e"), pe_kw("type"), pe_var("?t"), pe_blank()]),
+        Clause::Not(vec![
+            Clause::Pattern([pe_var("?e"), pe_kw("type"), pe_const(Value::Keyword(kw("group"))), pe_blank()]),
+        ]),
+    ];
+
+    let result = resolve_query(&db, &clauses, &rules);
+    let e_idx = result.attrs["?e"];
+    let eids: Vec<i64> = result.tuples.iter().filter_map(|t| match &t[e_idx] {
+        Value::Long(n) => Some(*n),
+        _ => None,
+    }).collect();
+    // entity-11 and entity-12 are variables (not groups)
+    assert_eq!(eids.len(), 2);
+    assert!(eids.contains(&11));
+    assert!(eids.contains(&12));
+}
+
+#[test]
+fn resolve_clause_predicate_comparison() {
+    // Predicate: find entities with val > 40
+    let db = hierarchy_db();
+    let rules: Rules = HashMap::new();
+
+    let clauses = vec![
+        Clause::Pattern([pe_var("?e"), pe_kw("val"), pe_var("?v"), pe_blank()]),
+        Clause::Predicate {
+            name: ">".into(),
+            args: vec![pe_var("?v"), pe_const(Value::Long(40))],
+        },
+    ];
+
+    let result = resolve_query(&db, &clauses, &rules);
+    // entity 11 has val=42 which is > 40, entity 12 has val="not-a-number" (Str > Long comparison)
+    assert!(result.tuples.len() >= 1);
+    let e_idx = result.attrs["?e"];
+    assert!(result.tuples.iter().any(|t| t[e_idx] == Value::Long(11)));
 }

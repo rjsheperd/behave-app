@@ -216,6 +216,14 @@ impl WasmDataScript {
         &self.avet
     }
 
+    pub fn schema_ref(&self) -> &Schema {
+        &self.schema
+    }
+
+    pub fn rschema_ref(&self) -> &ReverseSchema {
+        &self.rschema
+    }
+
     fn advance_max_eid(&mut self, e: i64) {
         if e > self.max_eid {
             self.max_eid = e;
@@ -587,40 +595,11 @@ impl WasmDataScript {
         patterns: js_sys::Array,
         find_vars: js_sys::Array,
     ) -> js_sys::Array {
-        use crate::query::{PatternEl, resolve_patterns, collect_results};
+        use crate::query::{resolve_patterns, collect_results};
         use persistent_sorted_set::relation::Var;
 
         // Parse patterns from JS
-        let mut rust_patterns: Vec<[PatternEl; 4]> = Vec::with_capacity(patterns.length() as usize);
-        for i in 0..patterns.length() {
-            let pat = js_sys::Array::from(&patterns.get(i));
-            let mut els = [PatternEl::Blank, PatternEl::Blank, PatternEl::Blank, PatternEl::Blank];
-            for j in 0..4.min(pat.length()) {
-                let el = pat.get(j);
-                els[j as usize] = if el.is_null() || el.is_undefined() {
-                    PatternEl::Blank
-                } else if let Some(s) = el.as_string() {
-                    if s.starts_with('?') {
-                        PatternEl::Var(s)
-                    } else if s == "_" {
-                        PatternEl::Blank
-                    } else if s.starts_with(':') {
-                        // Keyword attr or value
-                        PatternEl::Const(Value::Keyword(attr_from_keyword_str(&s)))
-                    } else {
-                        PatternEl::Const(Value::Str(s))
-                    }
-                } else if let Some(n) = el.as_f64() {
-                    let n_i64 = n as i64;
-                    PatternEl::Const(if n.fract() == 0.0 { Value::Long(n_i64) } else { Value::Double(n) })
-                } else if let Some(b) = el.as_bool() {
-                    PatternEl::Const(Value::Bool(b))
-                } else {
-                    PatternEl::Blank
-                };
-            }
-            rust_patterns.push(els);
-        }
+        let rust_patterns = parse_patterns_js(&patterns);
 
         // Parse find vars
         let rust_find: Vec<Var> = (0..find_vars.length())
@@ -631,16 +610,244 @@ impl WasmDataScript {
         let result_rel = resolve_patterns(self, &rust_patterns);
         let result_tuples = collect_results(&result_rel, &rust_find);
 
-        // Convert to JS
-        let outer = js_sys::Array::new_with_length(result_tuples.len() as u32);
-        for (i, tuple) in result_tuples.iter().enumerate() {
-            let inner = js_sys::Array::new_with_length(tuple.len() as u32);
-            for (j, val) in tuple.iter().enumerate() {
-                inner.set(j as u32, value_to_js(val));
+        tuples_to_js(&result_tuples)
+    }
+
+    /// Resolve a full Datalog query with clauses (including rule calls) and rules.
+    ///
+    /// `clauses_js` is a JS Array of clause objects. Each clause is one of:
+    /// - `{type: "pattern", pattern: [e, a, v, tx]}` — pattern clause
+    /// - `{type: "rule", name: "ruleName", args: [...]}` — rule call
+    /// - `{type: "predicate", name: "predicateName", args: [...]}` — predicate filter
+    /// - `{type: "and", clauses: [...]}` — conjunction
+    /// - `{type: "or", branches: [[...], [...]]}` — disjunction (array of clause arrays)
+    /// - `{type: "not", clauses: [...]}` — negation
+    ///
+    /// `rules_js` is a JS Object mapping rule names to arrays of branch objects:
+    /// `{"ruleName": [{head: ["?a", "?b"], body: [...clauses...]}]}`
+    ///
+    /// `find_vars` is a JS Array of variable name strings.
+    ///
+    /// Returns a JS Array of result tuples.
+    #[wasm_bindgen(js_name = "queryClauses")]
+    pub fn query_clauses(
+        &self,
+        clauses_js: js_sys::Array,
+        rules_js: JsValue,
+        find_vars: js_sys::Array,
+    ) -> js_sys::Array {
+        use crate::query::resolve_clauses_with_rules;
+        use persistent_sorted_set::relation::Var;
+
+        let clauses = parse_clauses_js(&clauses_js);
+        let rules = parse_rules_js(&rules_js);
+        let rust_find: Vec<Var> = (0..find_vars.length())
+            .filter_map(|i| find_vars.get(i).as_string())
+            .collect();
+
+        let result_tuples = resolve_clauses_with_rules(self, &clauses, &rules, &rust_find);
+        tuples_to_js(&result_tuples)
+    }
+
+    /// Execute a Datalog query from an EDN string, with optional rules and inputs.
+    ///
+    /// `query_edn` is the query as an EDN string:
+    /// ```
+    /// "[:find ?name ?age :in $ % ?min :where [?e :name ?name] [?e :age ?age] [(>= ?age ?min)]]"
+    /// ```
+    ///
+    /// `rules_edn` is the rules as an EDN string (pass empty string or null for no rules):
+    /// ```
+    /// "[[(subgroup ?g ?s) [?g :groups ?s]] [(subgroup ?g ?s) [?g :groups ?x] (subgroup ?x ?s)]]"
+    /// ```
+    ///
+    /// `inputs` is a JS Array of `[name, value]` pairs for `:in` variables:
+    /// ```
+    /// [["?min", 21], ["?uuid", "abc-123"]]
+    /// ```
+    ///
+    /// Returns a JS value shaped according to the `:find` spec:
+    /// - `:find ?a ?b` (rel) → `[[v1, v2], [v3, v4], ...]`
+    /// - `:find ?a .` (scalar) → `v` or `null`
+    /// - `:find [?a ...]` (coll) → `[v1, v2, ...]`
+    /// - `:find [?a ?b]` (tuple) → `[v1, v2]` or `null`
+    #[wasm_bindgen(js_name = "queryEdn")]
+    pub fn query_edn(
+        &self,
+        query_edn: String,
+        rules_edn: JsValue,
+        inputs: JsValue,
+    ) -> JsValue {
+        use crate::query::resolve_clauses_with_rules;
+        use persistent_sorted_set::pull;
+        use persistent_sorted_set::pull_parser::parse_pull_pattern;
+        use persistent_sorted_set::query_parser::{
+            parse_query, parse_rules, bind_inputs, FindSpec, FindElement,
+        };
+        let mut parsed = parse_query(&query_edn);
+
+        // Parse rules
+        let rules = if let Some(s) = rules_edn.as_string() {
+            if s.is_empty() {
+                parsed.rules.clone()
+            } else {
+                parse_rules(&s)
             }
-            outer.set(i as u32, inner.into());
+        } else {
+            parsed.rules.clone()
+        };
+
+        // Bind input parameters
+        if !inputs.is_null() && !inputs.is_undefined() {
+            let inputs_arr = js_sys::Array::from(&inputs);
+            let mut bindings = Vec::new();
+            for i in 0..inputs_arr.length() {
+                let pair = js_sys::Array::from(&inputs_arr.get(i));
+                if pair.length() >= 2 {
+                    if let Some(name) = pair.get(0).as_string() {
+                        let val = parse_input_value(&pair.get(1));
+                        bindings.push((name, val));
+                    }
+                }
+            }
+            let binding_refs: Vec<(&str, persistent_sorted_set::datom::Value)> = bindings
+                .iter()
+                .map(|(k, v)| (k.as_str(), v.clone()))
+                .collect();
+            bind_inputs(&mut parsed, &binding_refs);
         }
-        outer
+
+        let find_vars = parsed.find.vars();
+        let result_tuples = resolve_clauses_with_rules(
+            self,
+            &parsed.where_clauses,
+            &rules,
+            &find_vars,
+        );
+
+        let has_pull = parsed.has_pull_in_find();
+
+        // Pre-parse pull patterns if needed
+        let pull_patterns: Vec<Option<persistent_sorted_set::pull_parser::PullPattern>> =
+            if has_pull {
+                parsed.find_elements.iter().map(|fe| {
+                    if let FindElement::Pull { pattern_edn, .. } = fe {
+                        Some(parse_pull_pattern(&self.schema, &self.rschema, pattern_edn))
+                    } else {
+                        None
+                    }
+                }).collect()
+            } else {
+                vec![]
+            };
+
+        // Convert a single tuple element to JS, applying pull if needed
+        let element_to_js = |col: usize, val: &Value| -> JsValue {
+            if has_pull {
+                if let Some(Some(pattern)) = pull_patterns.get(col) {
+                    // Value is an entity ID — pull it
+                    let eid = match val {
+                        Value::Long(n) | Value::Ref(n) => *n,
+                        _ => return value_to_js(val),
+                    };
+                    return match pull::pull(self, pattern, eid) {
+                        Some(pr) => pull_result_to_js(&pr),
+                        None => JsValue::NULL,
+                    };
+                }
+            }
+            value_to_js(val)
+        };
+
+        // Shape output according to find spec
+        match &parsed.find {
+            FindSpec::Rel(_) => {
+                let outer = js_sys::Array::new_with_length(result_tuples.len() as u32);
+                for (i, tuple) in result_tuples.iter().enumerate() {
+                    let inner = js_sys::Array::new_with_length(tuple.len() as u32);
+                    for (j, val) in tuple.iter().enumerate() {
+                        inner.set(j as u32, element_to_js(j, val));
+                    }
+                    outer.set(i as u32, inner.into());
+                }
+                outer.into()
+            }
+            FindSpec::Scalar(_) => {
+                if let Some(tuple) = result_tuples.first() {
+                    if let Some(val) = tuple.first() {
+                        element_to_js(0, val)
+                    } else {
+                        JsValue::NULL
+                    }
+                } else {
+                    JsValue::NULL
+                }
+            }
+            FindSpec::Coll(_) => {
+                let arr = js_sys::Array::new_with_length(result_tuples.len() as u32);
+                for (i, tuple) in result_tuples.iter().enumerate() {
+                    if let Some(val) = tuple.first() {
+                        arr.set(i as u32, element_to_js(0, val));
+                    }
+                }
+                arr.into()
+            }
+            FindSpec::Tuple(_) => {
+                if let Some(tuple) = result_tuples.first() {
+                    let arr = js_sys::Array::new_with_length(tuple.len() as u32);
+                    for (j, val) in tuple.iter().enumerate() {
+                        arr.set(j as u32, element_to_js(j, val));
+                    }
+                    arr.into()
+                } else {
+                    JsValue::NULL
+                }
+            }
+        }
+    }
+
+    /// Pull an entity by pattern. Returns a JS object (nested map) or null.
+    ///
+    /// `pattern_edn` is the pull pattern as an EDN string, e.g. `"[:name :age]"`.
+    /// `eid` is the entity ID (number) or a lookup ref `[":attr", value]`.
+    #[wasm_bindgen(js_name = "pull")]
+    pub fn pull_js(&self, pattern_edn: String, eid: JsValue) -> JsValue {
+        use persistent_sorted_set::pull;
+        use persistent_sorted_set::pull_parser::parse_pull_pattern_edn;
+
+        let pattern = parse_pull_pattern_edn(&self.schema, &self.rschema, &pattern_edn);
+
+        let resolved_eid = resolve_eid_from_js(self, &eid);
+        match resolved_eid {
+            Some(eid) => match pull::pull(self, &pattern, eid) {
+                Some(pr) => pull_result_to_js(&pr),
+                None => JsValue::NULL,
+            },
+            None => JsValue::NULL,
+        }
+    }
+
+    /// Pull multiple entities by pattern. Returns a JS Array of objects.
+    #[wasm_bindgen(js_name = "pullMany")]
+    pub fn pull_many_js(&self, pattern_edn: String, eids: js_sys::Array) -> js_sys::Array {
+        use persistent_sorted_set::pull;
+        use persistent_sorted_set::pull_parser::parse_pull_pattern_edn;
+
+        let pattern = parse_pull_pattern_edn(&self.schema, &self.rschema, &pattern_edn);
+        let result = js_sys::Array::new_with_length(eids.length());
+        for i in 0..eids.length() {
+            let eid_js = eids.get(i);
+            let resolved = resolve_eid_from_js(self, &eid_js);
+            let val = match resolved {
+                Some(eid) => match pull::pull(self, &pattern, eid) {
+                    Some(pr) => pull_result_to_js(&pr),
+                    None => JsValue::NULL,
+                },
+                None => JsValue::NULL,
+            };
+            result.set(i, val);
+        }
+        result
     }
 
     /// Store the database to unified SQLite storage.
@@ -924,4 +1131,264 @@ fn make_datom_from_components(e: &JsValue, a: &JsValue, v: &JsValue, tx: &JsValu
         },
         tx.as_f64().unwrap_or(0.0) as i64,
     )
+}
+
+// ---------------------------------------------------------------------------
+// JS → Rust clause/rule parsing
+// ---------------------------------------------------------------------------
+
+use persistent_sorted_set::relation::{Clause, PatternEl, RuleBranch, Rules, Tuple, Var};
+
+/// Parse a single JS value into a PatternEl.
+fn pattern_el_from_js(el: &JsValue) -> PatternEl {
+    if el.is_null() || el.is_undefined() {
+        PatternEl::Blank
+    } else if let Some(s) = el.as_string() {
+        if s.starts_with('?') {
+            PatternEl::Var(s)
+        } else if s == "_" {
+            PatternEl::Blank
+        } else if s.starts_with(':') {
+            PatternEl::Const(Value::Keyword(attr_from_keyword_str(&s)))
+        } else {
+            PatternEl::Const(Value::Str(s))
+        }
+    } else if let Some(n) = el.as_f64() {
+        let n_i64 = n as i64;
+        PatternEl::Const(if n.fract() == 0.0 { Value::Long(n_i64) } else { Value::Double(n) })
+    } else if let Some(b) = el.as_bool() {
+        PatternEl::Const(Value::Bool(b))
+    } else {
+        PatternEl::Blank
+    }
+}
+
+/// Parse a JS Array of pattern arrays into Rust patterns.
+fn parse_patterns_js(patterns: &js_sys::Array) -> Vec<[PatternEl; 4]> {
+    let mut result = Vec::with_capacity(patterns.length() as usize);
+    for i in 0..patterns.length() {
+        let pat = js_sys::Array::from(&patterns.get(i));
+        let mut els = [PatternEl::Blank, PatternEl::Blank, PatternEl::Blank, PatternEl::Blank];
+        for j in 0..4.min(pat.length()) {
+            els[j as usize] = pattern_el_from_js(&pat.get(j));
+        }
+        result.push(els);
+    }
+    result
+}
+
+/// Parse a JS Array of PatternEl-like values into a Vec<PatternEl>.
+fn parse_args_js(arr: &js_sys::Array) -> Vec<PatternEl> {
+    (0..arr.length())
+        .map(|i| pattern_el_from_js(&arr.get(i)))
+        .collect()
+}
+
+/// Parse a single JS clause object into a Rust Clause.
+///
+/// Expected JS format:
+/// - `{type: "pattern", pattern: [e, a, v, tx]}`
+/// - `{type: "rule", name: "ruleName", args: [...]}`
+/// - `{type: "predicate", name: "predName", args: [...]}`
+/// - `{type: "and", clauses: [...]}`
+/// - `{type: "or", branches: [[...], [...]]}`
+/// - `{type: "not", clauses: [...]}`
+fn clause_from_js(val: &JsValue) -> Option<Clause> {
+    let type_str = js_sys::Reflect::get(val, &JsValue::from_str("type"))
+        .ok()?
+        .as_string()?;
+
+    match type_str.as_str() {
+        "pattern" => {
+            let pat_js = js_sys::Reflect::get(val, &JsValue::from_str("pattern")).ok()?;
+            let pat = js_sys::Array::from(&pat_js);
+            let mut els = [PatternEl::Blank, PatternEl::Blank, PatternEl::Blank, PatternEl::Blank];
+            for j in 0..4.min(pat.length()) {
+                els[j as usize] = pattern_el_from_js(&pat.get(j));
+            }
+            Some(Clause::Pattern(els))
+        }
+        "rule" => {
+            let name = js_sys::Reflect::get(val, &JsValue::from_str("name"))
+                .ok()?
+                .as_string()?;
+            let args_js = js_sys::Reflect::get(val, &JsValue::from_str("args")).ok()?;
+            let args = parse_args_js(&js_sys::Array::from(&args_js));
+            Some(Clause::RuleCall { name, args })
+        }
+        "predicate" => {
+            let name = js_sys::Reflect::get(val, &JsValue::from_str("name"))
+                .ok()?
+                .as_string()?;
+            let args_js = js_sys::Reflect::get(val, &JsValue::from_str("args")).ok()?;
+            let args = parse_args_js(&js_sys::Array::from(&args_js));
+            Some(Clause::Predicate { name, args })
+        }
+        "and" => {
+            let clauses_js = js_sys::Reflect::get(val, &JsValue::from_str("clauses")).ok()?;
+            let clauses = parse_clauses_js(&js_sys::Array::from(&clauses_js));
+            Some(Clause::And(clauses))
+        }
+        "or" => {
+            let branches_js = js_sys::Reflect::get(val, &JsValue::from_str("branches")).ok()?;
+            let branches_arr = js_sys::Array::from(&branches_js);
+            let mut branches = Vec::with_capacity(branches_arr.length() as usize);
+            for i in 0..branches_arr.length() {
+                let branch_clauses = parse_clauses_js(&js_sys::Array::from(&branches_arr.get(i)));
+                branches.push(branch_clauses);
+            }
+            Some(Clause::Or(branches))
+        }
+        "not" => {
+            let clauses_js = js_sys::Reflect::get(val, &JsValue::from_str("clauses")).ok()?;
+            let clauses = parse_clauses_js(&js_sys::Array::from(&clauses_js));
+            Some(Clause::Not(clauses))
+        }
+        _ => None,
+    }
+}
+
+/// Parse a JS Array of clause objects into Vec<Clause>.
+fn parse_clauses_js(arr: &js_sys::Array) -> Vec<Clause> {
+    (0..arr.length())
+        .filter_map(|i| clause_from_js(&arr.get(i)))
+        .collect()
+}
+
+/// Parse a JS rules object into Rust Rules.
+///
+/// Expected JS format:
+/// ```js
+/// {
+///   "ruleName": [
+///     { head: ["?a", "?b"], body: [{type: "pattern", ...}] },
+///     { head: ["?a", "?b"], body: [{type: "pattern", ...}] }
+///   ]
+/// }
+/// ```
+fn parse_rules_js(val: &JsValue) -> Rules {
+    let mut rules = Rules::new();
+    if val.is_null() || val.is_undefined() {
+        return rules;
+    }
+
+    let entries = js_sys::Object::entries(&js_sys::Object::from(val.clone()));
+    for i in 0..entries.length() {
+        let entry = js_sys::Array::from(&entries.get(i));
+        let name = match entry.get(0).as_string() {
+            Some(s) => s,
+            None => continue,
+        };
+        let branches_js = js_sys::Array::from(&entry.get(1));
+        let mut branches = Vec::with_capacity(branches_js.length() as usize);
+
+        for j in 0..branches_js.length() {
+            let branch_js = branches_js.get(j);
+
+            let head_js = match js_sys::Reflect::get(&branch_js, &JsValue::from_str("head")).ok() {
+                Some(h) => js_sys::Array::from(&h),
+                None => continue,
+            };
+            let head_args: Vec<Var> = (0..head_js.length())
+                .filter_map(|k| head_js.get(k).as_string())
+                .collect();
+
+            let body_js = match js_sys::Reflect::get(&branch_js, &JsValue::from_str("body")).ok() {
+                Some(b) => js_sys::Array::from(&b),
+                None => continue,
+            };
+            let body = parse_clauses_js(&body_js);
+
+            branches.push(RuleBranch { head_args, body });
+        }
+
+        if !branches.is_empty() {
+            rules.insert(name, branches);
+        }
+    }
+    rules
+}
+
+/// Parse a JS value into a datom Value for input binding.
+fn parse_input_value(val: &JsValue) -> Value {
+    if val.is_null() || val.is_undefined() {
+        Value::Nil
+    } else if let Some(s) = val.as_string() {
+        if s.starts_with(':') {
+            Value::Keyword(attr_from_keyword_str(&s))
+        } else {
+            Value::Str(s)
+        }
+    } else if let Some(n) = val.as_f64() {
+        if n.fract() == 0.0 {
+            Value::Long(n as i64)
+        } else {
+            Value::Double(n)
+        }
+    } else if let Some(b) = val.as_bool() {
+        Value::Bool(b)
+    } else {
+        Value::Nil
+    }
+}
+
+/// Convert result tuples to a JS Array of Arrays.
+fn tuples_to_js(tuples: &[Tuple]) -> js_sys::Array {
+    let outer = js_sys::Array::new_with_length(tuples.len() as u32);
+    for (i, tuple) in tuples.iter().enumerate() {
+        let inner = js_sys::Array::new_with_length(tuple.len() as u32);
+        for (j, val) in tuple.iter().enumerate() {
+            inner.set(j as u32, value_to_js(val));
+        }
+        outer.set(i as u32, inner.into());
+    }
+    outer
+}
+
+/// Convert a PullResult to a JS value (nested objects/arrays/scalars).
+fn pull_result_to_js(result: &persistent_sorted_set::pull::PullResult) -> JsValue {
+    use persistent_sorted_set::legacy_edn::attr_to_edn;
+    use persistent_sorted_set::pull::PullResult;
+
+    match result {
+        PullResult::Scalar(v) => value_to_js(v),
+        PullResult::Vec(items) => {
+            let arr = js_sys::Array::new_with_length(items.len() as u32);
+            for (i, item) in items.iter().enumerate() {
+                arr.set(i as u32, pull_result_to_js(item));
+            }
+            arr.into()
+        }
+        PullResult::Map(entries) => {
+            let obj = js_sys::Object::new();
+            for (attr, val) in entries {
+                let key = JsValue::from_str(&attr_to_edn(attr));
+                let _ = js_sys::Reflect::set(&obj, &key, &pull_result_to_js(val));
+            }
+            obj.into()
+        }
+    }
+}
+
+/// Resolve a JS entity ID to a Rust i64.
+/// Handles numbers directly and lookup refs like `[":bp/uuid", "abc"]`.
+fn resolve_eid_from_js(db: &WasmDataScript, eid: &JsValue) -> Option<i64> {
+    use persistent_sorted_set::pull::PullSource;
+
+    if let Some(n) = eid.as_f64() {
+        return Some(n as i64);
+    }
+    // Check for lookup ref: [":attr", value]
+    if js_sys::Array::is_array(eid) {
+        let arr = js_sys::Array::from(eid);
+        if arr.length() == 2 {
+            if let Some(attr_str) = arr.get(0).as_string() {
+                if let Some(attr) = attr_from_js(&JsValue::from_str(&attr_str)) {
+                    let val = parse_input_value(&arr.get(1));
+                    return db.resolve_lookup_ref(&attr, &val);
+                }
+            }
+        }
+    }
+    None
 }

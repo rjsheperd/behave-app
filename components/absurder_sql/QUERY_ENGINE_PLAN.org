@@ -1,0 +1,354 @@
+* Datalog Query Engine in Rust
+
+** Overview
+
+The Rust query engine resolves Datalog queries entirely in Rust, eliminating
+per-clause WASM boundary crossings. A query enters as a single EDN string (or
+structured JS objects) and exits as result tuples — all pattern lookups, joins,
+rule expansion, and predicate filtering happen natively.
+
+** Architecture
+
+#+begin_src
+  CLJS                         WASM boundary              Rust
+  ─────                        ──────────────             ────
+  (d/q query db rules args)
+          │
+          ▼
+  queryEdn(edn, rules, inputs)  ──────────►  parse_query()
+                                              parse_rules()
+                                              bind_inputs()
+                                              resolve_query()
+                                                ├─ resolve_clause (Pattern)
+                                                │    └─ PatternResolver::resolve_pattern
+                                                │         └─ search_internal → PSS indexes
+                                                ├─ resolve_clause (RuleCall)
+                                                │    └─ solve_rule → alpha_rename → recurse
+                                                ├─ resolve_clause (Predicate)
+                                                │    └─ apply_predicate_filter
+                                                ├─ resolve_clause (Or)
+                                                │    └─ branch + sum_rel
+                                                ├─ resolve_clause (Not)
+                                                │    └─ resolve + subtract_rel
+                                                └─ resolve_clause (And)
+                                                     └─ sequential resolve
+                                              project(find_vars)
+                                 ◄──────────  tuples_to_js()
+          │
+          ▼
+  result tuples (JS arrays)
+#+end_src
+
+** Implementation status
+
+*** DONE — Relation algebra (=relation.rs=)
+
+=Relation=, =hash_join=, =sum_rel=, =prod_rel=, =subtract_rel=, =collapse_rels=,
+=project=. Fully tested with 30+ unit tests.
+
+*** DONE — Rule engine (=relation.rs=)
+
+Types: =PatternEl=, =Clause=, =RuleBranch=, =Rules=, =PatternResolver= trait.
+
+Functions: =solve_rule= (depth-limited recursive), =resolve_clause= (full
+dispatcher), =resolve_query= (top-level entry).
+
+Supports: recursive rules, multi-branch OR rules, chained rule calls,
+predicate-guarded rules. 13 rule-specific tests in =query_tests.rs=.
+
+*** DONE — EDN query parser (=query_parser.rs=)
+
+=parse_query=, =parse_rules=, =bind_inputs=.
+
+Parses the standard DataScript query format directly from EDN strings:
+
+#+begin_src clojure
+[:find ?name .
+ :in $ % ?min-age
+ :where
+ [?e :name ?name]
+ [?e :age ?age]
+ [(>= ?age ?min-age)]
+ (some-rule ?e ?extra)]
+#+end_src
+
+Supports all =:find= variants (rel, scalar, coll, tuple), all clause types,
+namespaced keywords, and input binding. 19 unit tests + 54 integration tests
+against =DataScriptDB=.
+
+*** DONE — Native =PatternResolver= (=db.rs=)
+
+=DataScriptDB= implements =PatternResolver=. Handles =Ref(n)= → =Long(n)=
+normalization in output and =Long(n)= → =Ref(n)= coercion in search for
+ref-typed attributes.
+
+*** DONE — WASM =PatternResolver= (=query.rs=)
+
+=WasmDataScript= implements =PatternResolver=, using =search_internal= against
+PSS indexes entirely in Rust.
+
+*** DONE — WASM exports (=wasm_datascript.rs=)
+
+Three query entry points:
+
+| Export            | Input format                    | Use case                       |
+|-------------------+---------------------------------+--------------------------------|
+| =queryPatterns=   | JS arrays of =[e,a,v,tx]= patterns | Simple pattern-only queries    |
+| =queryClauses=    | JS clause objects + rules object  | Structured clause+rule queries |
+| =queryEdn=        | EDN strings + JS input pairs      | Full Datalog from EDN          |
+
+*** TODO — CLJS integration
+
+1. Update =core.cljc= =q= function to detect Rust-backed DB and route to =queryEdn=
+2. Keep CLJS fallback for non-Rust DBs (FilteredDB, plain collections)
+3. Aggregation and pull remain in CLJS, operating on Rust's result tuples
+
+** File inventory
+
+| File                                                | Purpose                                         |
+|-----------------------------------------------------+-------------------------------------------------|
+| =rust/persistent-sorted-set/src/relation.rs=        | Relation algebra + clause types + rule engine    |
+| =rust/persistent-sorted-set/src/query_parser.rs=    | EDN Datalog query/rule parser + input binding    |
+| =rust/persistent-sorted-set/src/db.rs=              | =PatternResolver= for native =DataScriptDB=     |
+| =rust/persistent-sorted-set/tests/query_tests.rs=   | 38 tests: patterns, joins, rules, predicates     |
+| =rust/persistent-sorted-set/tests/parser_tests.rs=  | 54 tests: parser + end-to-end resolution         |
+| =rust/datascript-rs/src/query.rs=                   | =PatternResolver= for =WasmDataScript= + helpers |
+| =rust/datascript-rs/src/wasm_datascript.rs=         | WASM exports + JS↔Rust parsing                   |
+
+** Test count
+
+| Test file                    | Tests | What's covered                                    |
+|------------------------------+-------+---------------------------------------------------|
+| =relation.rs= (unit)        |    30 | hash_join, sum_rel, prod_rel, subtract, collapse   |
+| =query_tests.rs=             |    38 | Pattern queries, joins, NOT, OR, predicates, rules |
+| =parser_tests.rs=            |    54 | Find specs, clauses, values, rules, input binding, |
+|                              |       | end-to-end resolution against BehavePlus-like DB   |
+| =query_parser.rs= (unit)    |    19 | Parser internals, roundtrip                        |
+| =db.rs= (unit)              |    15 | with_datom, search dispatch, datoms/seek/rseek     |
+| Other PSS tests              |   270 | B+ tree, storage, serialization                    |
+|------------------------------+-------+---------------------------------------------------|
+| *Total*                      |   426 |                                                    |
+
+** WASM API reference
+
+*** =queryEdn(queryEdn: string, rulesEdn: any, inputs: any): any=
+
+The primary entry point. Accepts standard DataScript EDN, returns
+=:find=-shaped results.
+
+#+begin_src javascript
+// Relation (default) — returns array of tuples
+db.queryEdn(
+  '[:find ?name ?age :where [?e :name ?name] [?e :age ?age]]',
+  null, null
+)
+// → [["Alice", 30], ["Bob", 25]]
+
+// Scalar — returns single value or null
+db.queryEdn(
+  '[:find ?name . :where [1 :name ?name]]',
+  null, null
+)
+// → "Alice"
+
+// Collection — returns flat array
+db.queryEdn(
+  '[:find [?name ...] :where [_ :name ?name]]',
+  null, null
+)
+// → ["Alice", "Bob", "Carol"]
+
+// Tuple — returns single array or null
+db.queryEdn(
+  '[:find [?name ?age] :where [1 :name ?name] [1 :age ?age]]',
+  null, null
+)
+// → ["Alice", 30]
+#+end_src
+
+*With rules and inputs:*
+
+#+begin_src javascript
+db.queryEdn(
+  '[:find ?name :in $ % ?root :where (subgroup ?root ?s) [?s :name ?name]]',
+  '[[(subgroup ?g ?s) [?g :group/children ?s]]'
+  + ' [(subgroup ?g ?s) [?g :group/children ?x] (subgroup ?x ?s)]]',
+  [["?root", 1]]
+)
+// → [["child_a"], ["child_b"], ["grandchild"]]
+#+end_src
+
+*** =queryClauses(clauses: Array, rules: Object, findVars: Array): Array=
+
+Structured JS object input. Useful when the caller already has parsed clause data.
+
+#+begin_src javascript
+db.queryClauses(
+  [
+    {type: "rule", name: "subgroup", args: [1, "?s"]},
+    {type: "pattern", pattern: ["?s", ":name", "?name", null]},
+  ],
+  {
+    "subgroup": [
+      {head: ["?g", "?s"], body: [
+        {type: "pattern", pattern: ["?g", ":group/children", "?s", null]}
+      ]},
+      {head: ["?g", "?s"], body: [
+        {type: "pattern", pattern: ["?g", ":group/children", "?x", null]},
+        {type: "rule", name: "subgroup", args: ["?x", "?s"]}
+      ]}
+    ]
+  },
+  ["?name"]
+)
+#+end_src
+
+Clause types:
+
+| Type          | Fields                                | Example                                       |
+|---------------+---------------------------------------+-----------------------------------------------|
+| =pattern=     | =pattern: [e, a, v, tx]=              | ={type: "pattern", pattern: ["?e", ":name", "?n", null]}= |
+| =rule=        | =name: string, args: [..]=            | ={type: "rule", name: "subgroup", args: ["?g", "?s"]}= |
+| =predicate=   | =name: string, args: [..]=            | ={type: "predicate", name: ">", args: ["?age", 21]}= |
+| =and=         | =clauses: [..]=                       | ={type: "and", clauses: [...]}=               |
+| =or=          | =branches: [[..], [..]]=              | ={type: "or", branches: [[...], [...]]}=      |
+| =not=         | =clauses: [..]=                       | ={type: "not", clauses: [...]}=               |
+
+Pattern element encoding:
+
+| JS value                 | Rust PatternEl               |
+|--------------------------+------------------------------|
+| ="?name"=                | =Var("?name")=               |
+| ="_"= or =null=          | =Blank=                      |
+| =":attr/name"=           | =Const(Keyword(attr/name))=  |
+| =42=                     | =Const(Long(42))=            |
+| =3.14=                   | =Const(Double(3.14))=        |
+| =true= / =false=         | =Const(Bool(..))=            |
+| ="hello"=                | =Const(Str("hello"))=        |
+
+*** =queryPatterns(patterns: Array, findVars: Array): Array=
+
+Simple pattern-only queries (no rules, predicates, or compound clauses).
+
+#+begin_src javascript
+db.queryPatterns(
+  [["?e", ":name", "?name", null],
+   ["?e", ":age", "?age", null]],
+  ["?name", "?age"]
+)
+// → [["Alice", 30], ["Bob", 25]]
+#+end_src
+
+** Rust API reference
+
+*** Query parser (=query_parser.rs=)
+
+#+begin_src rust
+use persistent_sorted_set::query_parser::*;
+
+// Parse query
+let q: ParsedQuery = parse_query("[:find ?name . :in $ % ?id :where ...]");
+// q.find   → FindSpec::Scalar("?name")
+// q.in_vars → ["?id"]
+// q.where_clauses → Vec<Clause>
+
+// Parse rules
+let rules: Rules = parse_rules("[[(lookup ?uuid ?e) [?e :bp/uuid ?uuid]] ...]");
+
+// Bind inputs
+bind_inputs(&mut q, &[("?id", Value::Long(42))]);
+
+// Resolve
+let result = resolve_query(&db, &q.where_clauses, &rules);
+let tuples = project(&result, &q.find.vars()).tuples;
+#+end_src
+
+*** =PatternResolver= trait (=relation.rs=)
+
+Implement this to use the rule engine with a custom data source:
+
+#+begin_src rust
+pub trait PatternResolver {
+    fn resolve_pattern(&self, pattern: &[PatternEl; 4]) -> Relation;
+}
+#+end_src
+
+Two implementations are provided:
+- =DataScriptDB= (native, for =cargo test=)
+- =WasmDataScript= (WASM, for browser)
+
+*** Built-in predicates
+
+| Predicate   | Behavior                                          |
+|-------------+---------------------------------------------------|
+| =number?=   | =true= for =Long=, =Double=, =Ref= values        |
+| =>= / =<=   | Numeric comparison via =value_cmp=                |
+| =>== / =<== | Numeric comparison (inclusive)                     |
+| === / =!==  | Structural equality via =PartialEq= on =Value=    |
+| =-differ?=  | At least one arg pair differs (for cycle detection)|
+
+Unknown predicates pass through without filtering.
+
+** Design decisions
+
+*** Ref ↔ Long normalization
+
+DataScript treats entity references and entity IDs as interchangeable numbers.
+Two normalizations ensure joins work across ref-typed attribute boundaries:
+
+1. *Output normalization*: =PatternResolver= converts =Ref(n)= → =Long(n)= in
+   the value column, so ref values join with entity IDs from the =e= column.
+
+2. *Search coercion*: When a pattern has =Const(Long(n))= in the value position
+   and the attribute is ref-typed, the resolver searches with =Ref(n)= instead.
+   This handles the case where a variable was bound as =Long(n)= from a previous
+   join's entity column and is now used to match a ref value.
+
+Together these let multi-hop ref chains like =app → module → submodule → group=
+resolve correctly.
+
+*** Depth-limited recursion
+
+Rule expansion uses natural recursion through =resolve_clause= → =solve_rule= →
+=resolve_clause= with a depth counter (max 64). This is simpler than the CLJS
+explicit stack + =-differ?= guard approach, and terminates because:
+
+1. Each level resolves clauses in context — variables get progressively bound
+2. On finite data, patterns eventually return empty relations (natural base case)
+3. The depth limit catches pathological cases (cyclic data)
+
+*** Alpha-renaming
+
+When a rule branch is expanded, internal variables (those not in the head args)
+get suffixed with =__auto__N= to prevent capture between branches and recursive
+invocations. Head args are substituted directly with call args, preserving
+bindings from the caller's context.
+
+*** EDN comment limitation
+
+The =edn 0.3= crate does not support =;= comments in EDN strings. Strip
+comments before passing to =parse_query= / =parse_rules= if needed.
+
+** Remaining work
+
+*** DONE — CLJS integration
+
+Completed via =src/absurder_sql/datascript/impl_rust.cljs=. Routes =d/q= through
+the Rust engine for Rust-backed databases, with CLJS fallback for aggregates.
+
+*** Additional predicates → Phase 4.3
+
+Production rules use predicates beyond the current set (8 in Rust vs ~40+ in CLJS).
+See =DATASCRIPT_RUST.org= Phase 4.3 for the full plan to add extended predicates.
+
+*** fn-expr support → Phase 4.2
+
+Function expressions =[(str ?first " " ?last) ?result]= are not yet supported.
+Parser recognizes them but skips (line 262 of =query_parser.rs=).
+See =DATASCRIPT_RUST.org= Phase 4.2 for the full plan including ~60 built-in functions.
+
+*** DONE — Pull API
+
+Pull-in-find (e.g. =[:find (pull ?e [*])]=) is implemented in =wasm_datascript.rs=.
+Remaining pull gaps (attribute options, recursion depth) are tracked in
+=DATASCRIPT_RUST.org= Phase 4.5 and 4.6.
