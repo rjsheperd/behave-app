@@ -112,8 +112,10 @@ Three query entry points:
 | =rust/persistent-sorted-set/src/db.rs=              | =PatternResolver= for native =DataScriptDB=     |
 | =rust/persistent-sorted-set/tests/query_tests.rs=   | 38 tests: patterns, joins, rules, predicates     |
 | =rust/persistent-sorted-set/tests/parser_tests.rs=  | 54 tests: parser + end-to-end resolution         |
+| =rust/persistent-sorted-set/src/transact.rs=        | Transaction processing + =TransactableDB= trait  |
+| =rust/persistent-sorted-set/tests/transact_tests.rs= | 31 tests: transact operations + EDN integration |
 | =rust/datascript-rs/src/query.rs=                   | =PatternResolver= for =WasmDataScript= + helpers |
-| =rust/datascript-rs/src/wasm_datascript.rs=         | WASM exports + JS↔Rust parsing                   |
+| =rust/datascript-rs/src/wasm_datascript.rs=         | WASM exports + JS↔Rust parsing + transact        |
 
 ** Test count
 
@@ -125,9 +127,11 @@ Three query entry points:
 |                              |       | end-to-end resolution against BehavePlus-like DB   |
 | =query_parser.rs= (unit)    |    19 | Parser internals, roundtrip                        |
 | =db.rs= (unit)              |    15 | with_datom, search dispatch, datoms/seek/rseek     |
+| =transact.rs= (unit)        |     7 | EDN parser internals                               |
+| =transact_tests.rs=          |    31 | Transact ops, tempids, upsert, retract, EDN        |
 | Other PSS tests              |   270 | B+ tree, storage, serialization                    |
 |------------------------------+-------+---------------------------------------------------|
-| *Total*                      |   426 |                                                    |
+| *Total*                      |   464 |                                                    |
 
 ** WASM API reference
 
@@ -238,6 +242,31 @@ db.queryPatterns(
 )
 // → [["Alice", 30], ["Bob", 25]]
 #+end_src
+
+*** =transact(txDataEdn: string): object=
+
+Transact tx-data against the database. Mutates the DB in place and returns a
+report with =txData=, =tempids=, and =currentTx=.
+
+#+begin_src javascript
+// Basic add
+db.transact('[[:db/add 1 :name "Alice"]]')
+// → { txData: [{e: 1, a: ":name", v: "Alice", tx: 536870913}],
+//     tempids: {}, currentTx: 536870913 }
+
+// Map entity with tempid
+db.transact('[{:db/id -1 :name "Bob" :age 25}]')
+// → { txData: [...], tempids: {"-1": 2}, currentTx: 536870914 }
+
+// Retract entity
+db.transact('[[:db/retractEntity 1]]')
+// → { txData: [...retraction datoms...], tempids: {}, currentTx: 536870915 }
+#+end_src
+
+Supported operations: =:db/add=, =:db/retract= (with/without value),
+=:db.fn/retractAttribute=, =:db.fn/retractEntity=, =:db/retractEntity=, map
+entities, tempids, lookup refs, =:db/current-tx=, upsert, nested maps, reverse
+refs. Returns ={error: "..."}= on parse or constraint errors.
 
 ** Rust API reference
 
@@ -352,3 +381,11 @@ See =DATASCRIPT_RUST.org= Phase 4.2 for the full plan including ~60 built-in fun
 Pull-in-find (e.g. =[:find (pull ?e [*])]=) is implemented in =wasm_datascript.rs=.
 Remaining pull gaps (attribute options, recursion depth) are tracked in
 =DATASCRIPT_RUST.org= Phase 4.5 and 4.6.
+
+*** DONE — Transact in Rust (Phase 4.8)
+
+Implemented in =transact.rs= with =TransactableDB= trait. Supports =:db/add=,
+=:db/retract=, =:db.fn/retractEntity=, =:db.fn/retractAttribute=, map entities,
+tempids, upsert, lookup refs. WASM export: =.transact(ednString)=. CLJS bridge:
+=transact-rust!= in =impl_rust.cljs=. 31 native tests. See =DATASCRIPT_RUST.org=
+Phase 4.8 for full details.

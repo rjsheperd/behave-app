@@ -345,19 +345,73 @@ production impact.
 - =WasmEntity::get(attr) -> JsValue=, =WasmEntity::touch() -> JsValue= (JS object)
 - *Test:* Entity lookup; touch; reverse refs; component entities
 
-** 4.8 Transact in Rust [HIGH]
+** DONE 4.8 Transact in Rust [HIGH]
 
-- *New file:* =rust/persistent-sorted-set/src/transact.rs=
-- CLJS handles all mutations: =d/transact!=, =d/with=, =d/db-with=
-- Implement in Rust:
-  - Temp-id resolution (negative IDs → allocated positive IDs)
-  - =:db/add=, =:db/retract= datom operations
-  - =:db.fn/retractEntity=, =:db.fn/retractAttribute= entity operations
-  - Map transaction forms (expand to =:db/add= assertions)
-  - Schema validation (cardinality, uniqueness, value types)
-- Expose via WASM: =WasmDB::transact(tx_data: JsValue) -> WasmDB=
-- Returns new DB + tx-report (tempids map, tx-data datoms)
-- *Test:* Basic add/retract; temp-ids; map forms; schema violations; entity retraction
+*** Architecture
+
+=TransactableDB= trait abstracts over =DataScriptDB= (native test) and
+=WasmDataScript= (WASM production). Core transact logic lives in
+=persistent-sorted-set/src/transact.rs= and is testable via =cargo test=
+without WASM.
+
+*** Transaction data types
+
+- =TxEntity= — =Add=, =Retract=, =RetractAttribute=, =RetractEntity=, =MapEntity=
+- =EntityRef= — =Eid(i64)=, =TempId(Neg|Str)=, =LookupRef(attr, val)=, =CurrentTx=
+- =TxValue= — =Val(Value)=, =TempId=, =LookupRef=, =CurrentTx=, =Nested(Box<TxEntity>)=
+- =TxReport= — =tx_data: Vec<Datom>=, =tempids: HashMap<TempId, i64>=, =current_tx: i64=
+
+*** Implemented operations
+
+- =:db/add= with cardinality enforcement (one: retract-old + add-new; many: skip duplicates)
+- =:db/retract= with value (exact match, no-op if missing)
+- =:db.fn/retractAttribute= / =:db/retract= without value (retract all =[e a]= datoms)
+- =:db.fn/retractEntity= / =:db/retractEntity= (forward datoms + incoming refs + component cascade)
+- Map entity expansion (mirrors CLJS =explode=) with reverse refs (=_parent=)
+- Nested map entities (auto-allocated ref)
+- Tempid resolution (negative numbers, strings) with consistent allocation
+- Upsert via =:db.unique/identity= attributes
+- Unique value constraint violation detection
+- Lookup ref resolution in entity and value position
+- =:db/current-tx= in entity and value position
+- EDN tx-data parser using the =edn= crate
+
+*** Not ported (CLJS fallback)
+
+- =:db.fn/call= / custom transaction functions (require calling CLJS fns from Rust)
+- =:db.fn/cas= / =:db/cas= (compare-and-swap — rarely used)
+- Tuple attribute handling
+
+*** Files
+
+| File | Purpose |
+|------+---------+
+| =rust/persistent-sorted-set/src/transact.rs= | Core transact logic, =TransactableDB= trait, EDN parser |
+| =rust/persistent-sorted-set/src/db.rs= | =impl TransactableDB for DataScriptDB= |
+| =rust/datascript-rs/src/wasm_datascript.rs= | =impl TransactableDB for WasmDataScript= + WASM export |
+| =rust/persistent-sorted-set/tests/transact_tests.rs= | 31 native tests |
+| =src/absurder_sql/datascript/impl_rust.cljs= | =transact-rust!= CLJS bridge |
+
+*** WASM API
+
+=transact(txDataEdn: string): object= — mutates DB in place, returns:
+
+#+begin_src javascript
+db.transact('[[:db/add 1 :name "Alice"] {:db/id -1 :age 30}]')
+// → { txData: [{e: 1, a: ":name", v: "Alice", tx: 536870913}, ...],
+//     tempids: {"-1": 2},
+//     currentTx: 536870913 }
+#+end_src
+
+*** Tests (31 native, =cargo test=)
+
+Basic add, tempid resolution (neg/string), shared tempids, cardinality one
+replacement, cardinality many, retract with value, retract nonexistent,
+retract attribute, retract entity (+ incoming refs, + component cascade),
+unique identity upsert, unique value violation, map entity expansion, nested
+map entity, reverse ref, lookup ref, =:db/current-tx=, tx-report structure,
+sequential transactions, EDN parsing integration (basic, map, retract,
+retract entity, alias form, refs+components, mixed)
 
 ** 4.9 FilteredDB [LOW]
 
@@ -368,18 +422,12 @@ production impact.
 - *Challenge:* Predicate is a CLJS function — requires JS callback mechanism
 - *Test:* Filter by attribute; filter by entity; nested filters; query against filtered DB
 
-** 4.10 Incremental sync [HIGH]
+** 4.10 Incremental sync → superseded by 4.8
 
-- *File:* =src/absurder_sql/datascript/impl_rust.cljs=
-- Current =sync-to-rust!= rebuilds the entire Rust DB from scratch after every CLJS transact
-- Replace with incremental approach:
-  - Extract tx-report datoms (=:tx-data=) from CLJS transact result
-  - Send only new/retracted datoms to Rust via =WasmDB::with_datoms=
-  - Avoids O(n) full rebuild on every transaction
-- Prerequisite: 4.8 (Rust transact) makes this obsolete — once transact is in
-  Rust, there's no CLJS→Rust sync needed at all
-- *Interim step:* Before 4.8, implement incremental sync to improve performance
-- *Test:* Transact → sync → query matches full rebuild; retraction sync; large DB perf
+With 4.8 (Rust transact) implemented, =transact-rust!= in =impl_rust.cljs=
+calls the Rust engine directly — no CLJS→Rust sync needed for supported tx
+forms. =sync-to-rust!= remains as fallback for unsupported forms (=:db.fn/call=,
+=:db.fn/cas=, custom tx functions).
 
 ** Phase 4 verification
 

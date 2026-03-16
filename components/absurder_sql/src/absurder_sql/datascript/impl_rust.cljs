@@ -223,6 +223,68 @@
       #js [(keyword->attr-str attr) (clj->js v)])
     :else (clj->js eid)))
 
+;;; Transact
+
+(defn- js-tempids->clj
+  "Convert a JS tempids object {'-1': 5, ...} to a CLJS map."
+  [js-obj]
+  (when (and js-obj (not (undefined? js-obj)))
+    (let [entries (js/Object.entries js-obj)]
+      (into {}
+            (map (fn [entry]
+                   (let [k (aget entry 0)
+                         v (aget entry 1)]
+                     ;; Try to parse numeric tempids back to numbers
+                     [(let [n (js/parseInt k 10)]
+                        (if (js/isNaN n) k n))
+                      (long v)])))
+            (array-seq entries)))))
+
+(defn- js-tx-datoms->clj
+  "Convert a JS array of datom objects from Rust tx-report to CLJS Datom vectors."
+  [js-arr]
+  (when js-arr
+    (into []
+          (map (fn [d]
+                 (let [tx (.-tx d)]
+                   (db/datom (.-e d)
+                             (js-datom-attr->keyword (.-a d))
+                             (.-v d)
+                             (if (neg? tx) (- tx) tx)
+                             (pos? tx)))))
+          (array-seq js-arr))))
+
+(defn- has-unsupported-tx-forms?
+  "Return true if tx-data contains forms that require CLJS (e.g. :db.fn/call, :db.fn/cas)."
+  [tx-data]
+  (some (fn [entity]
+          (when (sequential? entity)
+            (let [op (first entity)]
+              (or (= op :db.fn/call)
+                  (= op :db.fn/cas)
+                  (= op :db/cas)
+                  ;; Custom tx functions (non-builtin keywords)
+                  (and (keyword? op)
+                       (not (#{:db/add :db/retract
+                               :db.fn/retractAttribute :db.fn/retractEntity
+                               :db/retractEntity} op)))))))
+        tx-data))
+
+(defn transact-rust!
+  "Transact tx-data directly through the Rust engine.
+   Returns a map with :tx-data and :tempids, or nil if no rust-db or unsupported forms.
+   The rust-db state atom is mutated in place by the Rust engine."
+  [tx-data]
+  (when-let [rdb (:rust-db @state)]
+    (when-not (has-unsupported-tx-forms? tx-data)
+      (let [edn-str   (strip-edn-comments (pr-str (vec tx-data)))
+            js-report (.transact rdb edn-str)]
+        (if (aget js-report "error")
+          (throw (js/Error. (str "Rust transact error: " (aget js-report "error"))))
+          {:tx-data    (js-tx-datoms->clj (aget js-report "txData"))
+           :tempids    (js-tempids->clj (aget js-report "tempids"))
+           :current-tx (long (aget js-report "currentTx"))})))))
+
 ;;; Public API
 
 (defn q

@@ -11,6 +11,7 @@ use crate::datom::{Attr, Datom, Value};
 use crate::pull::PullSource;
 use crate::relation::{PatternEl, PatternResolver, Relation, Tuple};
 use crate::schema::{ReverseSchema, Schema, build_rschema};
+use crate::transact::TransactableDB;
 
 /// DataScript constants matching CLJS `db.cljc`.
 pub const E0: i64 = 0;
@@ -380,6 +381,71 @@ impl DataScriptDB {
         let from = Datom::new(E0, Some(attr.clone()), start.clone(), TX0);
         let to = Datom::new(EMAX, Some(attr.clone()), end.clone(), TXMAX);
         self.avet.slice(&from, &to)
+    }
+}
+
+impl TransactableDB for DataScriptDB {
+    fn search_eav(&self, e: i64, a: &Attr, v: &Value) -> Option<Datom> {
+        self.search(Some(e), Some(a), Some(v), None)
+            .first()
+            .cloned()
+            .cloned()
+    }
+
+    fn search_ea(&self, e: i64, a: &Attr) -> Vec<Datom> {
+        self.search(Some(e), Some(a), None, None)
+            .into_iter()
+            .cloned()
+            .collect()
+    }
+
+    fn search_e(&self, e: i64) -> Vec<Datom> {
+        self.search(Some(e), None, None, None)
+            .into_iter()
+            .cloned()
+            .collect()
+    }
+
+    fn search_av(&self, a: &Attr, v: &Value) -> Vec<Datom> {
+        self.search(None, Some(a), Some(v), None)
+            .into_iter()
+            .cloned()
+            .collect()
+    }
+
+    fn search_a_refs(&self, a: &Attr, v_ref: i64) -> Vec<Datom> {
+        self.search(None, Some(a), Some(&Value::Ref(v_ref)), None)
+            .into_iter()
+            .cloned()
+            .collect()
+    }
+
+    fn apply_datom(&mut self, datom: Datom) {
+        self.with_datom(datom);
+    }
+
+    fn schema(&self) -> &Schema {
+        &self.schema
+    }
+
+    fn rschema(&self) -> &ReverseSchema {
+        &self.rschema
+    }
+
+    fn max_eid(&self) -> i64 {
+        self.max_eid
+    }
+
+    fn set_max_eid(&mut self, eid: i64) {
+        self.max_eid = eid;
+    }
+
+    fn max_tx(&self) -> i64 {
+        self.max_tx
+    }
+
+    fn set_max_tx(&mut self, tx: i64) {
+        self.max_tx = tx;
     }
 }
 

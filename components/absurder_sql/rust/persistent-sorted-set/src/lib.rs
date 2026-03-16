@@ -24,6 +24,7 @@ pub mod relation;
 pub mod query_parser;
 pub mod pull_parser;
 pub mod pull;
+pub mod transact;
 
 #[cfg(target_arch = "wasm32")]
 pub mod wasm;

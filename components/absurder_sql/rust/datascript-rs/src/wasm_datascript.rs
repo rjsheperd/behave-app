@@ -369,6 +369,111 @@ impl WasmDataScript {
 }
 
 // ---------------------------------------------------------------------------
+// TransactableDB impl
+// ---------------------------------------------------------------------------
+
+impl persistent_sorted_set::transact::TransactableDB for WasmDataScript {
+    fn search_eav(&self, e: i64, a: &Attr, v: &Value) -> Option<Datom> {
+        crate::query::search_internal(self, Some(e), Some(a), Some(v), None)
+            .into_iter()
+            .next()
+    }
+
+    fn search_ea(&self, e: i64, a: &Attr) -> Vec<Datom> {
+        crate::query::search_internal(self, Some(e), Some(a), None, None)
+    }
+
+    fn search_e(&self, e: i64) -> Vec<Datom> {
+        crate::query::search_internal(self, Some(e), None, None, None)
+    }
+
+    fn search_av(&self, a: &Attr, v: &Value) -> Vec<Datom> {
+        crate::query::search_internal(self, None, Some(a), Some(v), None)
+    }
+
+    fn search_a_refs(&self, a: &Attr, v_ref: i64) -> Vec<Datom> {
+        crate::query::search_internal(self, None, Some(a), Some(&Value::Ref(v_ref)), None)
+    }
+
+    fn apply_datom(&mut self, datom: Datom) {
+        let attr = datom.a.as_ref().expect("datom must have attribute");
+        let indexing = self.is_indexed(attr);
+
+        if datom.tx > 0 {
+            // Adding — use std::mem::take to handle PSS's consuming conj
+            let eavt = std::mem::replace(
+                &mut self.eavt,
+                PersistentSortedSet::empty(comparator_for_index(IndexType::EAVT)),
+            );
+            self.eavt = eavt.conj(&datom);
+
+            let aevt = std::mem::replace(
+                &mut self.aevt,
+                PersistentSortedSet::empty(comparator_for_index(IndexType::AEVT)),
+            );
+            self.aevt = aevt.conj(&datom);
+
+            if indexing {
+                let avet = std::mem::replace(
+                    &mut self.avet,
+                    PersistentSortedSet::empty(comparator_for_index(IndexType::AVET)),
+                );
+                self.avet = avet.conj(&datom);
+            }
+            self.advance_max_eid(datom.e);
+        } else {
+            // Retracting — construct positive version to find and remove
+            let pos_datom = Datom::new(datom.e, datom.a.clone(), datom.v.clone(), -datom.tx);
+            if self.eavt.contains(&pos_datom) {
+                let eavt = std::mem::replace(
+                    &mut self.eavt,
+                    PersistentSortedSet::empty(comparator_for_index(IndexType::EAVT)),
+                );
+                self.eavt = eavt.disj(&pos_datom);
+
+                let aevt = std::mem::replace(
+                    &mut self.aevt,
+                    PersistentSortedSet::empty(comparator_for_index(IndexType::AEVT)),
+                );
+                self.aevt = aevt.disj(&pos_datom);
+
+                if indexing {
+                    let avet = std::mem::replace(
+                        &mut self.avet,
+                        PersistentSortedSet::empty(comparator_for_index(IndexType::AVET)),
+                    );
+                    self.avet = avet.disj(&pos_datom);
+                }
+            }
+        }
+    }
+
+    fn schema(&self) -> &Schema {
+        &self.schema
+    }
+
+    fn rschema(&self) -> &ReverseSchema {
+        &self.rschema
+    }
+
+    fn max_eid(&self) -> i64 {
+        self.max_eid
+    }
+
+    fn set_max_eid(&mut self, eid: i64) {
+        self.max_eid = eid;
+    }
+
+    fn max_tx(&self) -> i64 {
+        self.max_tx
+    }
+
+    fn set_max_tx(&mut self, tx: i64) {
+        self.max_tx = tx;
+    }
+}
+
+// ---------------------------------------------------------------------------
 // wasm_bindgen exports
 // ---------------------------------------------------------------------------
 
@@ -1068,6 +1173,60 @@ impl WasmDataScript {
         };
 
         meta_storage.write_metadata(&meta);
+    }
+
+    /// Transact tx-data (EDN string) against this database.
+    ///
+    /// Mutates the database in place (becomes db-after) and returns a JS object:
+    /// ```js
+    /// { txData: [{e, a, v, tx}, ...], tempids: {"<tempid>": eid, ...}, currentTx: number }
+    /// ```
+    ///
+    /// Supports: `:db/add`, `:db/retract`, `:db.fn/retractAttribute`,
+    /// `:db.fn/retractEntity`, `:db/retractEntity`, map entities, tempids,
+    /// lookup refs, upsert via `:db.unique/identity`.
+    #[wasm_bindgen(js_name = "transact")]
+    pub fn transact_edn(&mut self, tx_data_edn: String) -> JsValue {
+        use persistent_sorted_set::transact::{parse_tx_edn, transact};
+
+        let entities = match parse_tx_edn(&tx_data_edn, &self.rschema) {
+            Ok(e) => e,
+            Err(err) => {
+                let obj = js_sys::Object::new();
+                js_sys::Reflect::set(&obj, &"error".into(), &JsValue::from_str(&err.to_string())).ok();
+                return obj.into();
+            }
+        };
+
+        let report = match transact(self, entities) {
+            Ok(r) => r,
+            Err(err) => {
+                let obj = js_sys::Object::new();
+                js_sys::Reflect::set(&obj, &"error".into(), &JsValue::from_str(&err.to_string())).ok();
+                return obj.into();
+            }
+        };
+
+        // Convert tx_data to JS array of datom objects
+        let tx_data_arr = js_sys::Array::new_with_length(report.tx_data.len() as u32);
+        for (i, d) in report.tx_data.iter().enumerate() {
+            tx_data_arr.set(i as u32, datom_to_js(d));
+        }
+
+        // Convert tempids to JS object
+        let tempids_obj = js_sys::Object::new();
+        for (tid, eid) in &report.tempids {
+            let key = tid.to_string();
+            js_sys::Reflect::set(&tempids_obj, &JsValue::from_str(&key), &JsValue::from_f64(*eid as f64)).ok();
+        }
+
+        // Build result object
+        let result = js_sys::Object::new();
+        js_sys::Reflect::set(&result, &"txData".into(), &tx_data_arr).ok();
+        js_sys::Reflect::set(&result, &"tempids".into(), &tempids_obj).ok();
+        js_sys::Reflect::set(&result, &"currentTx".into(), &JsValue::from_f64(report.current_tx as f64)).ok();
+
+        result.into()
     }
 
     /// Collect garbage: walk all 3 indexes, delete orphan addresses.
