@@ -100,7 +100,7 @@ impl FindSpec {
     }
 }
 
-/// An element in a `:find` clause — either a plain variable or a pull expression.
+/// An element in a `:find` clause — variable, pull expression, or aggregate.
 #[derive(Clone, Debug)]
 pub enum FindElement {
     /// Plain variable: `?name`
@@ -111,6 +111,15 @@ pub enum FindElement {
         /// The raw EDN of the pull pattern (parsed later with schema context).
         pattern_edn: EdnValue,
     },
+    /// Aggregate: `(sum ?x)`, `(count ?e)`, `(min 3 ?x)`, etc.
+    Aggregate {
+        /// Aggregate function name: "sum", "avg", "count", etc.
+        name: String,
+        /// The variable being aggregated (last argument).
+        var: Var,
+        /// Optional numeric argument (e.g., `(min 3 ?x)` → n_arg = Some(3)).
+        n_arg: Option<i64>,
+    },
 }
 
 impl FindElement {
@@ -118,7 +127,12 @@ impl FindElement {
         match self {
             FindElement::Var(v) => v,
             FindElement::Pull { var, .. } => var,
+            FindElement::Aggregate { var, .. } => var,
         }
+    }
+
+    pub fn is_aggregate(&self) -> bool {
+        matches!(self, FindElement::Aggregate { .. })
     }
 }
 
@@ -136,6 +150,10 @@ pub struct ParsedQuery {
 impl ParsedQuery {
     pub fn has_pull_in_find(&self) -> bool {
         self.find_elements.iter().any(|e| matches!(e, FindElement::Pull { .. }))
+    }
+
+    pub fn has_aggregates(&self) -> bool {
+        self.find_elements.iter().any(|e| e.is_aggregate())
     }
 }
 
@@ -259,12 +277,15 @@ fn parse_pred_expr(inner: &[EdnValue]) -> Option<Clause> {
     let args: Vec<PatternEl> = call_elems[1..].iter().map(edn_to_pattern_el).collect();
 
     // If there's a second element in `inner`, it's a binding (fn-expr, not pred-expr).
-    // We don't support fn-expr yet, but parse the predicate part.
     if inner.len() == 1 {
         Some(Clause::Predicate { name, args })
     } else {
-        // fn-expr: [(fn ?a) ?result] — not yet supported, skip
-        None
+        // fn-expr: [(fn ?a ?b) ?result]
+        let binding = match &inner[1] {
+            EdnValue::Symbol(s) if is_variable(s) => s.clone(),
+            _ => return None,
+        };
+        Some(Clause::FnExpr { name, args, binding })
     }
 }
 
@@ -430,19 +451,56 @@ fn query_to_map(elems: &[EdnValue]) -> HashMap<String, Vec<EdnValue>> {
     result
 }
 
+/// Parse an aggregate find element: `(sum ?x)` or `(min 3 ?x)`.
+/// `args` is everything after the function name.
+fn parse_aggregate_element(name: &str, args: &[&EdnValue]) -> Option<FindElement> {
+    if args.is_empty() {
+        return None;
+    }
+
+    // Last arg must be a variable
+    let last = args.last()?;
+    let var = match last {
+        EdnValue::Symbol(s) if is_variable(s) => s.clone(),
+        _ => return None,
+    };
+
+    // Optional numeric argument before the variable (e.g., `(min 3 ?x)`)
+    let n_arg = if args.len() >= 2 {
+        match args[0] {
+            EdnValue::Integer(n) => Some(*n),
+            _ => None,
+        }
+    } else {
+        None
+    };
+
+    Some(FindElement::Aggregate {
+        name: name.to_string(),
+        var,
+        n_arg,
+    })
+}
+
+/// Known built-in aggregate function names.
+const BUILTIN_AGGREGATES: &[&str] = &[
+    "sum", "avg", "median", "variance", "stddev",
+    "min", "max", "count", "count-distinct", "distinct",
+    "rand", "sample",
+];
+
 /// Parse the `:find` section.
-/// Parse a find element — either a variable or `(pull ?var pattern)`.
+/// Parse a find element — variable, `(pull ?var pattern)`, or `(agg ?var)`.
 fn parse_find_element(el: &EdnValue) -> Option<FindElement> {
     match el {
         EdnValue::Symbol(s) if is_variable(s) => Some(FindElement::Var(s.clone())),
         EdnValue::List(items) => {
-            // (pull ?e [:attr ...])
             let items: Vec<&EdnValue> = items.iter().collect();
-            if items.len() >= 3 {
+            if items.len() >= 2 {
                 if let EdnValue::Symbol(s) = items[0] {
-                    if s == "pull" {
+                    // (pull ?e [:attr ...])
+                    if s == "pull" && items.len() >= 3 {
                         // items[1] might be $src or ?var
-                        // Check for optional source: (pull $src ?var pattern)
                         let (var_idx, _) = if let EdnValue::Symbol(s) = items[1] {
                             if s.starts_with('$') {
                                 (2, Some(s.clone()))
@@ -460,6 +518,12 @@ fn parse_find_element(el: &EdnValue) -> Option<FindElement> {
                                 });
                             }
                         }
+                        return None;
+                    }
+
+                    // (sum ?x), (count ?e), (min 3 ?x), etc.
+                    if BUILTIN_AGGREGATES.contains(&s.as_str()) {
+                        return parse_aggregate_element(s, &items[1..]);
                     }
                 }
             }
@@ -722,6 +786,11 @@ fn bind_clause(clause: &mut Clause, bindings: &HashMap<String, Value>) {
             }
         }
         Clause::Predicate { args, .. } => {
+            for el in args.iter_mut() {
+                bind_el(el, bindings);
+            }
+        }
+        Clause::FnExpr { args, .. } => {
             for el in args.iter_mut() {
                 bind_el(el, bindings);
             }

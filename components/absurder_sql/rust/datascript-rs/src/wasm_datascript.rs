@@ -830,6 +830,16 @@ impl WasmDataScript {
             &find_vars,
         );
 
+        // Apply aggregation if any find elements are aggregates
+        let result_tuples = if parsed.has_aggregates() {
+            persistent_sorted_set::aggregates::aggregate(
+                &parsed.find_elements,
+                result_tuples,
+            )
+        } else {
+            result_tuples
+        };
+
         let has_pull = parsed.has_pull_in_find();
 
         // Pre-parse pull patterns if needed

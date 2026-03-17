@@ -6,8 +6,9 @@
 
 use persistent_sorted_set::datom::{Datom, Value};
 use persistent_sorted_set::db::{DataScriptDB, TX0};
+use persistent_sorted_set::aggregates;
 use persistent_sorted_set::query_parser::{
-    bind_inputs, parse_query, parse_rules, FindSpec,
+    bind_inputs, parse_query, parse_rules, FindElement, FindSpec,
 };
 use persistent_sorted_set::relation::{
     project, resolve_query, Clause, PatternEl, Relation, Rules,
@@ -1038,4 +1039,540 @@ fn comments_inside_strings_preserved() {
     } else {
         panic!("expected pattern clause");
     }
+}
+
+// ---------------------------------------------------------------------------
+// Aggregate parsing + execution
+// ---------------------------------------------------------------------------
+
+/// Run a query with aggregation, return result tuples.
+fn run_aggregate_query(
+    db: &DataScriptDB,
+    query_edn: &str,
+) -> Vec<Vec<Value>> {
+    let q = parse_query(query_edn);
+    let rules = Rules::new();
+    let result = resolve_query(db, &q.where_clauses, &rules);
+    let projected = project(&result, &q.find.vars());
+    if q.has_aggregates() {
+        aggregates::aggregate(&q.find_elements, projected.tuples)
+    } else {
+        projected.tuples
+    }
+}
+
+fn age_db() -> DataScriptDB {
+    let mut schema = Schema::default();
+    schema.attrs.insert(kw("name"), AttrSchema { index: true, ..Default::default() });
+    schema.attrs.insert(kw("age"), AttrSchema::default());
+    schema.attrs.insert(kw("dept"), AttrSchema::default());
+    let mut db = DataScriptDB::empty(schema);
+    db.with_datom(d(1, "name", Value::Str("Alice".into()), 1));
+    db.with_datom(d(1, "age", Value::Long(30), 1));
+    db.with_datom(d(1, "dept", Value::Str("eng".into()), 1));
+    db.with_datom(d(2, "name", Value::Str("Bob".into()), 1));
+    db.with_datom(d(2, "age", Value::Long(25), 1));
+    db.with_datom(d(2, "dept", Value::Str("eng".into()), 1));
+    db.with_datom(d(3, "name", Value::Str("Carol".into()), 1));
+    db.with_datom(d(3, "age", Value::Long(35), 1));
+    db.with_datom(d(3, "dept", Value::Str("sales".into()), 1));
+    db.with_datom(d(4, "name", Value::Str("Dave".into()), 1));
+    db.with_datom(d(4, "age", Value::Long(40), 1));
+    db.with_datom(d(4, "dept", Value::Str("sales".into()), 1));
+    db
+}
+
+#[test]
+fn parse_aggregate_find_element() {
+    let q = parse_query("[:find (count ?e) :where [?e :name _]]");
+    assert!(q.has_aggregates());
+    assert_eq!(q.find_elements.len(), 1);
+    match &q.find_elements[0] {
+        FindElement::Aggregate { name, var, n_arg } => {
+            assert_eq!(name, "count");
+            assert_eq!(var, "?e");
+            assert_eq!(*n_arg, None);
+        }
+        other => panic!("Expected Aggregate, got {:?}", other),
+    }
+}
+
+#[test]
+fn parse_aggregate_with_n_arg() {
+    let q = parse_query("[:find (min 3 ?age) :where [_ :age ?age]]");
+    assert!(q.has_aggregates());
+    match &q.find_elements[0] {
+        FindElement::Aggregate { name, var, n_arg } => {
+            assert_eq!(name, "min");
+            assert_eq!(var, "?age");
+            assert_eq!(*n_arg, Some(3));
+        }
+        other => panic!("Expected Aggregate, got {:?}", other),
+    }
+}
+
+#[test]
+fn parse_mixed_find_with_aggregate() {
+    let q = parse_query("[:find ?dept (count ?e) :where [?e :dept ?dept]]");
+    assert!(q.has_aggregates());
+    assert_eq!(q.find_elements.len(), 2);
+    assert!(!q.find_elements[0].is_aggregate());
+    assert!(q.find_elements[1].is_aggregate());
+    // find.vars() should include both ?dept and ?e
+    let vars = q.find.vars();
+    assert_eq!(vars, vec!["?dept".to_string(), "?e".to_string()]);
+}
+
+#[test]
+fn aggregate_count_all() {
+    let db = age_db();
+    let result = run_aggregate_query(&db, "[:find (count ?e) :where [?e :name _]]");
+    assert_eq!(result.len(), 1);
+    assert_eq!(result[0][0], Value::Long(4));
+}
+
+#[test]
+fn aggregate_sum() {
+    let db = age_db();
+    let result = run_aggregate_query(&db, "[:find (sum ?age) :where [_ :age ?age]]");
+    assert_eq!(result.len(), 1);
+    // 30 + 25 + 35 + 40 = 130
+    assert_eq!(result[0][0], Value::Long(130));
+}
+
+#[test]
+fn aggregate_avg() {
+    let db = age_db();
+    let result = run_aggregate_query(&db, "[:find (avg ?age) :where [_ :age ?age]]");
+    assert_eq!(result.len(), 1);
+    // (30 + 25 + 35 + 40) / 4 = 32.5
+    assert_eq!(result[0][0], Value::Double(32.5));
+}
+
+#[test]
+fn aggregate_min_max() {
+    let db = age_db();
+    let min_result = run_aggregate_query(&db, "[:find (min ?age) :where [_ :age ?age]]");
+    assert_eq!(min_result[0][0], Value::Long(25));
+
+    let max_result = run_aggregate_query(&db, "[:find (max ?age) :where [_ :age ?age]]");
+    assert_eq!(max_result[0][0], Value::Long(40));
+}
+
+#[test]
+fn aggregate_grouped_by_dept() {
+    let db = age_db();
+    let result = run_aggregate_query(
+        &db,
+        "[:find ?dept (count ?e) :where [?e :dept ?dept]]",
+    );
+    assert_eq!(result.len(), 2);
+
+    let eng = result.iter().find(|r| r[0] == Value::Str("eng".into())).unwrap();
+    let sales = result.iter().find(|r| r[0] == Value::Str("sales".into())).unwrap();
+    assert_eq!(eng[1], Value::Long(2));
+    assert_eq!(sales[1], Value::Long(2));
+}
+
+#[test]
+fn aggregate_sum_grouped() {
+    let db = age_db();
+    let result = run_aggregate_query(
+        &db,
+        "[:find ?dept (sum ?age) :where [?e :dept ?dept] [?e :age ?age]]",
+    );
+    assert_eq!(result.len(), 2);
+
+    let eng = result.iter().find(|r| r[0] == Value::Str("eng".into())).unwrap();
+    let sales = result.iter().find(|r| r[0] == Value::Str("sales".into())).unwrap();
+    // eng: 30 + 25 = 55
+    assert_eq!(eng[1], Value::Long(55));
+    // sales: 35 + 40 = 75
+    assert_eq!(sales[1], Value::Long(75));
+}
+
+#[test]
+fn aggregate_median() {
+    let db = age_db();
+    let result = run_aggregate_query(&db, "[:find (median ?age) :where [_ :age ?age]]");
+    assert_eq!(result.len(), 1);
+    // sorted: [25, 30, 35, 40] → median = (30+35)/2 = 32.5
+    assert_eq!(result[0][0], Value::Double(32.5));
+}
+
+#[test]
+fn aggregate_count_distinct() {
+    let db = age_db();
+    let result = run_aggregate_query(
+        &db,
+        "[:find (count-distinct ?dept) :where [_ :dept ?dept]]",
+    );
+    assert_eq!(result.len(), 1);
+    assert_eq!(result[0][0], Value::Long(2));
+}
+
+#[test]
+fn aggregate_no_aggregate_passthrough() {
+    // Regular query without aggregates should still work
+    let db = age_db();
+    let result = run_aggregate_query(&db, "[:find ?name :where [_ :name ?name]]");
+    assert_eq!(result.len(), 4);
+}
+
+#[test]
+fn all_12_aggregates_parse() {
+    // Verify all 12 built-in aggregates are recognized by the parser
+    let aggregates = [
+        "sum", "avg", "median", "variance", "stddev",
+        "min", "max", "count", "count-distinct", "distinct",
+        "rand", "sample",
+    ];
+    for agg in &aggregates {
+        let query = if *agg == "sample" {
+            format!("[:find ({} 3 ?x) :where [_ :age ?x]]", agg)
+        } else {
+            format!("[:find ({} ?x) :where [_ :age ?x]]", agg)
+        };
+        let q = parse_query(&query);
+        assert!(
+            q.has_aggregates(),
+            "Aggregate '{}' should be recognized in query: {}",
+            agg,
+            query,
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// fn-expr parsing + execution
+// ---------------------------------------------------------------------------
+
+#[test]
+fn parse_fn_expr_clause() {
+    let q = parse_query(
+        "[:find ?full :where [?e :name ?name] [(str ?name \" Jr.\") ?full]]",
+    );
+    assert_eq!(q.where_clauses.len(), 2);
+    match &q.where_clauses[1] {
+        Clause::FnExpr { name, args, binding } => {
+            assert_eq!(name, "str");
+            assert_eq!(args.len(), 2);
+            assert_eq!(binding, "?full");
+        }
+        other => panic!("Expected FnExpr, got {:?}", other),
+    }
+}
+
+#[test]
+fn parse_fn_expr_arithmetic() {
+    let q = parse_query(
+        "[:find ?result :where [?e :age ?age] [(+ ?age 10) ?result]]",
+    );
+    match &q.where_clauses[1] {
+        Clause::FnExpr { name, args, binding } => {
+            assert_eq!(name, "+");
+            assert_eq!(args.len(), 2);
+            assert_eq!(binding, "?result");
+        }
+        other => panic!("Expected FnExpr, got {:?}", other),
+    }
+}
+
+#[test]
+fn fn_expr_str_concat() {
+    let db = age_db();
+    let result = run_query_with_inputs(
+        &db,
+        "[:find ?full :where [?e :name ?name] [(str ?name \" Jr.\") ?full]]",
+        "",
+        &[],
+    );
+    let mut names: Vec<String> = result
+        .iter()
+        .map(|t| match &t[0] { Value::Str(s) => s.clone(), _ => panic!() })
+        .collect();
+    names.sort();
+    assert_eq!(names, vec!["Alice Jr.", "Bob Jr.", "Carol Jr.", "Dave Jr."]);
+}
+
+#[test]
+fn fn_expr_arithmetic_add() {
+    let db = age_db();
+    let result = run_query_with_inputs(
+        &db,
+        "[:find ?name ?age2 :where [?e :name ?name] [?e :age ?age] [(+ ?age 10) ?age2]]",
+        "",
+        &[],
+    );
+    assert_eq!(result.len(), 4);
+    // Find Alice's row
+    let alice = result.iter().find(|r| r[0] == Value::Str("Alice".into())).unwrap();
+    assert_eq!(alice[1], Value::Long(40)); // 30 + 10
+}
+
+#[test]
+fn fn_expr_name_keyword() {
+    // Use (name ?kw) to extract the name part of a keyword
+    let mut schema = Schema::default();
+    schema.attrs.insert(kw("tag"), AttrSchema { index: true, ..Default::default() });
+    let mut db = DataScriptDB::empty(schema);
+    db.with_datom(d(1, "tag", Value::Keyword(kw_ns("bp", "fire")), 1));
+    db.with_datom(d(2, "tag", Value::Keyword(kw_ns("bp", "wind")), 1));
+
+    let result = run_query_with_inputs(
+        &db,
+        "[:find ?n :where [_ :tag ?kw] [(name ?kw) ?n]]",
+        "",
+        &[],
+    );
+    let mut names: Vec<String> = result
+        .iter()
+        .map(|t| match &t[0] { Value::Str(s) => s.clone(), _ => panic!() })
+        .collect();
+    names.sort();
+    assert_eq!(names, vec!["fire", "wind"]);
+}
+
+#[test]
+fn fn_expr_chained() {
+    // Chain: [(+ ?age 10) ?age2] [(str ?name " is " ?age2) ?desc]
+    let db = age_db();
+    let result = run_query_with_inputs(
+        &db,
+        "[:find ?desc :where [?e :name ?name] [?e :age ?age] [(+ ?age 10) ?age2] [(str ?name \" is \" ?age2) ?desc]]",
+        "",
+        &[],
+    );
+    assert_eq!(result.len(), 4);
+    let alice = result.iter().find(|r| {
+        matches!(&r[0], Value::Str(s) if s.contains("Alice"))
+    }).unwrap();
+    assert_eq!(alice[0], Value::Str("Alice is 40".into()));
+}
+
+#[test]
+fn fn_expr_with_predicate() {
+    // Combine fn-expr with predicate: [(+ ?age 10) ?future] [(> ?future 40)]
+    let db = age_db();
+    let result = run_query_with_inputs(
+        &db,
+        "[:find ?name :where [?e :name ?name] [?e :age ?age] [(+ ?age 10) ?future] [(> ?future 40)]]",
+        "",
+        &[],
+    );
+    // Only Carol (35+10=45) and Dave (40+10=50) should match
+    let mut names: Vec<String> = result
+        .iter()
+        .map(|t| match &t[0] { Value::Str(s) => s.clone(), _ => panic!() })
+        .collect();
+    names.sort();
+    assert_eq!(names, vec!["Carol", "Dave"]);
+}
+
+#[test]
+fn fn_expr_ground() {
+    // [(ground 42) ?val] binds a constant
+    let db = age_db();
+    let result = run_query_with_inputs(
+        &db,
+        "[:find ?val :where [(ground 42) ?val]]",
+        "",
+        &[],
+    );
+    assert_eq!(result.len(), 1);
+    assert_eq!(result[0][0], Value::Long(42));
+}
+
+// ---------------------------------------------------------------------------
+// Extended predicates (Phase 4.3)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn pred_zero() {
+    let mut schema = Schema::default();
+    schema.attrs.insert(kw("val"), AttrSchema::default());
+    let mut db = DataScriptDB::empty(schema);
+    db.with_datom(d(1, "val", Value::Long(0), 1));
+    db.with_datom(d(2, "val", Value::Long(5), 1));
+    db.with_datom(d(3, "val", Value::Long(-3), 1));
+
+    let result = run_query_with_inputs(
+        &db, "[:find ?e :where [?e :val ?v] [(zero? ?v)]]", "", &[],
+    );
+    assert_eq!(result.len(), 1);
+    assert_eq!(result[0][0], Value::Long(1));
+}
+
+#[test]
+fn pred_pos_neg() {
+    let mut schema = Schema::default();
+    schema.attrs.insert(kw("val"), AttrSchema::default());
+    let mut db = DataScriptDB::empty(schema);
+    db.with_datom(d(1, "val", Value::Long(5), 1));
+    db.with_datom(d(2, "val", Value::Long(-3), 1));
+    db.with_datom(d(3, "val", Value::Long(0), 1));
+
+    let pos = run_query_with_inputs(
+        &db, "[:find ?e :where [?e :val ?v] [(pos? ?v)]]", "", &[],
+    );
+    assert_eq!(pos.len(), 1);
+    assert_eq!(pos[0][0], Value::Long(1));
+
+    let neg = run_query_with_inputs(
+        &db, "[:find ?e :where [?e :val ?v] [(neg? ?v)]]", "", &[],
+    );
+    assert_eq!(neg.len(), 1);
+    assert_eq!(neg[0][0], Value::Long(2));
+}
+
+#[test]
+fn pred_even_odd() {
+    let mut schema = Schema::default();
+    schema.attrs.insert(kw("val"), AttrSchema::default());
+    let mut db = DataScriptDB::empty(schema);
+    db.with_datom(d(1, "val", Value::Long(2), 1));
+    db.with_datom(d(2, "val", Value::Long(3), 1));
+    db.with_datom(d(3, "val", Value::Long(4), 1));
+    db.with_datom(d(4, "val", Value::Long(5), 1));
+
+    let even = run_query_with_inputs(
+        &db, "[:find ?e :where [?e :val ?v] [(even? ?v)]]", "", &[],
+    );
+    assert_eq!(even.len(), 2); // e=1(2), e=3(4)
+
+    let odd = run_query_with_inputs(
+        &db, "[:find ?e :where [?e :val ?v] [(odd? ?v)]]", "", &[],
+    );
+    assert_eq!(odd.len(), 2); // e=2(3), e=4(5)
+}
+
+#[test]
+fn pred_nil_some() {
+    let db = age_db();
+    // All entities have :name, so (some? ?name) should pass all
+    let result = run_query_with_inputs(
+        &db, "[:find ?e :where [?e :name ?name] [(some? ?name)]]", "", &[],
+    );
+    assert_eq!(result.len(), 4);
+}
+
+#[test]
+fn pred_string_keyword() {
+    let db = age_db();
+    // :name values are strings
+    let result = run_query_with_inputs(
+        &db, "[:find ?e :where [?e :name ?name] [(string? ?name)]]", "", &[],
+    );
+    assert_eq!(result.len(), 4);
+
+    // :age values are longs, not strings
+    let result2 = run_query_with_inputs(
+        &db, "[:find ?e :where [?e :age ?a] [(string? ?a)]]", "", &[],
+    );
+    assert_eq!(result2.len(), 0);
+}
+
+#[test]
+fn pred_not() {
+    let mut schema = Schema::default();
+    schema.attrs.insert(kw("active"), AttrSchema::default());
+    let mut db = DataScriptDB::empty(schema);
+    db.with_datom(d(1, "active", Value::Bool(true), 1));
+    db.with_datom(d(2, "active", Value::Bool(false), 1));
+
+    let result = run_query_with_inputs(
+        &db, "[:find ?e :where [?e :active ?a] [(not ?a)]]", "", &[],
+    );
+    assert_eq!(result.len(), 1);
+    assert_eq!(result[0][0], Value::Long(2));
+}
+
+#[test]
+fn pred_re_find() {
+    let db = age_db();
+    // Find names starting with 'A'
+    let result = run_query_with_inputs(
+        &db, "[:find ?name :where [_ :name ?name] [(re-find \"^A\" ?name)]]", "", &[],
+    );
+    assert_eq!(result.len(), 1);
+    assert_eq!(result[0][0], Value::Str("Alice".into()));
+}
+
+#[test]
+fn pred_re_matches() {
+    let db = age_db();
+    // Full match: only 3-letter names
+    let result = run_query_with_inputs(
+        &db, "[:find ?name :where [_ :name ?name] [(re-matches \"...\" ?name)]]", "", &[],
+    );
+    assert_eq!(result.len(), 1);
+    assert_eq!(result[0][0], Value::Str("Bob".into()));
+}
+
+#[test]
+fn pred_clojure_string_starts_with() {
+    let db = age_db();
+    let result = run_query_with_inputs(
+        &db,
+        "[:find ?name :where [_ :name ?name] [(clojure.string/starts-with? ?name \"C\")]]",
+        "", &[],
+    );
+    assert_eq!(result.len(), 1);
+    assert_eq!(result[0][0], Value::Str("Carol".into()));
+}
+
+#[test]
+fn pred_clojure_string_includes() {
+    let db = age_db();
+    let result = run_query_with_inputs(
+        &db,
+        "[:find ?name :where [_ :name ?name] [(clojure.string/includes? ?name \"li\")]]",
+        "", &[],
+    );
+    assert_eq!(result.len(), 1);
+    assert_eq!(result[0][0], Value::Str("Alice".into()));
+}
+
+#[test]
+fn pred_clojure_string_ends_with() {
+    let db = age_db();
+    let result = run_query_with_inputs(
+        &db,
+        "[:find ?name :where [_ :name ?name] [(clojure.string/ends-with? ?name \"ve\")]]",
+        "", &[],
+    );
+    assert_eq!(result.len(), 1);
+    assert_eq!(result[0][0], Value::Str("Dave".into()));
+}
+
+#[test]
+fn pred_number() {
+    let db = age_db();
+    // :age values are numbers
+    let result = run_query_with_inputs(
+        &db, "[:find ?e :where [?e :age ?a] [(number? ?a)]]", "", &[],
+    );
+    assert_eq!(result.len(), 4);
+
+    // :name values are strings, not numbers
+    let result2 = run_query_with_inputs(
+        &db, "[:find ?e :where [?e :name ?n] [(number? ?n)]]", "", &[],
+    );
+    assert_eq!(result2.len(), 0);
+}
+
+#[test]
+fn pred_equality_aliases() {
+    // Test == and not= aliases
+    let db = age_db();
+    let result = run_query_with_inputs(
+        &db, "[:find ?name :where [?e :name ?name] [?e :age ?a] [(== ?a 30)]]", "", &[],
+    );
+    assert_eq!(result.len(), 1);
+    assert_eq!(result[0][0], Value::Str("Alice".into()));
+
+    let result2 = run_query_with_inputs(
+        &db, "[:find ?name :where [?e :name ?name] [?e :age ?a] [(not= ?a 30)]]", "", &[],
+    );
+    assert_eq!(result2.len(), 3);
 }

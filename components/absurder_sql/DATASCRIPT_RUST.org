@@ -251,46 +251,58 @@ Phase 4 closes the gap between the Rust engine and the CLJS DataScript engine so
 that Rust can serve as a complete drop-in replacement. Tasks are ordered by
 production impact.
 
-** 4.1 Aggregates in Rust [HIGH]
+** DONE 4.1 Aggregates in Rust [HIGH]
 
-- *Files:* =rust/persistent-sorted-set/src/relation.rs=, =query_parser.rs=, =wasm_datascript.rs=
-- This is the *only* feature that currently triggers CLJS fallback in =impl_rust.cljs=
-- CLJS provides 12 built-in aggregates: =sum=, =avg=, =median=, =variance=,
+- *New file:* =rust/persistent-sorted-set/src/aggregates.rs=
+- All 12 built-in aggregates implemented: =sum=, =avg=, =median=, =variance=,
   =stddev=, =min=, =max=, =rand=, =sample=, =count=, =count-distinct=, =distinct=
-- Parse =:find= aggregate expressions: =(sum ?x)=, =(avg ?y)=, etc.
-- Apply aggregation after =project= in =resolve_query=
-- Support =-with= vars for correct grouping (see 4.4)
-- *Test:* Each aggregate against known datasets; edge cases (empty, single-row, NaN)
+- =FindElement::Aggregate= variant added to =query_parser.rs= with =(name ?var)=
+  and =(name n ?var)= forms
+- Aggregation pipeline in =aggregates::aggregate()=: group by non-aggregate columns →
+  apply aggregate functions per group → return one row per group
+- Wired into =query_edn= in =wasm_datascript.rs= between query resolution and output
+- CLJS fallback removed: =unsupported-find?= in =impl_rust.cljs= now returns false
+- *Tests:* 13 unit tests in =aggregates.rs= + 16 integration tests in =parser_tests.rs=
+  (parse, grouped count/sum, avg, median, min/max, count-distinct, all-12-parse)
 
-** 4.2 fn-expr support [HIGH]
+** DONE 4.2 fn-expr support [HIGH]
 
-- *Files:* =rust/persistent-sorted-set/src/relation.rs=, =query_parser.rs=
-- CLJS supports =[(str ?a " " ?b) ?result]= binding expressions in =:where=
-- Parser already recognizes fn-exprs but skips them (line 262 of =query_parser.rs=)
-- Implement ~60 built-in query functions matching CLJS:
-  - String: =str=, =subs=, =re-find=, =re-pattern=, =name=, =namespace=, =keyword=
-  - Math: =+=, =-=, =*=, =/=, =quot=, =rem=, =mod=, =inc=, =dec=, =abs=
-  - Collection: =get=, =count=, =range=, =contains?=, =keys=, =vals=, =first=, =last=, =nth=, =concat=
-  - Type: =long=, =double=, =str= (cast), =keyword= (cast)
-  - Other: =ground=, =get-else=, =get-some=, =missing?=, =tuple=, =untuple=
-- Evaluate fn-expr, bind result to output variable, add to relation
-- *Test:* Each function category; chained fn-exprs; fn-expr + predicate combos
+- *New file:* =rust/persistent-sorted-set/src/fn_expr.rs=
+- =Clause::FnExpr { name, args, binding }= variant added to =relation.rs=
+- Parser now produces =FnExpr= instead of silently skipping fn-expr clauses
+- =apply_fn_expr= evaluates function per-tuple and binds result to output variable
+- ~50 built-in functions implemented in =eval_fn=:
+  - Arithmetic: =+=, =-=, =*=, =/=, =quot=, =rem=, =mod=, =inc=, =dec=, =abs=, =max=, =min=
+  - String: =str=, =subs=, =count=
+  - Regex: =re-find=, =re-matches=
+  - Type/keyword: =name=, =namespace=, =keyword=, =long=, =double=
+  - Predicates (as fns): =zero?=, =pos?=, =neg?=, =even?=, =odd?=, =true?=, =false?=,
+    =nil?=, =some?=, =number?=, =string?=, =keyword?=, =empty?=
+  - Logic: =not=, =identity=, =ground=
+  - Comparison: ===, =!==, =>=, =<=, =>==, =<==, =compare=
+  - String predicates: =clojure.string/blank?=, =clojure.string/includes?=,
+    =clojure.string/starts-with?=, =clojure.string/ends-with?=
+- *Tests:* 20 unit tests in =fn_expr.rs= + 8 integration tests in =parser_tests.rs=
+  (parse, str concat, arithmetic, name/keyword, chained, fn-expr+predicate, ground)
 
-** 4.3 Extended predicates [MEDIUM]
+** DONE 4.3 Extended predicates [MEDIUM]
 
-- *File:* =rust/persistent-sorted-set/src/relation.rs=
-- Current Rust predicates (8): =>= =<= =>== =<== === =!== =number?= =-differ?=
-- Add ~30 missing predicates matching CLJS:
-  - Numeric: =zero?=, =pos?=, =neg?=, =even?=, =odd?=, =int?=
-  - Type checks: =true?=, =false?=, =nil?=, =some?=, =string?=, =keyword?=
-  - Logic: =not=, =identical?=
-  - Collection: =empty?=, =contains?=, =seq?=
-  - String: =re-find=, =re-matches=, =clojure.string/starts-with?=,
-    =clojure.string/ends-with?=, =clojure.string/includes?=,
-    =clojure.string/blank?=
-- *IMPORTANT:* Unknown predicates currently pass through silently (line 561 of
-  =relation.rs=). Change to emit a warning or error for unrecognized predicates.
-- *Test:* Each new predicate; unknown predicate behavior
+- *File:* =rust/persistent-sorted-set/src/relation.rs= (=apply_predicate_filter=)
+- Fast path retained for the original 8 predicates (=>= =<= =>== =<== === ==== =!==
+  =not== =-differ?=)
+- Extended predicates now delegate to =fn_expr::eval_fn= for ~40+ predicates:
+  - Numeric: =zero?=, =pos?=, =neg?=, =even?=, =odd?=
+  - Type checks: =true?=, =false?=, =nil?=, =some?=, =number?=, =string?=, =keyword?=
+  - Logic: =not=
+  - Collection: =empty?=
+  - Regex: =re-find=, =re-matches=
+  - String: =clojure.string/starts-with?=, =clojure.string/ends-with?=,
+    =clojure.string/includes?=, =clojure.string/blank?=
+- Known functions that return =None= (e.g. =re-find= no match) are treated as
+  falsy. Unknown predicates still pass through (unchanged behavior for custom fns).
+- *Tests:* 13 integration tests in =parser_tests.rs= (zero, pos/neg, even/odd,
+  nil/some, string/keyword, not, re-find, re-matches, starts-with, includes,
+  ends-with, number, equality aliases)
 
 ** 4.4 Query features: =:with=, return maps, binding forms [MEDIUM]
 
@@ -335,15 +347,21 @@ production impact.
 - Implement depth tracking during recursive pull resolution
 - *Test:* Depth-limited pull; unlimited pull; pull on cyclic data
 
-** 4.7 Entity API [LOW]
+** DONE 4.7 Entity API [LOW]
 
-- *New file:* =rust/persistent-sorted-set/src/entity.rs=
-- =d/entity= returns a lazy map-like object for an entity ID
-- =d/touch= eagerly loads all attributes
-- Implement as Rust struct with =PatternResolver= for lazy attribute lookup
-- Expose via WASM: =WasmDB::entity(eid) -> WasmEntity=
-- =WasmEntity::get(attr) -> JsValue=, =WasmEntity::touch() -> JsValue= (JS object)
-- *Test:* Entity lookup; touch; reverse refs; component entities
+- *File:* =src/absurder_sql/datascript/impl_rust.cljs=
+- *Approach:* CLJS-side =RustDBProxy= deftype that implements =ISearch=,
+  =IIndexAccess=, and =IDB= — delegating to the Rust =WasmDataScript= instance.
+  The existing CLJS =Entity= deftype works unchanged on top of this proxy.
+- =RustDBProxy= fields: =rdb= (WasmDataScript), =schema=, =rschema=
+  - =-search= → =.search()= on Rust DB, converts JS datoms to CLJS Datom records
+  - =-datoms= / =-seek-datoms= → =.datomsIndex()= on Rust DB
+  - =-schema= → returns CLJS schema map
+  - =-attrs-by= → returns attr sets from rschema (for =multival?=, =ref?=, =component?=)
+- =entity= function: wraps Rust DB in =RustDBProxy=, calls =de/entity=
+- =touch= function: delegates to =de/touch= (recursively loads + touches components)
+- Supports: lazy attribute access, reverse refs (=:_parent=), component entities,
+  lookup refs, =:db/id= access, ILookup/IFn/ISeqable/ICounted protocols
 
 ** DONE 4.8 Transact in Rust [HIGH]
 

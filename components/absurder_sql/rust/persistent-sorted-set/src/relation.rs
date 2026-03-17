@@ -71,6 +71,8 @@ pub enum Clause {
     Pattern([PatternEl; 4]),
     RuleCall { name: String, args: Vec<PatternEl> },
     Predicate { name: String, args: Vec<PatternEl> },
+    /// Function expression: `[(fn ?a ?b) ?result]`
+    FnExpr { name: String, args: Vec<PatternEl>, binding: String },
     And(Vec<Clause>),
     Or(Vec<Vec<Clause>>),
     Not(Vec<Clause>),
@@ -419,6 +421,18 @@ fn alpha_rename(
 
     let suffix = format!("__auto__{}", seq_id);
 
+    fn rename_var(
+        var: &str,
+        subst: &HashMap<String, PatternEl>,
+        suffix: &str,
+    ) -> String {
+        if let Some(PatternEl::Var(v)) = subst.get(var) {
+            v.clone()
+        } else {
+            format!("{}{}", var, suffix)
+        }
+    }
+
     fn rename_el(
         el: &PatternEl,
         subst: &HashMap<String, PatternEl>,
@@ -456,6 +470,11 @@ fn alpha_rename(
             Clause::Predicate { name, args } => Clause::Predicate {
                 name: name.clone(),
                 args: args.iter().map(|a| rename_el(a, subst, suffix)).collect(),
+            },
+            Clause::FnExpr { name, args, binding } => Clause::FnExpr {
+                name: name.clone(),
+                args: args.iter().map(|a| rename_el(a, subst, suffix)).collect(),
+                binding: rename_var(binding, subst, suffix),
             },
             Clause::And(cs) => Clause::And(
                 cs.iter().map(|c| rename_clause(c, subst, suffix)).collect(),
@@ -511,6 +530,10 @@ fn apply_predicate(ctx: &mut Vec<Relation>, name: &str, args: &[PatternEl]) {
 }
 
 /// Apply a predicate filter to a single relation.
+///
+/// Fast path for the 8 original predicates, then falls back to `fn_expr::eval_fn`
+/// for extended predicates (~40+). Unknown predicates that return `None` from
+/// `eval_fn` pass through with a debug warning.
 fn apply_predicate_filter(rel: &Relation, name: &str, args: &[PatternEl]) -> Relation {
     use std::cmp::Ordering;
 
@@ -534,31 +557,41 @@ fn apply_predicate_filter(rel: &Relation, name: &str, args: &[PatternEl]) -> Rel
                 })
                 .collect();
 
+            // Fast path: original 8 predicates (inlined for performance)
             match name {
-                "number?" => matches!(
-                    &resolved[0],
-                    Value::Long(_) | Value::Double(_) | Value::Ref(_)
-                ),
-                ">" => resolved.len() >= 2
+                ">" => return resolved.len() >= 2
                     && value_cmp(&resolved[0], &resolved[1]) == Ordering::Greater,
-                "<" => resolved.len() >= 2
+                "<" => return resolved.len() >= 2
                     && value_cmp(&resolved[0], &resolved[1]) == Ordering::Less,
-                ">=" => resolved.len() >= 2
+                ">=" => return resolved.len() >= 2
                     && value_cmp(&resolved[0], &resolved[1]) != Ordering::Less,
-                "<=" => resolved.len() >= 2
+                "<=" => return resolved.len() >= 2
                     && value_cmp(&resolved[0], &resolved[1]) != Ordering::Greater,
-                "=" => resolved.len() >= 2 && resolved[0] == resolved[1],
-                "!=" => resolved.len() >= 2 && resolved[0] != resolved[1],
+                "=" | "==" => return resolved.len() >= 2 && resolved[0] == resolved[1],
+                "!=" | "not=" => return resolved.len() >= 2 && resolved[0] != resolved[1],
                 "-differ?" => {
-                    // At least one pair of args differs
                     if resolved.len() < 2 {
-                        true
-                    } else {
-                        let half = resolved.len() / 2;
-                        (0..half).any(|i| resolved[i] != resolved[half + i])
+                        return true;
                     }
+                    let half = resolved.len() / 2;
+                    return (0..half).any(|i| resolved[i] != resolved[half + i]);
                 }
-                _ => true, // Unknown predicate — pass through
+                _ => {}
+            }
+
+            // Extended path: delegate to fn_expr::eval_fn for ~40+ predicates
+            // (zero?, pos?, neg?, even?, odd?, nil?, some?, true?, false?,
+            //  number?, string?, keyword?, not, empty?, re-find, re-matches,
+            //  clojure.string/blank?, starts-with?, ends-with?, includes?, etc.)
+            if crate::fn_expr::is_known_fn(name) {
+                match crate::fn_expr::eval_fn(name, &resolved) {
+                    Some(Value::Bool(b)) => b,
+                    Some(Value::Nil) => false,
+                    Some(_) => true,  // Non-nil, non-false = truthy
+                    None => false,    // Known fn returned None = falsy (e.g. re-find no match)
+                }
+            } else {
+                true // Unknown predicate — pass through
             }
         })
         .cloned()
@@ -712,6 +745,9 @@ fn resolve_clause_depth<R: PatternResolver>(
         }
         Clause::Predicate { name, args } => {
             apply_predicate(ctx, name, args);
+        }
+        Clause::FnExpr { name, args, binding } => {
+            crate::fn_expr::apply_fn_expr(ctx, name, args, binding);
         }
     }
 }

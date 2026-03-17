@@ -5,6 +5,7 @@
   (:require ["datascript-rs" :refer [WasmDataScript]]
             [absurder-sql.datascript.core :as d]
             [absurder-sql.datascript.db :as db]
+            [absurder-sql.datascript.impl.entity :as de]
             [absurder-sql.datascript.parser :as dp]
             [clojure.string :as str]))
 
@@ -134,11 +135,10 @@
   (str/replace s #";[^\n]*" ""))
 
 (defn- unsupported-find?
-  "Return true if the parsed query uses features the Rust engine can't handle
-   (aggregates in :find)."
-  [parsed-q]
-  (let [find-elements (dp/find-elements (:qfind parsed-q))]
-    (some dp/aggregate? find-elements)))
+  "Return true if the parsed query uses features the Rust engine can't handle.
+   Aggregates are now supported in Rust (Phase 4.1)."
+  [_parsed-q]
+  false)
 
 (defn- parse-in-bindings
   "Parse :in clause symbols into a vector of role tags.
@@ -222,6 +222,128 @@
     (let [[attr v] eid]
       #js [(keyword->attr-str attr) (clj->js v)])
     :else (clj->js eid)))
+
+;;; Entity API (Phase 4.7)
+
+(defn- rschema-from-schema
+  "Build a CLJS rschema map from a CLJS schema map.
+   Mirrors db.cljc's rschema structure: {:db.type/ref #{attrs}, :db.cardinality/many #{attrs}, ...}"
+  [schema]
+  (reduce-kv
+    (fn [rs attr props]
+      (cond-> rs
+        (:db/index props)
+        (update :db/index (fnil conj #{}) attr)
+
+        (= :db.unique/identity (:db/unique props))
+        (-> (update :db.unique/identity (fnil conj #{}) attr)
+            (update :db/unique (fnil conj #{}) attr)
+            (update :db/index (fnil conj #{}) attr))
+
+        (= :db.unique/value (:db/unique props))
+        (-> (update :db.unique/value (fnil conj #{}) attr)
+            (update :db/unique (fnil conj #{}) attr)
+            (update :db/index (fnil conj #{}) attr))
+
+        (= :db.cardinality/many (:db/cardinality props))
+        (update :db.cardinality/many (fnil conj #{}) attr)
+
+        (= :db.type/ref (:db/valueType props))
+        (-> (update :db.type/ref (fnil conj #{}) attr)
+            (update :db/index (fnil conj #{}) attr))
+
+        (:db/isComponent props)
+        (update :db/isComponent (fnil conj #{}) attr)))
+    {} schema))
+
+(defn- js-datoms->clj-datoms
+  "Convert a JS array of datom objects to a seq of CLJS Datom records."
+  [js-arr]
+  (when js-arr
+    (map (fn [d]
+           (db/datom (.-e d)
+                     (js-datom-attr->keyword (.-a d))
+                     (.-v d)
+                     (.-tx d)))
+         (array-seq js-arr))))
+
+(defn- rust-search
+  "Search the Rust DB by pattern [e a v tx], returning CLJS Datom records.
+   Nils in pattern are wildcards."
+  [rdb pattern]
+  (let [[e a v tx] pattern
+        e-js  (if (some? e) e js/undefined)
+        a-js  (if (some? a) (keyword->attr-str a) js/undefined)
+        v-js  (if (some? v) (clj->js v) js/undefined)
+        tx-js (if (some? tx) tx js/undefined)]
+    (js-datoms->clj-datoms (.search rdb e-js a-js v-js tx-js))))
+
+(defn- rust-datoms
+  "Get datoms from a named Rust index with bounds."
+  [rdb index c0 c1 c2 c3]
+  (let [from-e  (if (some? c0) c0 js/undefined)
+        from-a  (if (some? c1) (keyword->attr-str c1) js/undefined)
+        from-v  js/undefined
+        from-tx js/undefined
+        to-e    js/undefined
+        to-a    js/undefined
+        to-v    js/undefined
+        to-tx   js/undefined]
+    ;; For seek-datoms, we use the index with from bounds only
+    (js-datoms->clj-datoms
+      (.datomsIndex rdb (name index)
+                    from-e from-a from-v from-tx
+                    to-e to-a to-v to-tx))))
+
+(deftype RustDBProxy [rdb schema rschema]
+  db/IDB
+  (-schema [_] schema)
+  (-attrs-by [_ property] (get rschema property))
+
+  db/ISearch
+  (-search [_ pattern]
+    (rust-search rdb pattern))
+
+  db/IIndexAccess
+  (-datoms [_ index c0 c1 _c2 _c3]
+    (rust-datoms rdb index c0 c1 nil nil))
+  (-seek-datoms [_ index c0 c1 _c2 _c3]
+    (rust-datoms rdb index c0 c1 nil nil))
+  (-rseek-datoms [_ index c0 c1 _c2 _c3]
+    (reverse (rust-datoms rdb index c0 c1 nil nil)))
+  (-index-range [_ _attr _start _end]
+    nil))
+
+(defn- make-rust-db-proxy
+  "Create a CLJS-compatible DB proxy wrapping a Rust WasmDataScript instance."
+  [rdb schema]
+  (let [rschema (rschema-from-schema schema)]
+    (->RustDBProxy rdb schema rschema)))
+
+(defn entity
+  "Create a DataScript entity backed by the Rust DB.
+   Same interface as d/entity. Returns nil if entity doesn't exist."
+  ([eid]
+   (when-let [rdb (:rust-db @state)]
+     (entity rdb eid)))
+  ([db-or-rdb eid]
+   (if (instance? RustDBProxy db-or-rdb)
+     ;; Already a proxy — use directly
+     (de/entity db-or-rdb eid)
+     ;; Assume it's a WasmDataScript — wrap it
+     (when-let [rdb (if (instance? WasmDataScript db-or-rdb)
+                      db-or-rdb
+                      (:rust-db @state))]
+       (let [js-schema (.schema rdb)
+             schema    (js->schema js-schema)
+             proxy     (make-rust-db-proxy rdb schema)]
+         (de/entity proxy eid))))))
+
+(defn touch
+  "Eagerly load all attributes of a Rust-backed entity.
+   Same interface as d/touch."
+  [e]
+  (de/touch e))
 
 ;;; Transact
 

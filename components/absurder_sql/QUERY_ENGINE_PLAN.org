@@ -73,8 +73,8 @@ Parses the standard DataScript query format directly from EDN strings:
 #+end_src
 
 Supports all =:find= variants (rel, scalar, coll, tuple), all clause types,
-namespaced keywords, and input binding. 19 unit tests + 54 integration tests
-against =DataScriptDB=.
+namespaced keywords, input binding, and aggregate expressions (=(sum ?x)=,
+=(count ?e)=, etc.). 19 unit tests + 70 integration tests against =DataScriptDB=.
 
 *** DONE — Native =PatternResolver= (=db.rs=)
 
@@ -87,6 +87,20 @@ ref-typed attributes.
 =WasmDataScript= implements =PatternResolver=, using =search_internal= against
 PSS indexes entirely in Rust.
 
+*** DONE — Aggregates (=aggregates.rs=)
+
+12 built-in aggregates: =sum=, =avg=, =median=, =variance=, =stddev=, =min=,
+=max=, =count=, =count-distinct=, =distinct=, =rand=, =sample=. Supports
+=(name ?var)= and =(name n ?var)= forms. Grouping by non-aggregate find columns.
+Wired into =queryEdn= between resolution and output shaping.
+
+*** DONE — Function expressions (=fn_expr.rs=)
+
+=[(fn ?a ?b) ?result]= clauses: evaluates built-in functions per-tuple and binds
+result to output variable. ~50 functions: arithmetic, string, regex, type/keyword,
+predicates-as-fns, logic, comparison, =clojure.string/*=. =Clause::FnExpr= variant
+in =relation.rs=, dispatched in =resolve_clause_depth=.
+
 *** DONE — WASM exports (=wasm_datascript.rs=)
 
 Three query entry points:
@@ -97,11 +111,12 @@ Three query entry points:
 | =queryClauses=    | JS clause objects + rules object  | Structured clause+rule queries |
 | =queryEdn=        | EDN strings + JS input pairs      | Full Datalog from EDN          |
 
-*** TODO — CLJS integration
+*** DONE — CLJS integration
 
-1. Update =core.cljc= =q= function to detect Rust-backed DB and route to =queryEdn=
-2. Keep CLJS fallback for non-Rust DBs (FilteredDB, plain collections)
-3. Aggregation and pull remain in CLJS, operating on Rust's result tuples
+Completed via =src/absurder_sql/datascript/impl_rust.cljs=. Routes =d/q= through
+the Rust engine for Rust-backed databases. With aggregates now in Rust (Phase 4.1),
+there is *no CLJS query fallback* — all queries route through the Rust engine.
+CLJS fallback retained only for non-Rust DBs (FilteredDB, plain collections).
 
 ** File inventory
 
@@ -112,6 +127,8 @@ Three query entry points:
 | =rust/persistent-sorted-set/src/db.rs=              | =PatternResolver= for native =DataScriptDB=     |
 | =rust/persistent-sorted-set/tests/query_tests.rs=   | 38 tests: patterns, joins, rules, predicates     |
 | =rust/persistent-sorted-set/tests/parser_tests.rs=  | 54 tests: parser + end-to-end resolution         |
+| =rust/persistent-sorted-set/src/aggregates.rs=      | 12 built-in aggregate functions + grouping        |
+| =rust/persistent-sorted-set/src/fn_expr.rs=         | ~50 built-in query functions + fn-expr evaluation |
 | =rust/persistent-sorted-set/src/transact.rs=        | Transaction processing + =TransactableDB= trait  |
 | =rust/persistent-sorted-set/tests/transact_tests.rs= | 31 tests: transact operations + EDN integration |
 | =rust/datascript-rs/src/query.rs=                   | =PatternResolver= for =WasmDataScript= + helpers |
@@ -123,15 +140,17 @@ Three query entry points:
 |------------------------------+-------+---------------------------------------------------|
 | =relation.rs= (unit)        |    30 | hash_join, sum_rel, prod_rel, subtract, collapse   |
 | =query_tests.rs=             |    38 | Pattern queries, joins, NOT, OR, predicates, rules |
-| =parser_tests.rs=            |    54 | Find specs, clauses, values, rules, input binding, |
-|                              |       | end-to-end resolution against BehavePlus-like DB   |
+| =parser_tests.rs=            |    91 | Find specs, clauses, values, rules, input binding, |
+|                              |       | aggregates, fn-exprs, extended predicates             |
 | =query_parser.rs= (unit)    |    19 | Parser internals, roundtrip                        |
 | =db.rs= (unit)              |    15 | with_datom, search dispatch, datoms/seek/rseek     |
+| =aggregates.rs= (unit)      |    13 | Sum, avg, median, variance, stddev, min/max, etc.  |
+| =fn_expr.rs= (unit)         |    20 | str, +, -, name, subs, predicates, re-find, etc.   |
 | =transact.rs= (unit)        |     7 | EDN parser internals                               |
 | =transact_tests.rs=          |    31 | Transact ops, tempids, upsert, retract, EDN        |
 | Other PSS tests              |   270 | B+ tree, storage, serialization                    |
 |------------------------------+-------+---------------------------------------------------|
-| *Total*                      |   464 |                                                    |
+| *Total*                      |   556 |                                                    |
 
 ** WASM API reference
 
@@ -308,13 +327,22 @@ Two implementations are provided:
 
 *** Built-in predicates
 
-| Predicate   | Behavior                                          |
-|-------------+---------------------------------------------------|
-| =number?=   | =true= for =Long=, =Double=, =Ref= values        |
-| =>= / =<=   | Numeric comparison via =value_cmp=                |
-| =>== / =<== | Numeric comparison (inclusive)                     |
-| === / =!==  | Structural equality via =PartialEq= on =Value=    |
-| =-differ?=  | At least one arg pair differs (for cycle detection)|
+*Fast path (inlined):*
+
+| Predicate     | Behavior                                          |
+|---------------+---------------------------------------------------|
+| =>= / =<=     | Comparison via =value_cmp=                        |
+| =>== / =<==   | Comparison (inclusive)                             |
+| === / ====    | Structural equality via =PartialEq= on =Value=    |
+| =!== / =not== | Structural inequality                             |
+| =-differ?=    | At least one arg pair differs (for cycle detection)|
+
+*Extended (via =fn_expr::eval_fn=):*
+
+=zero?=, =pos?=, =neg?=, =even?=, =odd?=, =true?=, =false?=, =nil?=, =some?=,
+=number?=, =string?=, =keyword?=, =not=, =empty?=, =re-find=, =re-matches=,
+=clojure.string/blank?=, =clojure.string/includes?=, =clojure.string/starts-with?=,
+=clojure.string/ends-with?=, and all comparison/arithmetic fns.
 
 Unknown predicates pass through without filtering.
 
@@ -363,24 +391,32 @@ comments before passing to =parse_query= / =parse_rules= if needed.
 *** DONE — CLJS integration
 
 Completed via =src/absurder_sql/datascript/impl_rust.cljs=. Routes =d/q= through
-the Rust engine for Rust-backed databases, with CLJS fallback for aggregates.
+the Rust engine for Rust-backed databases. No CLJS query fallback remains —
+aggregates are handled in Rust since Phase 4.1.
 
-*** Additional predicates → Phase 4.3
+*** DONE — Extended predicates (Phase 4.3)
 
-Production rules use predicates beyond the current set (8 in Rust vs ~40+ in CLJS).
-See =DATASCRIPT_RUST.org= Phase 4.3 for the full plan to add extended predicates.
+Extended from 8 to ~40+ predicates by delegating to =fn_expr::eval_fn= from
+=apply_predicate_filter=. Fast path retained for original 8 comparison predicates.
+Known functions that return =None= are falsy; unknown predicates pass through.
 
-*** fn-expr support → Phase 4.2
+*** DONE — fn-expr support (Phase 4.2)
 
-Function expressions =[(str ?first " " ?last) ?result]= are not yet supported.
-Parser recognizes them but skips (line 262 of =query_parser.rs=).
-See =DATASCRIPT_RUST.org= Phase 4.2 for the full plan including ~60 built-in functions.
+Function expressions =[(str ?first " " ?last) ?result]= fully supported in Rust.
+=Clause::FnExpr= variant in =relation.rs=, ~50 built-in functions in =fn_expr.rs=.
+See =DATASCRIPT_RUST.org= Phase 4.2 for details.
 
 *** DONE — Pull API
 
 Pull-in-find (e.g. =[:find (pull ?e [*])]=) is implemented in =wasm_datascript.rs=.
 Remaining pull gaps (attribute options, recursion depth) are tracked in
 =DATASCRIPT_RUST.org= Phase 4.5 and 4.6.
+
+*** DONE — Entity API (Phase 4.7)
+
+=RustDBProxy= deftype in =impl_rust.cljs= implements =ISearch=, =IIndexAccess=,
+=IDB= — delegating to Rust =WasmDataScript=. The standard CLJS =Entity= deftype
+works unchanged on top. =entity= and =touch= functions provided in =impl_rust.cljs=.
 
 *** DONE — Transact in Rust (Phase 4.8)
 
