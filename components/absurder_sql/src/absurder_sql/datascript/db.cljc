@@ -272,11 +272,17 @@
        (fn [js-obj]
          (if (instance? Datom js-obj)
            js-obj
-           (Datom. (unchecked-get js-obj "e")
-                   (convert-attr (unchecked-get js-obj "a"))
-                   (unchecked-get js-obj "v")
-                   (or (unchecked-get js-obj "tx") tx0)
-                   0 0))))))
+           (let [v (unchecked-get js-obj "v")
+                 ;; Keyword values come back from Rust as strings like ":input"
+                 ;; or ":db.cardinality/many". Convert them back to keywords.
+                 v (if (and (string? v) (identical? ":" (.charAt v 0)))
+                     (str->keyword v)
+                     v)]
+             (Datom. (unchecked-get js-obj "e")
+                     (convert-attr (unchecked-get js-obj "a"))
+                     v
+                     (or (unchecked-get js-obj "tx") tx0)
+                     0 0)))))))
 
 (defn+ ^:private hash-datom [^Datom d]
   (-> (hash (.-e d))
@@ -1033,13 +1039,16 @@
         arr         (cond-> datoms
                       (not (arrays/array? datoms)) (arrays/into-array))
         _           (arrays/asort arr cmp-datoms-eavt-quick)
-        eavt        (set/from-sorted-array cmp-datoms-eavt arr (arrays/alength arr) opts)
+        eavt        #?(:cljs (set/from-sorted-array-bulk "eavt" arr)
+                       :clj  (set/from-sorted-array cmp-datoms-eavt arr (arrays/alength arr) opts))
         _           (arrays/asort arr cmp-datoms-aevt-quick)
-        aevt        (set/from-sorted-array cmp-datoms-aevt arr (arrays/alength arr) opts)
+        aevt        #?(:cljs (set/from-sorted-array-bulk "aevt" arr)
+                       :clj  (set/from-sorted-array cmp-datoms-aevt arr (arrays/alength arr) opts))
         avet-datoms (filter (fn [^Datom d] (contains? indexed (.-a d))) datoms)
         avet-arr    (to-array avet-datoms)
         _           (arrays/asort avet-arr cmp-datoms-avet-quick)
-        avet        (set/from-sorted-array cmp-datoms-avet avet-arr (arrays/alength avet-arr) opts)
+        avet        #?(:cljs (set/from-sorted-array-bulk "avet" avet-arr)
+                       :clj  (set/from-sorted-array cmp-datoms-avet avet-arr (arrays/alength avet-arr) opts))
         max-eid     (init-max-eid rschema eavt avet)
         max-tx      (transduce (map (fn [^Datom d] (datom-tx d))) max tx0 eavt)]
     (map->DB

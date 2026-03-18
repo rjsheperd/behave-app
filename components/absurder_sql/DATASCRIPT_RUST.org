@@ -895,3 +895,237 @@ Documentation (after each sub-task):
 
 7. =QUERY_ENGINE_PLAN.org= — file inventory, test counts, API reference updated
 8. =DATASCRIPT_RUST.org= — mark sub-task DONE with implementation details
+
+* Phase 6: Issues Before Removing CLJS Fallbacks
+
+The Rust DataScript engine migration is functionally complete: all =d/q=, =d/pull=,
+and =d/entity= calls in the behave app have been routed through =impl-rust/*=
+with CLJS fallbacks. This phase tracks 8 remaining issues that must be resolved
+before the CLJS fallback paths can be safely removed.
+
+** TODO 6.1 Keyword Values Corrupted on Persistence Restore [HIGH]
+
+*** Problem
+
+=sync-from-rust= converts Rust datoms back to CLJS, but keyword values
+(=:input=, =:output=, =:continuous=, =:discrete=, etc.) come back as strings
+(=":input"=) instead of keywords (=:input=).
+
+*** Root cause
+
+=value_to_js= in =wasm.rs= converts =Value::Keyword= to a JS string =":input"=.
+=sync-from-rust= in =impl_rust.cljs= passes =(.-v d)= as-is — no keyword parsing
+for values (only attributes get =js-datom-attr->keyword=).
+
+*** Why it doesn't break today
+
+For query results, datoms from =sync-to-rust!= retain their =original_js=
+reference (the original CLJS object), so =datom_to_js= returns the original value
+with proper keywords. The issue ONLY manifests when datoms are reconstructed from
+scratch — i.e., the persistence restore path.
+
+*** Impact
+
+If a worksheet is saved via Rust =.storeToLegacy= then restored via
+=restoreFromLegacy= → =sync-from-rust=, keyword-valued attributes become strings.
+Code like =(= (:submodule/io submodule) :input)= fails.
+
+*** Fix
+
+In =sync-from-rust=, parse value strings that look like keywords (start with =:=)
+back into CLJS keywords, matching what =value_from_js= does on the Rust side.
+
+*** Files
+
+- =components/absurder_sql/src/absurder_sql/datascript/impl_rust.cljs= (~5 lines
+  in =sync-from-rust=)
+
+** TODO 6.2 No Error Handling in Rust Sync Listener [HIGH]
+
+*** Problem
+
+The =:rust-sync= listener in =setup-conn!= calls =sync-to-rust!= with no
+try/catch. If it throws (WASM OOM, schema mismatch, etc.), the exception
+propagates into DataScript's =transact!= internals, potentially leaving the CLJS
+conn in an undefined state, and the Rust DB stale.
+
+*** Fix
+
+Wrap the listener body in =try=/=catch=. On failure, log a warning and optionally
+set a flag (=rust-sync-failed?=) that =impl-rust/q= checks to force CLJS fallback
+until the next successful sync.
+
+*** Files
+
+- =projects/behave/src/cljs/behave/store.cljs= (~8 lines in =setup-conn!=)
+
+** TODO 6.3 reactive-entity Bypasses Rust Entirely [MEDIUM]
+
+*** Problem
+
+=austinbirch.reactive-entity= calls =(d/entity db eid)= directly (line 47 of
+=reactive_entity.cljs=), plus =d/datoms= (line 53), =db/entid= (line 52),
+=db/ref?= (line 58). It reads from the CLJS conn, not the Rust DB.
+
+*** Why it matters
+
+reactive-entity drives the worksheet entity subscriptions (=:worksheet= sub in
+=worksheet/subs.cljs= line 55-62, used throughout the UI). It's performant because
+it tracks fine-grained attribute access and only re-renders on change. It does NOT
+benefit from Rust acceleration.
+
+*** Impact for Phase 6
+
+If we remove the CLJS DataScript DB entirely (making Rust the sole source of
+truth), reactive-entity breaks completely.
+
+*** Options
+
+- *(A) Leave as-is:* reactive-entity uses CLJS DB (source of truth anyway). This
+  is fine as long as we keep the dual-state model. No work needed now.
+- *(B) Fork reactive-entity:* Replace =d/entity= with =impl-rust/entity-ws=.
+  Requires RustDBProxy to fully support the entity protocols reactive-entity needs.
+  More work, and reactive-entity is already fast for small worksheet DBs.
+
+*** Recommendation
+
+Option A — leave as-is. Document that reactive-entity requires the CLJS conn.
+
+** TODO 6.4 Pull Not Accelerated Through Posh [MEDIUM]
+
+*** Problem
+
+Posh dcfg has =:q impl-rust/q= but =:pull* d/pull= (still CLJS). All
+posh-managed =pull= subscriptions use CLJS DataScript.
+
+*** Impact
+
+=pull= subs (=vms/store.cljs=: =pull=, =pull-many=; used by =:vms/pull=,
+=:vms/pull-many=, =:vms/pull-children= subs) don't benefit from Rust. These are
+cached by posh (VMS never mutates), so performance impact is only on first render.
+
+*** Fix
+
+Replace =:pull* d/pull= with =:pull* impl-rust/pull= in =posh/reagent.cljs= dcfg.
+Need to verify =impl-rust/pull= handles posh's expected return format.
+
+*** Files
+
+- =components/posh/src/posh/reagent.cljs= (~1 line)
+
+** TODO 6.5 =d/entid= Calls Bypass Rust [LOW]
+
+*** Problem
+
+Two =d/entid= calls remain:
+
+- =worksheet/subs.cljs:59= — =(d/entid @@s/conn [:worksheet/uuid ws-uuid])=
+- =worksheet/events.cljs:624= — =(d/entid ds [:worksheet/uuid ws-uuid])=
+
+These resolve lookup refs to numeric entity IDs via the CLJS DB.
+
+*** Impact
+
+Minor — these are not hot paths. But if we remove the CLJS DB, they break.
+
+*** Fix
+
+Add =impl-rust/entid= that uses =RustDBProxy='s =-datoms :avet= (now fixed with
+correct index component mapping).
+
+*** Files
+
+- =impl_rust.cljs= (~10 lines)
+- =worksheet/subs.cljs=, =worksheet/events.cljs= (~2 lines each)
+
+** TODO 6.6 Listener Ordering Is an Implementation Detail [LOW]
+
+*** Problem
+
+=setup-conn!= relies on listeners firing in registration order (=:rust-sync=
+before re-posh, re-posh before reactive-entity). This works because CLJS
+=PersistentArrayMap= preserves insertion order for maps with ≤8 entries. But it's
+not a documented guarantee.
+
+*** Impact
+
+If DataScript changes its listener storage or a 9th listener is added, ordering
+breaks — posh queries run against stale Rust DB.
+
+*** Fix
+
+No code change needed now (≤3 listeners). Add a comment documenting the
+dependency. If listener count grows, use a wrapper that enforces ordering.
+
+*** Files
+
+- =projects/behave/src/cljs/behave/store.cljs= (comment only)
+
+** TODO 6.7 Dead Code Cleanup [LOW]
+
+1. *=unsupported-find?=* — always returns =false=. Remove function and all call
+   sites.
+2. *=init-sql-conn-from-datoms!=* in =store.cljs= — never called. Remove.
+3. *=-index-range=* on =RustDBProxy= — returns =nil=. Should throw to surface
+   unexpected usage.
+
+*** Files
+
+- =impl_rust.cljs=, =store.cljs=
+
+** TODO 6.8 Missing CLJS-Level Integration Tests [MEDIUM]
+
+*** Problem
+
+216 Rust-level tests pass, but there are NO ClojureScript-level tests that verify
+the full interop chain: CLJS datom → =sync-to-rust!= → Rust query →
+=rust-result->clj= → CLJS comparison. Keyword value round-trip, lookup ref entity
+resolution via =RustDBProxy=, and posh reactive query re-evaluation are all
+untested at the CLJS level.
+
+*** Fix
+
+Add integration tests to the kaocha test suite covering:
+
+- Keyword value round-trip through sync-to-rust → query → result
+- Lookup ref entity creation via =impl-rust/entity=
+- =sync-from-rust= round-trip (save + restore preserves keyword values)
+- Posh reactive sub re-fires correctly after transaction with =impl-rust/q= in
+  dcfg
+
+*** Files
+
+- New test file in =test/absurder_sql/datascript/impl_rust_test.cljs=
+
+** Phase 6 Priority Order
+
+| # | Issue | Severity | Effort | Blocks Phase 6? |
+|---+-------+----------+--------+-----------------|
+| 1 | Keyword values on restore | HIGH | Small | Yes — persistence breaks |
+| 2 | Sync listener error handling | HIGH | Small | Yes — silent data loss |
+| 8 | CLJS integration tests | MEDIUM | Medium | Yes — can't verify correctness |
+| 4 | Pull through posh | MEDIUM | Tiny | No — performance only |
+| 3 | reactive-entity bypass | MEDIUM | None (document) | Partial — blocks full CLJS removal |
+| 5 | d/entid bypass | LOW | Small | Yes — if removing CLJS DB |
+| 6 | Listener ordering | LOW | Tiny (comment) | No |
+| 7 | Dead code | LOW | Tiny | No |
+
+** Phase 6 Verification
+
+After addressing issues 6.1, 6.2, and 6.8:
+
+- =cargo test= — all Rust tests pass
+- kaocha CLJS tests — new integration tests pass
+- Manual: create worksheet → enter data → save → reopen → verify keyword-valued
+  attributes (e.g. =submodule/io=) display correctly
+- Manual: toggle =window.toggleRustEngine()= off → identical behavior
+- Manual: force sync failure (e.g. corrupt schema) → verify error logged, app
+  continues functioning via CLJS fallback
+
+** Key Files
+
+- =components/absurder_sql/src/absurder_sql/datascript/impl_rust.cljs=
+- =components/posh/src/posh/reagent.cljs=
+- =projects/behave/src/cljs/behave/store.cljs=
+- =projects/behave/src/cljs/austinbirch/reactive_entity.cljs= (reference only)
+- =components/absurder_sql/rust/persistent-sorted-set/src/wasm.rs= (reference)

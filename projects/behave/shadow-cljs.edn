@@ -9,7 +9,11 @@
                           :runner-ns    kaocha.cljs2.shadow-runner
                           :test-dir     "target/kaocha-test"
                           :ns-regexp    "^behave\\..*-test$"
-                          :build-hooks  [(behave.test-build/flush-hook)]
+                          :js-options   {:resolve {"datascript-rs"
+                                                   {:target :file
+                                                    :file   "target/datascript-rs/datascript_rs.js"}}}
+                          :build-hooks  [(behave.test-build/wasm-prepare-hook)
+                                        (behave.test-build/flush-hook)]
                           :devtools     {:http-port 1819
                                          :http-root "target/kaocha-test"
                                          :preloads  [lambdaisland.chui.remote]}}
@@ -17,8 +21,17 @@
             :browser    {:target          :browser
                          :output-dir      "target/browser/js"
                          :asset-path      "/js"
+                         :js-options      {:resolve {"datascript-rs"
+                                                     {:target :file
+                                                      :file   "target/datascript-rs/datascript_rs.js"}}}
+                         :compiler-options {:closure-defines
+                                           {absurder-sql.datascript.persistent-sorted-set/WASM_URL
+                                            "/js/datascript_rs_bg.wasm"
+                                            absurder-sql.core/WASM_URL
+                                            "/js/datascript_rs_bg.wasm"}}
                          :modules         {:app {:entries [behave.client]}}
-                         :build-hooks     [(behave.test-build/browser-flush-hook)]
+                         :build-hooks     [(behave.test-build/wasm-prepare-hook)
+                                          (behave.test-build/browser-flush-hook)]
                          :devtools        {:preloads [day8.re-frame-10x.preload devtools.preload]}
                          :dev             {:compiler-options
                                            {:closure-defines
@@ -32,8 +45,12 @@
             :app        {:target      :browser
                          :output-dir  "resources/public/cljs"
                          :asset-path  "/cljs"
+                         :js-options  {:resolve {"datascript-rs"
+                                                 {:target :file
+                                                  :file   "target/datascript-rs/datascript_rs.js"}}}
                          :modules     {:app {:entries [behave.client]}}
-                         :build-hooks [(behave.test-build/app-configure-hook)
+                         :build-hooks [(behave.test-build/wasm-prepare-hook)
+                                       (behave.test-build/app-configure-hook)
                                        (behave.test-build/app-flush-hook)]
                          :compiler-options {:optimizations :advanced
                                             :externs ["resources/behave_externs.js"

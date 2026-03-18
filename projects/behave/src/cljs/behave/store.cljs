@@ -9,6 +9,7 @@
             [browser-utils.core                     :refer [download]]
             [absurder-sql.datascript.core           :as d]
             [absurder-sql.datascript.impl-rust      :as impl-rust]
+            [absurder-sql.datascript.persistent-sorted-set :as pss]
             [absurder-sql.datascript.sqlite         :as ds-sqlite]
             [absurder-sql.datascript.storage-async  :as storage-async]
             [absurder-sql.interface                 :as sql]
@@ -158,11 +159,15 @@
 
 (defn load-store-minimal!
   "Set up an in-memory DataScript conn without SQLite backing.
-   Used on initial load when no worksheet is active."
+   Used on initial load when no worksheet is active.
+   Awaits WASM init but does not return a Promise to the caller."
   []
-  (let [schema (->ds-schema all-schemas)]
-    (setup-conn! (d/create-conn schema))
-    (rf/dispatch-sync [:state/set :sync-loaded? true])))
+  (-> (pss/ensure-initialized!)
+      (p/then (fn [_]
+                (let [schema (->ds-schema all-schemas)]
+                  (setup-conn! (d/create-conn schema))
+                  (rf/dispatch-sync [:state/set :sync-loaded? true])))))
+  nil)
 
 (defn load-store-local!
   "Initialize a local DataScript connection backed by SQLite.
@@ -170,7 +175,7 @@
   [ws-uuid]
   (let [schema  (->ds-schema all-schemas)
         db-name (str "worksheet-" ws-uuid ".db")]
-    (-> (sql/init!)
+    (-> (p/all [(pss/ensure-initialized!) (sql/init!)])
         (p/then (fn [_] (init-sql-conn! schema db-name)))
         (p/then (fn [{ds-conn :conn :keys [wrapper sql-conn]}]
                   (swap! sql-state assoc

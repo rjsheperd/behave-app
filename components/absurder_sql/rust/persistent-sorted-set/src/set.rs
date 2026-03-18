@@ -71,13 +71,57 @@ impl PersistentSortedSet {
         }
     }
 
-    /// Create from a sorted array of keys.
+    /// Build tree bottom-up from a pre-sorted Vec of keys. O(n) — no COW,
+    /// no per-insert string cloning. Each datom is moved (not cloned) into
+    /// exactly one leaf node.
     pub fn from_sorted(keys: Vec<Key>, cmp: Rc<Comparator>) -> Self {
-        let mut set = Self::empty(cmp);
-        for key in &keys {
-            set = set.conj(key);
+        let count = keys.len() as i64;
+        if count == 0 {
+            return Self::empty(cmp);
         }
-        set
+
+        let settings = Settings::default();
+        let bf = settings.branching_factor();
+
+        // Split keys into leaf-sized chunks. `into_iter` + `collect` moves
+        // the datoms instead of cloning them.
+        let mut nodes: Vec<Rc<Node>> = keys
+            .into_iter()
+            .collect::<Vec<_>>()
+            .chunks(bf)
+            .map(|chunk| {
+                Rc::new(Node::Leaf(Leaf::with_keys(chunk.to_vec(), settings.clone())))
+            })
+            .collect();
+
+        // Build branch levels until we have a single root.
+        let mut level: u32 = 1;
+        while nodes.len() > 1 {
+            let mut next_level: Vec<Rc<Node>> = Vec::new();
+            for chunk in nodes.chunks(bf) {
+                let child_keys: Vec<Key> = chunk.iter().map(|n| n.max_key().clone()).collect();
+                let children: Vec<Option<Rc<Node>>> = chunk.iter().map(|n| Some(Rc::clone(n))).collect();
+                next_level.push(Rc::new(Node::Branch(Branch::new(
+                    level,
+                    child_keys,
+                    None,
+                    Some(children),
+                    settings.clone(),
+                ))));
+            }
+            nodes = next_level;
+            level += 1;
+        }
+
+        Self {
+            cmp,
+            storage: None,
+            settings,
+            address: None,
+            root: Some(nodes.into_iter().next().unwrap()),
+            count,
+            version: Rc::new(Cell::new(0)),
+        }
     }
 
     /// Get root node, lazily loading from storage if needed.

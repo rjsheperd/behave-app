@@ -7,14 +7,29 @@
         cider/cider-nrepl                           {:mvn/version "0.55.7"}
         io.github.tonsky/extend-clj                 {:mvn/version "0.1.0"}
         refactor-nrepl/refactor-nrepl               {:mvn/version  "3.11.0"}
-        lambdaisland/kaocha-cljs2                   {:mvn/version "0.2.72"}}
+        lambdaisland/kaocha-cljs2                   {:mvn/version "0.2.72"}
+        sig/posh                                    {:local/root "../posh"}
+        reagent/reagent                             {:mvn/version "0.10.0"
+                                                     :exclusions  [cljsjs/react
+                                                                   cljsjs/react-dom
+                                                                   cljsjs/react-dom-server]}}
  :aliases {:test   {:extra-paths ["test"]
-                    :extra-deps  {lambdaisland/kaocha-cljs2 {:mvn/version "0.2.72"}}}
+                    :extra-deps  {lambdaisland/kaocha-cljs2 {:mvn/version "0.2.72"}
+                                  sig/posh                  {:local/root "../posh"}
+                                  reagent/reagent           {:mvn/version "0.10.0"
+                                                             :exclusions  [cljsjs/react
+                                                                           cljsjs/react-dom
+                                                                           cljsjs/react-dom-server]}}}
            :funnel {:replace-deps {lambdaisland/funnel {:mvn/version "1.6.93"}}
                     :main-opts    ["-m" "lambdaisland.funnel"]}
            :kaocha {:main-opts  ["-m" "kaocha.runner"]
                     :extra-deps {lambdaisland/kaocha       {:mvn/version "1.91.1392"}
                                  lambdaisland/chui         {:mvn/version "1.2.205"}
-                                 lambdaisland/kaocha-cljs2 {:mvn/version "0.2.72"}}}}}
+                                 lambdaisland/kaocha-cljs2 {:mvn/version "0.2.72"}
+                                 sig/posh                  {:local/root "../posh"}
+                                 reagent/reagent           {:mvn/version "0.10.0"
+                                                            :exclusions  [cljsjs/react
+                                                                          cljsjs/react-dom
+                                                                          cljsjs/react-dom-server]}}}}}
 
 ;; lambdaisland/kaocha {:mvn/version "1.91.1392"}

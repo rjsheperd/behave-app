@@ -8,6 +8,12 @@ use std::collections::HashSet;
 use js_sys;
 use wasm_bindgen::prelude::*;
 
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = console, js_name = log)]
+    fn console_log(s: &str);
+}
+
 use persistent_sorted_set::comparator::{
     comparator_for_index, parse_index_type, value_cmp, IndexType,
 };
@@ -503,11 +509,114 @@ impl WasmDataScript {
     /// Returns a new WasmDataScript (persistent/immutable).
     #[wasm_bindgen(js_name = "withDatoms")]
     pub fn with_datoms(mut self, datoms_array: js_sys::Array) -> WasmDataScript {
-        for i in 0..datoms_array.length() {
+        let len = datoms_array.length();
+        console_log(&format!("withDatoms: {} datoms", len));
+        for i in 0..len {
             let datom = datom_from_js(&datoms_array.get(i));
+            if i < 10 {
+                console_log(&format!(
+                    "  withDatoms[{}]: e={} a={:?} v={:?} tx={}",
+                    i, datom.e, datom.a, datom.v, datom.tx
+                ));
+            }
             self = self.with_datom_internal(datom);
         }
         self
+    }
+
+    /// Ultra-fast bulk load from a tab/newline-delimited string.
+    /// Format per line: `e\tattr\tv_type\tv_data\ttx`
+    /// Parses all datoms in pure Rust, sorts per index, builds trees bottom-up.
+    /// Zero JS boundary crossings.
+    #[wasm_bindgen(js_name = "transactBulkString")]
+    pub fn transact_bulk_string(&mut self, data: &str) {
+        use persistent_sorted_set::datom::{Attr, Datom, Value};
+        use persistent_sorted_set::comparator::{cmp_datoms, IndexType};
+
+        let mut all_datoms: Vec<Datom> = Vec::with_capacity(data.len() / 30);
+        let mut max_eid: i64 = self.max_eid;
+
+        for line in data.split('\n') {
+            if line.is_empty() { continue; }
+            let mut parts = line.splitn(5, '\t');
+            let e: i64 = parts.next().unwrap_or("0").parse().unwrap_or(0);
+            let a_str = parts.next().unwrap_or("");
+            let v_type = parts.next().unwrap_or("s");
+            let v_data = parts.next().unwrap_or("");
+            let tx: i64 = parts.next().unwrap_or("0").parse().unwrap_or(0);
+
+            let attr = if a_str.is_empty() {
+                None
+            } else if let Some(idx) = a_str.find('/') {
+                Some(Attr::Keyword {
+                    ns: Some(a_str[..idx].to_string()),
+                    name: a_str[idx + 1..].to_string(),
+                })
+            } else {
+                Some(Attr::Keyword { ns: None, name: a_str.to_string() })
+            };
+
+            let val = match v_type {
+                "n" => {
+                    let n: f64 = v_data.parse().unwrap_or(0.0);
+                    if n.fract() == 0.0 && n >= i64::MIN as f64 && n <= i64::MAX as f64 {
+                        Value::Long(n as i64)
+                    } else {
+                        Value::Double(n)
+                    }
+                }
+                "r" => Value::Ref(v_data.parse().unwrap_or(0)),
+                "k" => {
+                    if let Some(idx) = v_data.find('/') {
+                        Value::Keyword(Attr::Keyword {
+                            ns: Some(v_data[..idx].to_string()),
+                            name: v_data[idx + 1..].to_string(),
+                        })
+                    } else {
+                        Value::Keyword(Attr::Keyword { ns: None, name: v_data.to_string() })
+                    }
+                }
+                "b" => Value::Bool(v_data == "true" || v_data == "1"),
+                _ => Value::Str(v_data.to_string()),
+            };
+
+            if e > max_eid { max_eid = e; }
+            all_datoms.push(Datom::new(e, attr, val, tx));
+        }
+
+        self.max_eid = max_eid;
+
+        console_log(&format!(
+            "transactBulkString: {} datoms parsed, max_eid={}",
+            all_datoms.len(), max_eid
+        ));
+        for (i, d) in all_datoms.iter().enumerate().take(20) {
+            console_log(&format!(
+                "  datom[{}]: e={} a={:?} v={:?} tx={}",
+                i, d.e, d.a, d.v, d.tx
+            ));
+        }
+
+        // Build EAVT: sort + bottom-up tree
+        let mut eavt_datoms = all_datoms.clone();
+        eavt_datoms.sort_by(|a, b| cmp_datoms(IndexType::EAVT, a, b));
+        self.eavt = PersistentSortedSet::from_sorted(
+            eavt_datoms, comparator_for_index(IndexType::EAVT));
+
+        // Build AEVT: sort + bottom-up tree
+        let mut aevt_datoms = all_datoms.clone();
+        aevt_datoms.sort_by(|a, b| cmp_datoms(IndexType::AEVT, a, b));
+        self.aevt = PersistentSortedSet::from_sorted(
+            aevt_datoms, comparator_for_index(IndexType::AEVT));
+
+        // Build AVET: filter indexed attrs, sort + bottom-up tree
+        let avet_datoms: Vec<Datom> = all_datoms.into_iter()
+            .filter(|d| d.a.as_ref().map_or(false, |a| self.is_indexed(a)))
+            .collect();
+        let mut avet_sorted = avet_datoms;
+        avet_sorted.sort_by(|a, b| cmp_datoms(IndexType::AVET, a, b));
+        self.avet = PersistentSortedSet::from_sorted(
+            avet_sorted, comparator_for_index(IndexType::AVET));
     }
 
     /// Count of datoms in the EAVT index.
@@ -1229,6 +1338,18 @@ impl WasmDataScript {
         result
     }
 
+    /// Resolve an entity ID or lookup ref to a numeric entity ID.
+    /// Returns the numeric eid, or `JsValue::NULL` if unresolvable.
+    ///
+    /// `eid` may be a number (returned as-is) or a lookup ref `[":attr", value]`.
+    #[wasm_bindgen(js_name = "entid")]
+    pub fn entid_js(&self, eid: JsValue) -> JsValue {
+        match resolve_eid_from_js(self, &eid) {
+            Some(id) => JsValue::from_f64(id as f64),
+            None => JsValue::NULL,
+        }
+    }
+
     /// Store the database to unified SQLite storage.
     #[wasm_bindgen(js_name = "storeDb")]
     pub fn store_db(&mut self, db_name: String) {
@@ -1331,7 +1452,10 @@ impl WasmDataScript {
         let settings_base = Settings::new(512);
         let meta = {
             let storage = LegacyStorage::new(&db_name, settings_base.clone());
-            storage.read_metadata()
+            match storage.read_metadata() {
+                Some(m) => m,
+                None => return None, // No legacy metadata — not a legacy DB
+            }
         };
 
         let settings = Settings::new(meta.branching_factor);

@@ -169,9 +169,8 @@ pub mod wasm {
             Some(metadata_from_edn(&edn))
         }
 
-        pub fn read_metadata(&self) -> LegacyMetadata {
+        pub fn read_metadata(&self) -> Option<LegacyMetadata> {
             Self::read_metadata_raw(self.conn.db.get())
-                .expect("No legacy metadata found at addr=0")
         }
 
         pub fn write_metadata(&mut self, meta: &LegacyMetadata) {

@@ -11,9 +11,9 @@
 
 ;;; State
 
-(defonce ^:private state (atom {:rust-db nil
-                                :cljs-db nil
-                                :named-dbs {}
+(defonce ^:private state (atom {:rust-db        nil
+                                :cljs-db        nil
+                                :named-dbs      {}
                                 :named-cljs-dbs {}}))
 
 (defonce rust-enabled? (atom true))
@@ -62,7 +62,7 @@
 
 ;;; Schema conversion (CLJS <-> JS for WasmDataScript)
 
-(defn- schema->js
+(defn schema->js
   "Convert a CLJS DataScript schema map to the JS object format WasmDataScript expects."
   [schema]
   (let [obj (js/Object.)]
@@ -116,11 +116,18 @@
 
 (defn- keyword->attr-str
   "Convert a CLJS keyword to the string format WasmDataScript expects.
-   :person/name -> \":person/name\", :name -> \":name\"."
+   :person/name -> \":person/name\", :name -> \":name\".
+   Also handles string attributes (passed through with leading colon)."
   [kw]
-  (if (namespace kw)
-    (str ":" (namespace kw) "/" (name kw))
-    (str ":" (name kw))))
+  (if (keyword? kw)
+    (if (namespace kw)
+      (str ":" (namespace kw) "/" (name kw))
+      (str ":" (name kw)))
+    (if (string? kw)
+      (if (= (aget kw 0) ":")
+        kw
+        (str ":" kw))
+      (str ":" kw))))
 
 (defn- js-datom-attr->keyword
   "Convert a JS datom attribute string like ':name' or ':ns/name' to a keyword."
@@ -129,21 +136,38 @@
 
 ;;; Sync
 
+(defn- value-type+str
+  "Encode a value as type tag + string for bulk serialization to Rust."
+  [v]
+  (cond
+    (string? v)  (str "s\t" v)
+    (number? v)  (str "n\t" v)
+    (keyword? v) (str "k\t" (if-let [ns (namespace v)]
+                              (str ns "/" (name v))
+                              (name v)))
+    (boolean? v) (str "b\t" (if v "true" "false"))
+    (nil? v)     "s\t"
+    :else        (str "s\t" v)))
+
 (defn sync-to-rust!
   "Sync a CLJS DataScript DB to a WasmDataScript instance.
-   Extracts all datoms and rebuilds the Rust DB from scratch."
+   Uses bulk string serialization — one WASM call for all datoms."
   [cljs-db]
   (let [schema    (:schema cljs-db)
         js-schema (schema->js schema)
         datoms    (d/datoms cljs-db :eavt)
         rust-db   (.emptyDb WasmDataScript js-schema)
-        arr       (js/Array.)]
+        sb        (js/Array.)]
     (doseq [^db/Datom d datoms]
-      (.push arr #js {:e  (.-e d)
-                      :a  (keyword->attr-str (.-a d))
-                      :v  (.-v d)
-                      :tx (.-tx d)}))
-    (.withDatoms rust-db arr)))
+      (let [a     (.-a d)
+            a-str (if (keyword? a)
+                    (if-let [ns (namespace a)]
+                      (str ns "/" (name a))
+                      (name a))
+                    (str a))]
+        (.push sb (str (.-e d) "\t" a-str "\t" (value-type+str (.-v d)) "\t" (.-tx d)))))
+    (.transactBulkString rust-db (.join sb "\n"))
+    rust-db))
 
 (defn sync-from-rust
   "Create a CLJS DataScript DB from a WasmDataScript instance.
@@ -190,14 +214,26 @@
               :else                    {:param s})))
         in-clause))
 
+(defn- str->keyword
+  "Convert a string like \":input\" or \":db.cardinality/many\" to a keyword."
+  [^string s]
+  (let [s (if (identical? ":" (.charAt s 0)) (.substring s 1) s)
+        i (.indexOf s "/")]
+    (if (== i -1)
+      (keyword s)
+      (keyword (.substring s 0 i) (.substring s (inc i))))))
+
 (defn- js-pull-result->clj
   "Convert a JS pull result (nested objects with ':keyword' string keys)
-   to a CLJS map with keyword keys, matching d/pull return format."
+   to a CLJS map with keyword keys, matching d/pull return format.
+   String values starting with \":\" are converted back to keywords."
   [js-obj]
   (cond
     (nil? js-obj)    nil
     (number? js-obj) js-obj
-    (string? js-obj) js-obj
+    (string? js-obj) (if (identical? ":" (.charAt ^string js-obj 0))
+                       (str->keyword js-obj)
+                       js-obj)
     (boolean? js-obj) js-obj
 
     (array? js-obj)
@@ -209,7 +245,7 @@
        (reduce (fn [m entry]
                  (let [k (aget entry 0)
                        v (aget entry 1)]
-                   (assoc! m (keyword (subs k 1)) (js-pull-result->clj v))))
+                   (assoc! m (str->keyword k) (js-pull-result->clj v))))
                (transient {})
                (array-seq entries))))
 
@@ -269,31 +305,31 @@
    Mirrors db.cljc's rschema structure: {:db.type/ref #{attrs}, :db.cardinality/many #{attrs}, ...}"
   [schema]
   (reduce-kv
-    (fn [rs attr props]
-      (cond-> rs
-        (:db/index props)
-        (update :db/index (fnil conj #{}) attr)
+   (fn [rs attr props]
+     (cond-> rs
+       (:db/index props)
+       (update :db/index (fnil conj #{}) attr)
 
-        (= :db.unique/identity (:db/unique props))
-        (-> (update :db.unique/identity (fnil conj #{}) attr)
-            (update :db/unique (fnil conj #{}) attr)
-            (update :db/index (fnil conj #{}) attr))
+       (= :db.unique/identity (:db/unique props))
+       (-> (update :db.unique/identity (fnil conj #{}) attr)
+           (update :db/unique (fnil conj #{}) attr)
+           (update :db/index (fnil conj #{}) attr))
 
-        (= :db.unique/value (:db/unique props))
-        (-> (update :db.unique/value (fnil conj #{}) attr)
-            (update :db/unique (fnil conj #{}) attr)
-            (update :db/index (fnil conj #{}) attr))
+       (= :db.unique/value (:db/unique props))
+       (-> (update :db.unique/value (fnil conj #{}) attr)
+           (update :db/unique (fnil conj #{}) attr)
+           (update :db/index (fnil conj #{}) attr))
 
-        (= :db.cardinality/many (:db/cardinality props))
-        (update :db.cardinality/many (fnil conj #{}) attr)
+       (= :db.cardinality/many (:db/cardinality props))
+       (update :db.cardinality/many (fnil conj #{}) attr)
 
-        (= :db.type/ref (:db/valueType props))
-        (-> (update :db.type/ref (fnil conj #{}) attr)
-            (update :db/index (fnil conj #{}) attr))
+       (= :db.type/ref (:db/valueType props))
+       (-> (update :db.type/ref (fnil conj #{}) attr)
+           (update :db/index (fnil conj #{}) attr))
 
-        (:db/isComponent props)
-        (update :db/isComponent (fnil conj #{}) attr)))
-    {} schema))
+       (:db/isComponent props)
+       (update :db/isComponent (fnil conj #{}) attr)))
+   {} schema))
 
 (defn- js-datoms->clj-datoms
   "Convert a JS array of datom objects to a seq of CLJS Datom records."
@@ -311,10 +347,10 @@
    Nils in pattern are wildcards."
   [rdb pattern]
   (let [[e a v tx] pattern
-        e-js  (if (some? e) e js/undefined)
-        a-js  (if (some? a) (keyword->attr-str a) js/undefined)
-        v-js  (if (some? v) (clj->js v) js/undefined)
-        tx-js (if (some? tx) tx js/undefined)]
+        e-js       (if (some? e) e js/undefined)
+        a-js       (if (some? a) (keyword->attr-str a) js/undefined)
+        v-js       (if (some? v) (clj->js v) js/undefined)
+        tx-js      (if (some? tx) tx js/undefined)]
     (js-datoms->clj-datoms (.search rdb e-js a-js v-js tx-js))))
 
 (defn- rust-datoms
@@ -331,18 +367,18 @@
                      (:aevt "aevt") [c1 c0 c2 c3]
                      (:avet "avet") [c2 c0 c1 c3]
                      [c0 c1 c2 c3])
-        from-e  (if (some? e) e js/undefined)
-        from-a  (if (some? a) (keyword->attr-str a) js/undefined)
-        from-v  (if (some? v) (clj->js v) js/undefined)
-        from-tx (if (some? tx) tx js/undefined)
-        to-e    js/undefined
-        to-a    js/undefined
-        to-v    js/undefined
-        to-tx   js/undefined]
+        from-e     (if (some? e) e js/undefined)
+        from-a     (if (some? a) (keyword->attr-str a) js/undefined)
+        from-v     (if (some? v) (clj->js v) js/undefined)
+        from-tx    (if (some? tx) tx js/undefined)
+        to-e       js/undefined
+        to-a       js/undefined
+        to-v       js/undefined
+        to-tx      js/undefined]
     (js-datoms->clj-datoms
-      (.datomsIndex rdb (name index)
-                    from-e from-a from-v from-tx
-                    to-e to-a to-v to-tx))))
+     (.datomsIndex rdb (name index)
+                   from-e from-a from-v from-tx
+                   to-e to-a to-v to-tx))))
 
 (deftype RustDBProxy [rdb schema rschema]
   db/IDB
@@ -470,44 +506,44 @@
 (defn- q-impl
   "Core Rust query implementation. Uses `rdb` as the primary DB."
   [rdb query-form inputs]
-  (let [parsed-q (dp/parse-query query-form)
-        q-map      (cond-> query-form
-                     (sequential? query-form) dp/query->map)
-        in-clause  (or (:in q-map) '[$])
-        bindings   (parse-in-bindings in-clause)
-        rules-str  (atom nil)
-        params     (atom [])
+  (let [parsed-q    (dp/parse-query query-form)
+        q-map       (cond-> query-form
+                      (sequential? query-form) dp/query->map)
+        in-clause   (or (:in q-map) '[$])
+        bindings    (parse-in-bindings in-clause)
+        rules-str   (atom nil)
+        params      (atom [])
         source-name (atom "")
         source-db   (atom nil)
-        _          (dorun
-                    (map-indexed
-                     (fn [idx binding]
-                       (let [input (nth inputs idx nil)]
-                         (cond
-                           (= :db binding)      nil
-                           (= :rules binding)   (reset! rules-str
-                                                        (strip-edn-comments (pr-str input)))
-                           (:source binding)     (let [src-name (:source binding)]
-                                                   (reset! source-name src-name)
-                                                   (cond
-                                                     (instance? WasmDataScript input)
-                                                     (reset! source-db input)
+        _           (dorun
+                     (map-indexed
+                      (fn [idx binding]
+                        (let [input (nth inputs idx nil)]
+                          (cond
+                            (= :db binding)      nil
+                            (= :rules binding)   (reset! rules-str
+                                                         (strip-edn-comments (pr-str input)))
+                            (:source binding)     (let [src-name (:source binding)]
+                                                    (reset! source-name src-name)
+                                                    (cond
+                                                      (instance? WasmDataScript input)
+                                                      (reset! source-db input)
 
                                                      ;; Look up named DB if input is a CLJS DB
-                                                     :else
-                                                     (when-let [ndb (get-in @state [:named-dbs src-name])]
-                                                       (reset! source-db ndb))))
-                           (:param binding)      (swap! params conj
-                                                       #js [(str "?" (:param binding))
-                                                            (clj->js input)]))))
-                     bindings))
-        query-edn  (strip-edn-comments (pr-str query-form))
-        rules-edn  (or @rules-str "")
-        inputs-js  (apply array @params)
-        js-result  (if (seq @source-name)
-                     (.queryEdnMulti rdb query-edn rules-edn inputs-js
-                                     @source-name @source-db)
-                     (.queryEdn rdb query-edn rules-edn inputs-js))]
+                                                      :else
+                                                      (when-let [ndb (get-in @state [:named-dbs src-name])]
+                                                        (reset! source-db ndb))))
+                            (:param binding)      (swap! params conj
+                                                         #js [(str "?" (:param binding))
+                                                              (clj->js input)]))))
+                      bindings))
+        query-edn   (strip-edn-comments (pr-str query-form))
+        rules-edn   (or @rules-str "")
+        inputs-js   (apply array @params)
+        js-result   (if (seq @source-name)
+                      (.queryEdnMulti rdb query-edn rules-edn inputs-js
+                                      @source-name @source-db)
+                      (.queryEdn rdb query-edn rules-edn inputs-js))]
     (rust-result->clj js-result parsed-q)))
 
 (defn- resolve-rust-db
@@ -527,6 +563,17 @@
      ;; Default to VMS Rust DB
      (:rust-db s))))
 
+(defn- has-db-input?
+  "Returns true if the query's :in clause expects a database source ($).
+   Queries without a DB (e.g. posh's internal collection re-queries with
+   :in [[vars ...]]) should always fall back to CLJS d/q."
+  [query-form]
+  (let [q-map     (cond-> query-form
+                    (sequential? query-form) dp/query->map)
+        in-clause (or (:in q-map) '[$])]
+    (some #(or (= '$ %) (and (symbol? %) (str/starts-with? (name %) "$")))
+          in-clause)))
+
 (defn q
   "Query via the Rust engine when a rust-db is available.
    Same interface as d/q. Falls back to d/q for unsupported features
@@ -535,7 +582,8 @@
    Detects the correct Rust DB by comparing the input DB identity with
    tracked CLJS DBs (for posh/re-posh reactive query routing)."
   [query-form & inputs]
-  (if (not @rust-enabled?)
+  (if (or (not @rust-enabled?)
+          (not (has-db-input? query-form)))
     (apply d/q query-form inputs)
     (let [rdb (resolve-rust-db (first inputs))]
       (if (nil? rdb)
@@ -553,10 +601,11 @@
 
 (defn pull
   "Pull an entity via the Rust engine. Same interface as d/pull.
-   Falls back to d/pull if rust-enabled? is false or no rust-db exists."
+   Falls back to d/pull if rust-enabled? is false or no rust-db exists.
+   Resolves the Rust DB by identity matching (for posh reactive routing)."
   [db pattern eid]
-  (let [rdb (:rust-db @state)]
-    (if (or (not @rust-enabled?) (nil? rdb))
+  (let [rdb (when @rust-enabled? (resolve-rust-db db))]
+    (if (nil? rdb)
       (d/pull db pattern eid)
       (let [pattern-edn (strip-edn-comments (pr-str pattern))
             js-result   (.pull rdb pattern-edn (eid->js eid))]
@@ -564,12 +613,24 @@
 
 (defn pull-many
   "Pull multiple entities via the Rust engine. Same interface as d/pull-many.
-   Falls back to d/pull-many if rust-enabled? is false or no rust-db exists."
+   Falls back to d/pull-many if rust-enabled? is false or no rust-db exists.
+   Resolves the Rust DB by identity matching (for posh reactive routing)."
   [db pattern eids]
-  (let [rdb (:rust-db @state)]
-    (if (or (not @rust-enabled?) (nil? rdb))
+  (let [rdb (when @rust-enabled? (resolve-rust-db db))]
+    (if (nil? rdb)
       (d/pull-many db pattern eids)
       (let [pattern-edn (strip-edn-comments (pr-str pattern))
             eids-js     (apply array (map eid->js eids))
             js-result   (.pullMany rdb pattern-edn eids-js)]
         (mapv js-pull-result->clj (array-seq js-result))))))
+
+(defn entid
+  "Resolve an entity ID or lookup ref to a numeric eid via the Rust engine.
+   Same interface as d/entid. Falls back to d/entid when Rust is unavailable."
+  [db eid]
+  (let [rdb (when @rust-enabled? (resolve-rust-db db))]
+    (if (nil? rdb)
+      (d/entid db eid)
+      (let [result (.entid rdb (eid->js eid))]
+        (when-not (nil? result)
+          (long result))))))

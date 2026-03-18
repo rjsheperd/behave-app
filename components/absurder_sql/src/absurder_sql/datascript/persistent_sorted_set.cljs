@@ -58,17 +58,35 @@
     (set! (.-_storage new) s))
   new)
 
+(defn- kw->attr-str
+  "Convert a keyword to the attribute string format for conjFieldsMut.
+   :person/name -> \"person/name\", :name -> \"name\" (no leading colon)."
+  [kw]
+  (if-let [ns (namespace kw)]
+    (str ns "/" (name kw))
+    (name kw)))
+
 (defn conj
-  "Analogue to [[clojure.core/conj]] but with comparator that overrides the one stored in set."
+  "Analogue to [[clojure.core/conj]] but with comparator that overrides the one stored in set.
+   Uses conjFieldsMut with pre-extracted fields to minimize WASM boundary crossings."
   [^WasmPSS set key cmp]
-  (let [js-cmp (js-comparator cmp)]
-    (propagate-storage set (.conj set key js-cmp))))
+  (let [^number e  (.-e key)
+        a          (.-a key)
+        v          (.-v key)
+        ^number tx (.-tx key)]
+    (.conjFieldsMut set e (kw->attr-str a) v tx)
+    set))
 
 (defn disj
-  "Analogue to [[clojure.core/disj]] with comparator that overrides the one stored in set."
+  "Analogue to [[clojure.core/disj]] with comparator that overrides the one stored in set.
+   Uses disjFieldsMut with pre-extracted fields to minimize WASM boundary crossings."
   [^WasmPSS set key cmp]
-  (let [js-cmp (js-comparator cmp)]
-    (propagate-storage set (.disj set key js-cmp))))
+  (let [^number e  (.-e key)
+        a          (.-a key)
+        v          (.-v key)
+        ^number tx (.-tx key)]
+    (.disjFieldsMut set e (kw->attr-str a) v tx)
+    set))
 
 (defn slice
   "An iterator for part of the set with provided boundaries.
@@ -116,6 +134,45 @@
          storage    (:storage opts)
          settings   #js {:branchingFactor (or (:branching-factor opts) 512)}]
      (.from WasmPSS js-arr js-cmp storage settings))))
+
+(defn from-sorted-array-indexed
+  "Like from-sorted-array but uses Rust-native comparator for the given index
+   type (\"eavt\", \"aevt\", \"avet\"). All datom parsing and tree building
+   happens in Rust — no JS comparator callbacks."
+  [index-type keys]
+  (let [js-arr (if (array? keys) keys (to-array keys))]
+    (.fromIndexed WasmPSS js-arr index-type)))
+
+(defn- datom-value-type+str
+  "Encode a datom value as type tag + string for bulk serialization."
+  [v]
+  (cond
+    (string? v)  (array "s" v)
+    (number? v)  (array "n" (str v))
+    (keyword? v) (array "k" (if-let [ns (namespace v)]
+                              (str ns "/" (name v))
+                              (name v)))
+    (boolean? v) (array "b" (if v "true" "false"))
+    (nil? v)     (array "s" "")
+    :else        (array "s" (str v))))
+
+(defn from-sorted-array-bulk
+  "Ultra-fast bulk load: serializes all datoms as a single tab/newline string
+   and passes it to Rust in ONE WASM call. Zero Reflect::get crossings.
+   Rust builds the B+ tree bottom-up from the sorted data in O(n)."
+  [index-type keys]
+  (let [sb (js/Array.)]
+    (doseq [d (if (array? keys) (array-seq keys) keys)]
+      (let [^number e  (.-e d)
+            a          (.-a d)
+            v          (.-v d)
+            ^number tx (.-tx d)
+            a-str      (if-let [ns (namespace a)]
+                         (str ns "/" (name a))
+                         (name a))
+            vts        (datom-value-type+str v)]
+        (.push sb (str e "\t" a-str "\t" (aget vts 0) "\t" (aget vts 1) "\t" tx))))
+    (.fromBulkString WasmPSS (.join sb "\n") index-type)))
 
 (defn from-sequential
   "Create a set with custom comparator and a collection of keys. Useful when you don't want to call [[clojure.core/apply]] on [[sorted-set-by]]."

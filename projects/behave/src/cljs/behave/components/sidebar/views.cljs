@@ -35,9 +35,10 @@
   (let [*loaded?          (rf/subscribe [:app/loaded?])
         *hidden?          (rf/subscribe [:sidebar/hidden?])
         worksheet-modules (when @*loaded?
-                            (map (fn [module-entity]
-                                   (keyword (str/lower-case (:module/name module-entity))))
-                                 @(rf/subscribe [:sidebar/worksheet-modules ws-uuid])))
+                            (keep (fn [module-entity]
+                                    (when-let [n (:module/name module-entity)]
+                                      (keyword (str/lower-case n))))
+                                  @(rf/subscribe [:sidebar/worksheet-modules ws-uuid])))
         sidebar-modules   (or (seq worksheet-modules)
                               @(rf/subscribe [:sidebar/modules]))]
 

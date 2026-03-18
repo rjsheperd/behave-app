@@ -41,9 +41,7 @@ pub fn datom_from_js(val: &JsValue) -> Datom {
         .and_then(|v| v.as_f64())
         .unwrap_or(0.0) as i64;
 
-    let mut datom = Datom::new(e, a, v, tx);
-    datom.original_js = Some(val.clone());
-    datom
+    Datom::new(e, a, v, tx)
 }
 
 /// Convert a Datom to a JS object with e, a, v, tx properties.
@@ -417,6 +415,90 @@ impl WasmPSS {
         WasmPSS { inner: set, index_type: None }
     }
 
+    /// Build a WasmPSS from a pre-sorted JS array of CLJS Datom objects using
+    /// Rust-native comparator and field extraction.
+    #[wasm_bindgen(js_name = "fromIndexed")]
+    pub fn from_indexed(arr: js_sys::Array, index_type: String) -> WasmPSS {
+        let idx = parse_index_type(&index_type);
+        let cmp = comparator_for_index(idx);
+        let len = arr.length();
+
+        let mut datoms: Vec<Datom> = Vec::with_capacity(len as usize);
+        for i in 0..len {
+            datoms.push(datom_from_js(&arr.get(i)));
+        }
+
+        let mut set = PersistentSortedSet::empty(Rc::clone(&cmp));
+        for datom in &datoms {
+            set = set.conj(datom);
+        }
+
+        WasmPSS { inner: set, index_type: Some(idx) }
+    }
+
+    /// Ultra-fast bulk load from a tab/newline-delimited string of datom fields.
+    /// Format per line: `e\tattr\tv_type\tv_data\ttx`
+    /// v_type: s=string, n=number, k=keyword, b=boolean, r=ref
+    /// This does ZERO Reflect::get calls — all parsing happens in pure Rust.
+    #[wasm_bindgen(js_name = "fromBulkString")]
+    pub fn from_bulk_string(data: &str, index_type: String) -> WasmPSS {
+        let idx = parse_index_type(&index_type);
+        let cmp = comparator_for_index(idx);
+
+        let mut datoms: Vec<Datom> = Vec::with_capacity(data.len() / 30); // rough estimate
+
+        for line in data.split('\n') {
+            if line.is_empty() { continue; }
+            let mut parts = line.splitn(5, '\t');
+            let e: i64 = parts.next().unwrap_or("0").parse().unwrap_or(0);
+            let a_str = parts.next().unwrap_or("");
+            let v_type = parts.next().unwrap_or("s");
+            let v_data = parts.next().unwrap_or("");
+            let tx: i64 = parts.next().unwrap_or("0").parse().unwrap_or(0);
+
+            let attr = if a_str.is_empty() {
+                None
+            } else if let Some(idx) = a_str.find('/') {
+                Some(Attr::Keyword {
+                    ns: Some(a_str[..idx].to_string()),
+                    name: a_str[idx + 1..].to_string(),
+                })
+            } else {
+                Some(Attr::Keyword { ns: None, name: a_str.to_string() })
+            };
+
+            let val = match v_type {
+                "n" => {
+                    let n: f64 = v_data.parse().unwrap_or(0.0);
+                    if n.fract() == 0.0 && n >= i64::MIN as f64 && n <= i64::MAX as f64 {
+                        Value::Long(n as i64)
+                    } else {
+                        Value::Double(n)
+                    }
+                }
+                "r" => Value::Ref(v_data.parse().unwrap_or(0)),
+                "k" => {
+                    if let Some(idx) = v_data.find('/') {
+                        Value::Keyword(Attr::Keyword {
+                            ns: Some(v_data[..idx].to_string()),
+                            name: v_data[idx + 1..].to_string(),
+                        })
+                    } else {
+                        Value::Keyword(Attr::Keyword { ns: None, name: v_data.to_string() })
+                    }
+                }
+                "b" => Value::Bool(v_data == "true" || v_data == "1"),
+                _ => Value::Str(v_data.to_string()), // "s" or default
+            };
+
+            datoms.push(Datom::new(e, attr, val, tx));
+        }
+
+        // Build tree bottom-up from sorted datoms — O(n), no COW cloning
+        let set = PersistentSortedSet::from_sorted(datoms, cmp);
+        WasmPSS { inner: set, index_type: Some(idx) }
+    }
+
     /// Restore from storage address (lazy — root not loaded until accessed).
     #[wasm_bindgen(js_name = "restore")]
     pub fn restore(
@@ -465,12 +547,79 @@ impl WasmPSS {
     // --- Common methods ---
 
     /// Add a key (JS datom object). Optional comparator override (ignored).
+    /// Returns a NEW WasmPSS (persistent/immutable).
     pub fn conj(&self, key: JsValue, _cmp: JsValue) -> WasmPSS {
         let datom = datom_from_js(&key);
         WasmPSS {
             inner: self.inner.clone().conj(&datom),
             index_type: self.index_type,
         }
+    }
+
+    /// Mutating conj — reuses this WasmPSS object instead of allocating a new one.
+    /// Avoids intermediate WASM object accumulation during bulk transact.
+    #[wasm_bindgen(js_name = "conjMut")]
+    pub fn conj_mut(&mut self, key: JsValue, _cmp: JsValue) {
+        let datom = datom_from_js(&key);
+        // Take the inner PSS (replaces with a dummy), conj, store result back.
+        // The consumed PSS's old nodes are freed immediately.
+        let taken = std::mem::replace(
+            &mut self.inner,
+            PersistentSortedSet::empty(std::rc::Rc::new(|_, _| std::cmp::Ordering::Equal)),
+        );
+        self.inner = taken.conj(&datom);
+    }
+
+    /// Fast mutating conj with pre-extracted fields. Avoids Reflect::get
+    /// overhead of datom_from_js. The `a` parameter is a keyword string
+    /// like "name" or "module/name" (no leading colon).
+    #[wasm_bindgen(js_name = "conjFieldsMut")]
+    pub fn conj_fields_mut(&mut self, e: f64, a: &str, v: JsValue, tx: f64) {
+        let attr = if a.is_empty() {
+            None
+        } else if let Some(idx) = a.find('/') {
+            Some(Attr::Keyword {
+                ns: Some(a[..idx].to_string()),
+                name: a[idx + 1..].to_string(),
+            })
+        } else {
+            Some(Attr::Keyword {
+                ns: None,
+                name: a.to_string(),
+            })
+        };
+        let val = value_from_js(&v);
+        let datom = Datom::new(e as i64, attr, val, tx as i64);
+        let taken = std::mem::replace(
+            &mut self.inner,
+            PersistentSortedSet::empty(std::rc::Rc::new(|_, _| std::cmp::Ordering::Equal)),
+        );
+        self.inner = taken.conj(&datom);
+    }
+
+    /// Fast mutating disj with pre-extracted fields.
+    #[wasm_bindgen(js_name = "disjFieldsMut")]
+    pub fn disj_fields_mut(&mut self, e: f64, a: &str, v: JsValue, tx: f64) {
+        let attr = if a.is_empty() {
+            None
+        } else if let Some(idx) = a.find('/') {
+            Some(Attr::Keyword {
+                ns: Some(a[..idx].to_string()),
+                name: a[idx + 1..].to_string(),
+            })
+        } else {
+            Some(Attr::Keyword {
+                ns: None,
+                name: a.to_string(),
+            })
+        };
+        let val = value_from_js(&v);
+        let datom = Datom::new(e as i64, attr, val, tx as i64);
+        let taken = std::mem::replace(
+            &mut self.inner,
+            PersistentSortedSet::empty(std::rc::Rc::new(|_, _| std::cmp::Ordering::Equal)),
+        );
+        self.inner = taken.disj(&datom);
     }
 
     /// Remove a key (JS datom object). Optional comparator override (ignored).
@@ -480,6 +629,17 @@ impl WasmPSS {
             inner: self.inner.clone().disj(&datom),
             index_type: self.index_type,
         }
+    }
+
+    /// Mutating disj — reuses this WasmPSS object.
+    #[wasm_bindgen(js_name = "disjMut")]
+    pub fn disj_mut(&mut self, key: JsValue, _cmp: JsValue) {
+        let datom = datom_from_js(&key);
+        let taken = std::mem::replace(
+            &mut self.inner,
+            PersistentSortedSet::empty(std::rc::Rc::new(|_, _| std::cmp::Ordering::Equal)),
+        );
+        self.inner = taken.disj(&datom);
     }
 
     pub fn contains(&self, key: JsValue) -> bool {
