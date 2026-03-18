@@ -3,6 +3,7 @@
             [clojure.set            :refer [rename-keys]]
             [behave.translate       :refer [<t]]
             [absurder-sql.datascript.core :as d]
+            [absurder-sql.datascript.impl-rust :as impl-rust]
             [re-frame.core          :refer [reg-sub path] :as rf]))
 
 (reg-sub
@@ -14,12 +15,14 @@
 (reg-sub
  :tool/all-tools
  (fn [_ _]
-   (let [eids (d/q '[:find [?e ...]
-                     :in $
-                     :where
-                     [?e :tool/name ?name]]
-                   @@s/vms-conn)]
-     (map #(d/entity @@s/vms-conn %) eids))))
+   (let [eids (impl-rust/q '[:find [?e ...]
+                              :in $
+                              :where
+                              [?e :tool/name ?name]]
+                            @@s/vms-conn)]
+     (map #(or (impl-rust/entity %)
+               (d/entity @@s/vms-conn %))
+          eids))))
 
 (reg-sub
  :tool/selected-tool-uuid
@@ -34,7 +37,8 @@
 (reg-sub
  :tool/entity
  (fn [_ [_ tool-uuid]]
-   (d/entity @@s/vms-conn [:bp/uuid tool-uuid])))
+   (or (impl-rust/entity [:bp/uuid tool-uuid])
+       (d/entity @@s/vms-conn [:bp/uuid tool-uuid]))))
 
 (defn- enrich-subtool-variable [subtool-variable]
   (let [variable-data (rename-keys (first (:variable/_subtool-variables subtool-variable))
@@ -48,12 +52,12 @@
 (reg-sub
  :subtool/encriched-subtool-variables
  (fn [_ [_ subtool-uuid]]
-   (let [subtool (d/pull @@s/vms-conn '[* {:subtool/variables
-                                           [* {:variable/_subtool-variables
-                                               [* {:variable/list
-                                                   [* {:list/options
-                                                       [* {:list-option/color-tag-ref [*]}]}]}]}]}]
-                         [:bp/uuid subtool-uuid])]
+   (let [subtool (impl-rust/pull @@s/vms-conn '[* {:subtool/variables
+                                                     [* {:variable/_subtool-variables
+                                                         [* {:variable/list
+                                                             [* {:list/options
+                                                                 [* {:list-option/color-tag-ref [*]}]}]}]}]}]
+                                              [:bp/uuid subtool-uuid])]
      (->> (:subtool/variables subtool)
           (mapv enrich-subtool-variable)
           (sort-by :subtool-variable/order)))))
@@ -121,14 +125,14 @@
 (reg-sub
  :tool/all-outputs
  (fn [db [_ tool-uuid subtool-uuid]]
-   (->> (d/q '[:find [?output-uuids ...]
-               :in $ ?uuid
-               :where
-               [?s  :bp/uuid ?uuid]
-               [?s  :subtool/variables ?sv]
-               [?sv :subtool-variable/io :output]
-               [?sv :bp/uuid ?output-uuids]]
-             @@s/vms-conn subtool-uuid)
+   (->> (impl-rust/q '[:find [?output-uuids ...]
+                       :in $ ?uuid
+                       :where
+                       [?s  :bp/uuid ?uuid]
+                       [?s  :subtool/variables ?sv]
+                       [?sv :subtool-variable/io :output]
+                       [?sv :bp/uuid ?output-uuids]]
+                     @@s/vms-conn subtool-uuid)
         (map (fn [output-uuid]
                [output-uuid (get-in db [:state
                                         :tool
@@ -142,7 +146,8 @@
 (reg-sub
  :tool/sv->translated-name
  (fn [_ [_ subtool-variable-uuid]]
-   (when-let [translation-key (->> (d/entity @@s/vms-conn [:bp/uuid subtool-variable-uuid])
+   (when-let [translation-key (->> (or (impl-rust/entity [:bp/uuid subtool-variable-uuid])
+                                      (d/entity @@s/vms-conn [:bp/uuid subtool-variable-uuid]))
                                    :subtool-variable/translation-key)]
      @(<t translation-key))))
 

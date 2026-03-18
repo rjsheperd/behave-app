@@ -2,6 +2,7 @@
   (:require [ajax.core                  :refer [ajax-request]]
             [ajax.protocols             :as pr]
             [absurder-sql.datascript.core :as d]
+            [absurder-sql.datascript.impl-rust :as impl-rust]
             [clojure.string             :as str]
             [posh.reagent               :refer [pull pull-many q posh!]
              :rename {q posh-query pull posh-pull pull-many posh-pull-many}]
@@ -137,6 +138,9 @@
     (let [conn (d/create-conn schema)]
       (reset! vms-conn conn)
       (d/transact conn datoms)
+      ;; Bootstrap Rust DB BEFORE posh! so reactive queries have data ready
+      (let [rdb (impl-rust/sync-to-rust! @conn)]
+        (impl-rust/set-rust-db! rdb @conn))
       (posh! conn)
       conn)))
 
@@ -164,14 +168,17 @@
 (defn entity-from-uuid
   "Return a re-frame entity using a UUID (maps to the `:bp/uuid` attribute)"
   [bp-uuid]
-  (d/entity @@vms-conn [:bp/uuid bp-uuid]))
+  (or (impl-rust/entity [:bp/uuid bp-uuid])
+      (d/entity @@vms-conn [:bp/uuid bp-uuid])))
 
 (defn entity-from-nid
   "Return a re-frame entity using a Nano-ID (maps to the `:bp/nid` attribute)"
   [bp-nid]
-  (d/entity @@vms-conn [:bp/nid bp-nid]))
+  (or (impl-rust/entity [:bp/nid bp-nid])
+      (d/entity @@vms-conn [:bp/nid bp-nid])))
 
 (defn entity-from-eid
   "Return a re-frame entity using an entity ID (maps to the `:db/id` attribute)"
   [eid]
-  (d/entity @@vms-conn eid))
+  (or (impl-rust/entity eid)
+      (d/entity @@vms-conn eid)))

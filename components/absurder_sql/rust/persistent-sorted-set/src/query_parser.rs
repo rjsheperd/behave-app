@@ -136,6 +136,17 @@ impl FindElement {
     }
 }
 
+/// How an `:in` parameter is bound.
+#[derive(Clone, Debug)]
+pub enum InBinding {
+    /// `?x` — single value substituted into patterns
+    Scalar(Var),
+    /// `[?x ...]` — collection, each element creates a row in an initial relation
+    Coll(Var),
+    /// `[[?a ?b]]` — tuple, destructured into multiple scalar bindings
+    Tuple(Vec<Var>),
+}
+
 /// A fully parsed Datalog query.
 #[derive(Clone, Debug)]
 pub struct ParsedQuery {
@@ -143,6 +154,7 @@ pub struct ParsedQuery {
     /// Full find elements including pull expressions. Parallel to `find.vars()`.
     pub find_elements: Vec<FindElement>,
     pub in_vars: Vec<String>,
+    pub in_bindings: Vec<InBinding>,
     pub where_clauses: Vec<Clause>,
     pub rules: Rules,
 }
@@ -206,14 +218,21 @@ fn edn_to_pattern_el(v: &EdnValue) -> PatternEl {
     }
 }
 
-/// Parse a vector like `[?e :name ?n]` into a `Clause::Pattern`.
+/// Parse a vector like `[?e :name ?n]` or `[$ws ?e :name ?n]` into a `Clause::Pattern`.
 /// Vectors are data patterns (always 3 or 4 elements: e, a, v, [tx]).
+/// An optional leading source var (`$`, `$ws`) is captured as the pattern's source.
 fn parse_pattern(elems: &[EdnValue]) -> Option<Clause> {
-    // Skip leading source var ($)
-    let elems = if !elems.is_empty() && is_src_var(&elems[0]) {
-        &elems[1..]
+    // Check for leading source var ($, $ws, etc.)
+    let (source, elems) = if !elems.is_empty() && is_src_var(&elems[0]) {
+        let src = match &elems[0] {
+            EdnValue::Symbol(s) => {
+                if s == "$" { None } else { Some(s.clone()) }
+            }
+            _ => None,
+        };
+        (src, &elems[1..])
     } else {
-        elems
+        (None, elems)
     };
 
     // A pattern needs at least 2 elements (e, a)
@@ -225,7 +244,7 @@ fn parse_pattern(elems: &[EdnValue]) -> Option<Clause> {
     for (i, el) in elems.iter().enumerate() {
         pattern[i] = edn_to_pattern_el(el);
     }
-    Some(Clause::Pattern(pattern))
+    Some(Clause::Pattern { source, pattern })
 }
 
 /// Parse a list like `(rule-name ?a ?b)` into a `Clause::RuleCall`.
@@ -276,16 +295,28 @@ fn parse_pred_expr(inner: &[EdnValue]) -> Option<Clause> {
 
     let args: Vec<PatternEl> = call_elems[1..].iter().map(edn_to_pattern_el).collect();
 
+    // Database-aware function names (take $ as first arg)
+    let is_db_fn = matches!(name.as_str(), "get-else" | "get-some" | "missing?");
+
     // If there's a second element in `inner`, it's a binding (fn-expr, not pred-expr).
     if inner.len() == 1 {
-        Some(Clause::Predicate { name, args })
+        // Predicate form — but missing? as predicate is DB-aware
+        if is_db_fn {
+            Some(Clause::DbFnExpr { name, args, binding: String::new() })
+        } else {
+            Some(Clause::Predicate { name, args })
+        }
     } else {
         // fn-expr: [(fn ?a ?b) ?result]
         let binding = match &inner[1] {
             EdnValue::Symbol(s) if is_variable(s) => s.clone(),
             _ => return None,
         };
-        Some(Clause::FnExpr { name, args, binding })
+        if is_db_fn {
+            Some(Clause::DbFnExpr { name, args, binding })
+        } else {
+            Some(Clause::FnExpr { name, args, binding })
+        }
     }
 }
 
@@ -357,22 +388,24 @@ fn parse_clause(form: &EdnValue) -> Option<Clause> {
                 return Some(Clause::And(clauses));
             }
 
-            // Skip source-var prefix ($)
+            // Determine the "effective" elements (after optional source-var prefix)
+            // for pred-expr detection, but pass full elems to parse_pattern
+            // so it can capture the source var.
             let elems_ref = if !elems.is_empty() && is_src_var(&elems[0]) {
                 &elems[1..]
             } else {
                 elems.as_slice()
             };
 
-            // Check if first element is a nested vector/list → pred-expr
+            // Check if first element (after source) is a nested vector/list → pred-expr
             if !elems_ref.is_empty()
                 && matches!(&elems_ref[0], EdnValue::Vector(_) | EdnValue::List(_))
             {
                 return parse_pred_expr(elems_ref);
             }
 
-            // Otherwise it's a data pattern
-            parse_pattern(elems_ref)
+            // Otherwise it's a data pattern — pass full elems so source var is captured
+            parse_pattern(elems.as_slice())
         }
 
         // List: rule expression `(rule-name ?a ?b)` or `(not ...)` etc.
@@ -580,19 +613,70 @@ fn parse_find(elems: &[EdnValue]) -> (FindSpec, Vec<FindElement>) {
     (FindSpec::Rel(vars), fes)
 }
 
-/// Parse the `:in` section. Returns variable names (excluding `$` and `%`).
-fn parse_in(elems: &[EdnValue]) -> Vec<String> {
-    elems
-        .iter()
-        .filter_map(|el| match el {
-            EdnValue::Symbol(s)
-                if !s.starts_with('$') && s != "%" && s != "_" =>
-            {
-                Some(s.clone())
+/// Parse the `:in` section. Returns (scalar var names, all bindings).
+fn parse_in(elems: &[EdnValue]) -> (Vec<String>, Vec<InBinding>) {
+    let mut vars = Vec::new();
+    let mut bindings = Vec::new();
+
+    for el in elems {
+        match el {
+            // Skip source vars ($, $ws) and rules var (%)
+            EdnValue::Symbol(s) if s.starts_with('$') || s == "%" || s == "_" => {}
+            // Scalar binding: ?x
+            EdnValue::Symbol(s) if is_variable(s) => {
+                vars.push(s.clone());
+                bindings.push(InBinding::Scalar(s.clone()));
             }
-            _ => None,
-        })
-        .collect()
+            // Vector form: [?x ...] (collection) or [[?a ?b]] (tuple)
+            EdnValue::Vector(inner) => {
+                if inner.len() == 2 {
+                    if let EdnValue::Symbol(dots) = &inner[1] {
+                        if dots == "..." {
+                            // Collection binding: [?x ...]
+                            if let EdnValue::Symbol(v) = &inner[0] {
+                                if is_variable(v) {
+                                    vars.push(v.clone());
+                                    bindings.push(InBinding::Coll(v.clone()));
+                                }
+                            }
+                            continue;
+                        }
+                    }
+                }
+                // Check for tuple binding: [[?a ?b]]
+                if inner.len() == 1 {
+                    if let EdnValue::Vector(tuple_vars) = &inner[0] {
+                        let tvars: Vec<String> = tuple_vars
+                            .iter()
+                            .filter_map(|v| match v {
+                                EdnValue::Symbol(s) if is_variable(s) => Some(s.clone()),
+                                _ => None,
+                            })
+                            .collect();
+                        if tvars.len() == tuple_vars.len() {
+                            for tv in &tvars {
+                                vars.push(tv.clone());
+                            }
+                            bindings.push(InBinding::Tuple(tvars));
+                            continue;
+                        }
+                    }
+                }
+                // Fallback: treat vector elements as individual vars
+                for v in inner {
+                    if let EdnValue::Symbol(s) = v {
+                        if is_variable(s) {
+                            vars.push(s.clone());
+                            bindings.push(InBinding::Scalar(s.clone()));
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    (vars, bindings)
 }
 
 /// Parse a Datalog query from an EDN string.
@@ -631,7 +715,7 @@ pub fn parse_query_edn(val: &EdnValue) -> ParsedQuery {
     let sections = query_to_map(elems);
 
     let (find, find_elements) = sections.get("find").map(|v| parse_find(v)).unwrap_or((FindSpec::Rel(vec![]), vec![]));
-    let in_vars = sections.get("in").map(|v| parse_in(v)).unwrap_or_default();
+    let (in_vars, in_bindings) = sections.get("in").map(|v| parse_in(v)).unwrap_or_default();
     let where_clauses = sections
         .get("where")
         .map(|v| v.iter().filter_map(parse_clause).collect())
@@ -641,6 +725,7 @@ pub fn parse_query_edn(val: &EdnValue) -> ParsedQuery {
         find,
         find_elements,
         in_vars,
+        in_bindings,
         where_clauses,
         rules: Rules::new(),
     }
@@ -665,7 +750,7 @@ fn parse_query_map(val: &EdnValue) -> ParsedQuery {
     };
 
     let (find, find_elements) = parse_find(&get("find"));
-    let in_vars = parse_in(&get("in"));
+    let (in_vars, in_bindings) = parse_in(&get("in"));
     let where_clauses = get("where")
         .iter()
         .filter_map(parse_clause)
@@ -675,6 +760,7 @@ fn parse_query_map(val: &EdnValue) -> ParsedQuery {
         find,
         find_elements,
         in_vars,
+        in_bindings,
         where_clauses,
         rules: Rules::new(),
     }
@@ -773,9 +859,51 @@ pub fn bind_inputs(query: &mut ParsedQuery, inputs: &[(&str, Value)]) {
     }
 }
 
+/// Process collection and tuple bindings from `:in`, returning initial
+/// relations that should be pre-seeded into the query context.
+///
+/// - `Scalar` bindings are handled by `bind_inputs` (pattern substitution)
+/// - `Coll` bindings create a relation with one row per collection element
+/// - `Tuple` bindings are expanded to scalar substitutions
+///
+/// `input_values` maps variable names to their input values. For `Coll`,
+/// the value should be `Value::Nil` placeholder — the actual collection
+/// is passed via `coll_values` keyed by var name.
+pub fn build_collection_relations(
+    in_bindings: &[InBinding],
+    coll_values: &HashMap<String, Vec<Value>>,
+) -> Vec<crate::relation::Relation> {
+    use crate::relation::Relation;
+
+    let mut rels = Vec::new();
+
+    for binding in in_bindings {
+        match binding {
+            InBinding::Coll(var) => {
+                if let Some(values) = coll_values.get(var) {
+                    let mut attrs = HashMap::new();
+                    attrs.insert(var.clone(), 0);
+                    let tuples: Vec<Vec<Value>> = values
+                        .iter()
+                        .map(|v| vec![v.clone()])
+                        .collect();
+                    // Always push — even empty relations constrain the join to 0 results
+                    rels.push(Relation::new(attrs, tuples));
+                }
+            }
+            InBinding::Scalar(_) | InBinding::Tuple(_) => {
+                // Scalar: handled by bind_inputs
+                // Tuple: caller should expand to scalars before calling bind_inputs
+            }
+        }
+    }
+
+    rels
+}
+
 fn bind_clause(clause: &mut Clause, bindings: &HashMap<String, Value>) {
     match clause {
-        Clause::Pattern(p) => {
+        Clause::Pattern { pattern: p, .. } => {
             for el in p.iter_mut() {
                 bind_el(el, bindings);
             }
@@ -791,6 +919,11 @@ fn bind_clause(clause: &mut Clause, bindings: &HashMap<String, Value>) {
             }
         }
         Clause::FnExpr { args, .. } => {
+            for el in args.iter_mut() {
+                bind_el(el, bindings);
+            }
+        }
+        Clause::DbFnExpr { args, .. } => {
             for el in args.iter_mut() {
                 bind_el(el, bindings);
             }
@@ -840,7 +973,7 @@ mod tests {
         assert_eq!(q.find, FindSpec::Rel(vec!["?e".into(), "?name".into()]));
         assert_eq!(q.where_clauses.len(), 1);
         match &q.where_clauses[0] {
-            Clause::Pattern(p) => {
+            Clause::Pattern { pattern: p, .. } => {
                 assert_eq!(p[0], PatternEl::Var("?e".into()));
                 assert_eq!(p[1], PatternEl::Const(Value::Keyword(kw("name"))));
                 assert_eq!(p[2], PatternEl::Var("?name".into()));
@@ -923,7 +1056,7 @@ mod tests {
     fn parse_namespaced_attr() {
         let q = parse_query("[:find ?e :where [?e :bp/uuid \"abc\"]]");
         match &q.where_clauses[0] {
-            Clause::Pattern(p) => {
+            Clause::Pattern { pattern: p, .. } => {
                 assert_eq!(
                     p[1],
                     PatternEl::Const(Value::Keyword(Attr::Keyword {
@@ -941,7 +1074,7 @@ mod tests {
     fn parse_wildcard() {
         let q = parse_query("[:find ?e :where [?e :name _]]");
         match &q.where_clauses[0] {
-            Clause::Pattern(p) => {
+            Clause::Pattern { pattern: p, .. } => {
                 assert_eq!(p[2], PatternEl::Blank);
             }
             _ => panic!("expected Pattern"),
@@ -1002,7 +1135,7 @@ mod tests {
         );
         bind_inputs(&mut q, &[("?uuid", Value::Str("abc-123".into()))]);
         match &q.where_clauses[0] {
-            Clause::Pattern(p) => {
+            Clause::Pattern { pattern: p, .. } => {
                 assert_eq!(p[2], PatternEl::Const(Value::Str("abc-123".into())));
             }
             _ => panic!("expected Pattern"),
@@ -1041,7 +1174,7 @@ mod tests {
     fn parse_keyword_value() {
         let q = parse_query("[:find ?e :where [?e :type :worksheet]]");
         match &q.where_clauses[0] {
-            Clause::Pattern(p) => {
+            Clause::Pattern { pattern: p, .. } => {
                 assert_eq!(
                     p[2],
                     PatternEl::Const(Value::Keyword(kw("worksheet")))
@@ -1055,7 +1188,7 @@ mod tests {
     fn parse_boolean_value() {
         let q = parse_query("[:find ?e :where [?e :active true]]");
         match &q.where_clauses[0] {
-            Clause::Pattern(p) => {
+            Clause::Pattern { pattern: p, .. } => {
                 assert_eq!(p[2], PatternEl::Const(Value::Bool(true)));
             }
             _ => panic!("expected Pattern"),

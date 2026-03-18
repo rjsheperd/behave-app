@@ -2,6 +2,7 @@
   (:require [re-frame.core                 :as rf]
             [re-posh.core                  :as rp]
             [absurder-sql.datascript.core  :as d]
+            [absurder-sql.datascript.impl-rust :as impl-rust]
             [behave.components.toolbar     :refer [step-priority]]
             [behave.importer               :refer [import-worksheet]]
             [behave.logger                 :refer [log]]
@@ -14,14 +15,14 @@
 ;;; Helpers
 
 (defn ^:private q-worksheet [conn ws-uuid]
-  (d/q '[:find ?ws .
+  (impl-rust/q-ws '[:find ?ws .
          :in $ ?ws-uuid
          :where
          [?ws :worksheet/uuid ?ws-uuid]]
        conn ws-uuid))
 
 (defn ^:private q-input-group [conn ws-uuid group-uuid repeat-id]
-  (d/q '[:find ?ig .
+  (impl-rust/q-ws '[:find ?ig .
          :in $ ?ws-uuid ?group-uuid ?repeat-id
          :where
          [?ws :worksheet/uuid ?ws-uuid]
@@ -31,7 +32,7 @@
        conn ws-uuid group-uuid repeat-id))
 
 (defn ^:private q-input-variable [conn group-id group-variable-uuid]
-  (d/q '[:find ?i .
+  (impl-rust/q-ws '[:find ?i .
          :in $ ?ig ?uuid
          :where
          [?ig :input-group/inputs ?i]
@@ -39,7 +40,7 @@
        conn group-id group-variable-uuid))
 
 (defn ^:private q-input-value [conn ws-uuid group-uuid repeat-id]
-  (d/q '[:find ?value .
+  (impl-rust/q-ws '[:find ?value .
          :in $ ?ws-uuid ?group-uuid ?repeat-id
          :where
          [?ws :worksheet/uuid ?ws-uuid]
@@ -51,14 +52,14 @@
        conn ws-uuid group-uuid repeat-id))
 
 (defn ^:private q-input-unit [conn group-id group-variable-uuid]
-  (or (d/q '[:find ?units .
+  (or (impl-rust/q-ws '[:find ?units .
              :in $ ?ig ?uuid
              :where
              [?ig :input-group/inputs ?i]
              [?i :input/group-variable-uuid ?uuid]
              [?i :input/units ?units]] ;; `:input/units` deprecated
            conn group-id group-variable-uuid)
-      (d/q '[:find ?units .
+      (impl-rust/q-ws '[:find ?units .
              :in $ ?ig ?uuid
              :where
              [?ig :input-group/inputs ?i]
@@ -216,7 +217,7 @@
  :worksheet/delete-repeat-input-group
  [(rp/inject-cofx :ds)]
  (fn [{:keys [ds]} [_ ws-uuid group-uuid repeat-id]]
-   (let [input-ids (d/q '[:find [?g ...]
+   (let [input-ids (impl-rust/q-ws '[:find [?g ...]
                           :in $ ?ws-uuid ?group-uuid ?repeat-id
                           :where
                           [?w :worksheet/uuid ?ws-uuid]
@@ -256,7 +257,7 @@
  :worksheet/delete-existing-result-table
  [(rp/inject-cofx :ds)]
  (fn [{:keys [ds]} [_ ws-uuid]]
-   (when-let [existing-eid (d/q '[:find ?t .
+   (when-let [existing-eid (impl-rust/q-ws '[:find ?t .
                                   :in $ ?ws-uuid
                                   :where
                                   [?ws :worksheet/uuid ?ws-uuid]
@@ -268,7 +269,7 @@
  :worksheet/add-result-table
  [(rp/inject-cofx :ds)]
  (fn [{:keys [ds]} [_ ws-uuid]]
-   (when-let [ws (first (d/q '[:find [?e ...]
+   (when-let [ws (first (impl-rust/q-ws '[:find [?e ...]
                                :in $ ?uuid
                                :where [?e :worksheet/uuid ?uuid]] ds ws-uuid))]
      {:transact [{:worksheet/_result-table ws}]})))
@@ -277,18 +278,18 @@
  :worksheet/add-result-table-header
  [(rp/inject-cofx :ds)]
  (fn [{:keys [ds]} [_ ws-uuid group-variable-uuid repeat-id units]]
-   (when-let [table (first (d/q '[:find [?table]
+   (when-let [table (first (impl-rust/q-ws '[:find [?table]
                                   :in $ ?uuid
                                   :where [?w :worksheet/uuid ?uuid]
                                   [?w :worksheet/result-table ?table]] ds ws-uuid))]
      ;; header with gv-uuid and repeat-id does not already exist
-     (when-not (d/q '[:find ?h .
+     (when-not (impl-rust/q-ws '[:find ?h .
                       :in $ ?t ?group-variable-uuid ?repeat-id
                       :where [?t :result-table/headers ?h]
                       [?h :result-header/group-variable-uuid ?group-variable-uuid]
                       [?h :result-header/repeat-id ?repeat-id]]
                     ds table group-variable-uuid repeat-id)
-       (let [headers (count (d/q '[:find [?h ...]
+       (let [headers (count (impl-rust/q-ws '[:find [?h ...]
                                    :in $ ?t
                                    :where [?t :result-table/headers ?h]]
                                  ds table))]
@@ -301,7 +302,7 @@
  :worksheet/add-result-table-row
  [(rp/inject-cofx :ds)]
  (fn [{:keys [ds]} [_ ws-uuid row-id]]
-   (when-let [table (first (d/q '[:find [?table]
+   (when-let [table (first (impl-rust/q-ws '[:find [?table]
                                   :in $ ?uuid
                                   :where [?w :worksheet/uuid ?uuid]
                                   [?w :worksheet/result-table ?table]]
@@ -313,19 +314,19 @@
  :worksheet/add-result-table-cell
  [(rp/inject-cofx :ds)]
  (fn [{:keys [ds]} [_ ws-uuid row-id group-variable-uuid repeat-id value]]
-   (when-let [table (d/q '[:find ?table .
+   (when-let [table (impl-rust/q-ws '[:find ?table .
                            :in $ ?uuid
                            :where
                            [?w :worksheet/uuid ?uuid]
                            [?w :worksheet/result-table ?table]]
                          ds ws-uuid)]
-     (when-let [row (d/q '[:find ?r .
+     (when-let [row (impl-rust/q-ws '[:find ?r .
                            :in $ ?table ?row-id
                            :where
                            [?table :result-table/rows ?r]
                            [?r :result-row/id ?row-id]]
                          ds table row-id)]
-       (when-let [header (d/q '[:find ?h .
+       (when-let [header (impl-rust/q-ws '[:find ?h .
                                 :in $ ?table ?group-var-uuid ?repeat-id
                                 :where
                                 [?t :result-table/headers ?h]
@@ -389,7 +390,7 @@
  :worksheet/remove-y-axis-limit
  [(rp/inject-cofx :ds)]
  (fn [{:keys [ds]} [_ ws-uuid gv-uuid]]
-   (when-let [eid (d/q '[:find ?y .
+   (when-let [eid (impl-rust/q-ws '[:find ?y .
                          :in $ ?uuid ?gv-uuid
                          :where
                          [?w :worksheet/uuid ?uuid]
@@ -458,7 +459,7 @@
  :worksheet/update-y-axis-limit-attr
  [(rp/inject-cofx :ds)]
  (fn [{:keys [ds]} [_ ws-uuid group-var-uuid attr value]]
-   (when-let [y (first (d/q '[:find [?y]
+   (when-let [y (first (impl-rust/q-ws '[:find [?y]
                               :in $ ?ws-uuid ?group-var-uuid
                               :where
                               [?w :worksheet/uuid ?ws-uuid]
@@ -500,7 +501,7 @@
  :worksheet/update-x-axis-limit-attr
  [(rp/inject-cofx :ds)]
  (fn [{:keys [ds]} [_ ws-uuid attr value]]
-   (when-let [eid (d/q '[:find ?y .
+   (when-let [eid (impl-rust/q-ws '[:find ?y .
                          :in $ ?ws-uuid
                          :where
                          [?w :worksheet/uuid ?ws-uuid]
@@ -514,7 +515,7 @@
  :worksheet/update-table-filter-attr
  [(rp/inject-cofx :ds)]
  (fn [{ds :ds} [_ ws-uuid group-var-uuid attr value]]
-   (when-let [table-filter-id (d/q '[:find ?f .
+   (when-let [table-filter-id (impl-rust/q-ws '[:find ?f .
                                      :in $ ?ws-uuid ?group-var-uuid
                                      :where
                                      [?w :worksheet/uuid ?ws-uuid]
@@ -570,7 +571,7 @@
  :worksheet/remove-table-filter
  [(rp/inject-cofx :ds)]
  (fn [{:keys [ds]} [_ ws-uuid gv-uuid]]
-   (when-let [eid (d/q '[:find ?f .
+   (when-let [eid (impl-rust/q-ws '[:find ?f .
                          :in $ ?uuid ?gv-uuid
                          :where
                          [?w :worksheet/uuid ?uuid]
@@ -584,7 +585,7 @@
  :worksheet/toggle-enable-filter
  [(rp/inject-cofx :ds)]
  (fn [{:keys [ds]} [_ ws-uuid gv-uuid]]
-   (when-let [eid (d/q '[:find ?f .
+   (when-let [eid (impl-rust/q-ws '[:find ?f .
                          :in $ ?uuid ?gv-uuid
                          :where
                          [?w :worksheet/uuid ?uuid]
@@ -600,7 +601,7 @@
  :worksheet/update-graph-settings-attr
  [(rp/inject-cofx :ds)]
  (fn [{:keys [ds]} [_ ws-uuid attr value]]
-   (when-let [g (first (d/q '[:find [?g]
+   (when-let [g (first (impl-rust/q-ws '[:find [?g]
                               :in $ ?uuid
                               :where
                               [?w :worksheet/uuid ?uuid]
@@ -679,7 +680,7 @@
  :worksheet/delete-existing-diagrams
  [(rp/inject-cofx :ds)]
  (fn [{:keys [ds]} [_ ws-uuid]]
-   (let [existing-eids (d/q '[:find [?d ...]
+   (let [existing-eids (impl-rust/q-ws '[:find [?d ...]
                               :in $ ?ws-uuid
                               :where
                               [?ws :worksheet/uuid ?ws-uuid]
@@ -746,7 +747,7 @@
                     slope-direction
                     _elapsed-time
                     units-uuid]]
-   (let [existing-eid    (d/q '[:find ?d .
+   (let [existing-eid    (impl-rust/q-ws '[:find ?d .
                                 :in $ ?uuid ?gv-uuid ?row-id
                                 :where
                                 [?ws :worksheet/uuid ?uuid]
@@ -808,7 +809,7 @@
                     wind-dir
                     wind-speed
                     units-uuid]]
-   (let [existing-eid (d/q '[:find ?d .
+   (let [existing-eid (impl-rust/q-ws '[:find ?d .
                              :in $ ?uuid ?gv-uuid ?row-id
                              :where
                              [?ws :worksheet/uuid ?uuid]
@@ -865,7 +866,7 @@
  :worksheet/delete-existing-result-table
  [(rp/inject-cofx :ds)]
  (fn [{:keys [ds]} [_ ws-uuid]]
-   (when-let [existing-eid (d/q '[:find ?t .
+   (when-let [existing-eid (impl-rust/q-ws '[:find ?t .
                                   :in $ ?ws-uuid
                                   :where
                                   [?ws :worksheet/uuid ?ws-uuid]

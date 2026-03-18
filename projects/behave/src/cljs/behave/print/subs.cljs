@@ -2,6 +2,7 @@
   (:require [behave.store :as s]
             [clojure.string :as str]
             [absurder-sql.datascript.core :as d]
+            [absurder-sql.datascript.impl-rust :as impl-rust]
             [re-frame.core :as rf]
             [re-posh.core :as rp]
             [string-utils.interface :refer [split-commas-or-spaces]]))
@@ -57,7 +58,7 @@
 (rf/reg-sub
  :print/matrix-table-two-multi-valued-inputs
  (fn [_ [_ {:keys [ws-uuid row-gv-uuid row-values col-gv-uuid col-values output-gv-uuid]}]]
-   (let [table-data (d/q
+   (let [table-data (impl-rust/q-ws
                      '[:find ?i ?j ?value
                        :in $ ?ws-uuid ?row-gv-uuid [?i ...] ?col-gv-uuid [?j ...] ?output-gv-uuid
                        :where
@@ -95,7 +96,7 @@
 (rf/reg-sub
  :print/matrix-table-three-multi-valued-inputs
  (fn [_ [_ {:keys [ws-uuid row-gv-uuid row-values col-gv-uuid col-values output-gv-uuid submatrix-gv-uuid submatrix-value]}]]
-   (let [table-data (d/q
+   (let [table-data (impl-rust/q-ws
                      '[:find ?i ?j ?value
                        :in $ ?ws-uuid ?row-gv-uuid [?i ...] ?col-gv-uuid [?j ...] ?output-gv-uuid ?submatrix-gv-uuid ?submatrix-value
                        :where

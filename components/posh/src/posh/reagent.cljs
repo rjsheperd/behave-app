@@ -3,6 +3,7 @@
   (:require [posh.plugin-base :as base
              :include-macros true]
             [absurder-sql.datascript.core :as d]
+            [absurder-sql.datascript.impl-rust :as impl-rust]
             [reagent.core :as r]
             [reagent.ratom :as ra]))
 
@@ -10,7 +11,7 @@
   (let [dcfg {:db            d/db
               :pull*         d/pull
               :pull-many     d/pull-many
-              :q             d/q
+              :q             impl-rust/q
               :filter        d/filter
               :with          d/with
               :entid         d/entid

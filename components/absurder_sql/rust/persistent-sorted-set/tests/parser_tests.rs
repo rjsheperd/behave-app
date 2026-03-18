@@ -8,10 +8,11 @@ use persistent_sorted_set::datom::{Datom, Value};
 use persistent_sorted_set::db::{DataScriptDB, TX0};
 use persistent_sorted_set::aggregates;
 use persistent_sorted_set::query_parser::{
-    bind_inputs, parse_query, parse_rules, FindElement, FindSpec,
+    bind_inputs, build_collection_relations, parse_query, parse_rules,
+    FindElement, FindSpec, InBinding,
 };
 use persistent_sorted_set::relation::{
-    project, resolve_query, Clause, PatternEl, Relation, Rules,
+    project, resolve_query, resolve_query_with_initial, Clause, PatternEl, Relation, Rules,
 };
 use persistent_sorted_set::schema::{
     kw, kw_ns, AttrSchema, Cardinality, Schema, Unique, ValueType,
@@ -299,7 +300,7 @@ fn clause_pattern_three_elements() {
     let q = parse_query("[:find ?e :where [?e :name \"Alice\"]]");
     assert_eq!(q.where_clauses.len(), 1);
     match &q.where_clauses[0] {
-        Clause::Pattern(p) => {
+        Clause::Pattern { pattern: p, .. } => {
             assert_eq!(p[0], PatternEl::Var("?e".into()));
             assert!(matches!(&p[1], PatternEl::Const(Value::Keyword(_))));
             assert_eq!(p[2], PatternEl::Const(Value::Str("Alice".into())));
@@ -313,7 +314,7 @@ fn clause_pattern_three_elements() {
 fn clause_pattern_four_elements() {
     let q = parse_query("[:find ?e ?tx :where [?e :name _ ?tx]]");
     match &q.where_clauses[0] {
-        Clause::Pattern(p) => {
+        Clause::Pattern { pattern: p, .. } => {
             assert_eq!(p[3], PatternEl::Var("?tx".into()));
         }
         _ => panic!("expected Pattern"),
@@ -378,7 +379,7 @@ fn clause_not() {
     match &q.where_clauses[1] {
         Clause::Not(inner) => {
             assert_eq!(inner.len(), 1);
-            assert!(matches!(&inner[0], Clause::Pattern(_)));
+            assert!(matches!(&inner[0], Clause::Pattern { .. }));
         }
         other => panic!("expected Not, got {:?}", other),
     }
@@ -392,8 +393,8 @@ fn clause_or() {
     match &q.where_clauses[0] {
         Clause::Or(branches) => {
             assert_eq!(branches.len(), 2);
-            assert!(matches!(&branches[0][0], Clause::Pattern(_)));
-            assert!(matches!(&branches[1][0], Clause::Pattern(_)));
+            assert!(matches!(&branches[0][0], Clause::Pattern { .. }));
+            assert!(matches!(&branches[1][0], Clause::Pattern { .. }));
         }
         other => panic!("expected Or, got {:?}", other),
     }
@@ -424,7 +425,7 @@ fn clause_and_inside_or() {
 fn value_string() {
     let q = parse_query(r#"[:find ?e :where [?e :name "Alice"]]"#);
     match &q.where_clauses[0] {
-        Clause::Pattern(p) => assert_eq!(p[2], PatternEl::Const(Value::Str("Alice".into()))),
+        Clause::Pattern { pattern: p, .. } => assert_eq!(p[2], PatternEl::Const(Value::Str("Alice".into()))),
         _ => panic!("expected Pattern"),
     }
 }
@@ -433,7 +434,7 @@ fn value_string() {
 fn value_integer() {
     let q = parse_query("[:find ?e :where [?e :age 42]]");
     match &q.where_clauses[0] {
-        Clause::Pattern(p) => assert_eq!(p[2], PatternEl::Const(Value::Long(42))),
+        Clause::Pattern { pattern: p, .. } => assert_eq!(p[2], PatternEl::Const(Value::Long(42))),
         _ => panic!("expected Pattern"),
     }
 }
@@ -442,7 +443,7 @@ fn value_integer() {
 fn value_negative_integer() {
     let q = parse_query("[:find ?e :where [?e :offset -5]]");
     match &q.where_clauses[0] {
-        Clause::Pattern(p) => assert_eq!(p[2], PatternEl::Const(Value::Long(-5))),
+        Clause::Pattern { pattern: p, .. } => assert_eq!(p[2], PatternEl::Const(Value::Long(-5))),
         _ => panic!("expected Pattern"),
     }
 }
@@ -451,7 +452,7 @@ fn value_negative_integer() {
 fn value_boolean_true() {
     let q = parse_query("[:find ?e :where [?e :active true]]");
     match &q.where_clauses[0] {
-        Clause::Pattern(p) => assert_eq!(p[2], PatternEl::Const(Value::Bool(true))),
+        Clause::Pattern { pattern: p, .. } => assert_eq!(p[2], PatternEl::Const(Value::Bool(true))),
         _ => panic!("expected Pattern"),
     }
 }
@@ -460,7 +461,7 @@ fn value_boolean_true() {
 fn value_boolean_false() {
     let q = parse_query("[:find ?e :where [?e :active false]]");
     match &q.where_clauses[0] {
-        Clause::Pattern(p) => assert_eq!(p[2], PatternEl::Const(Value::Bool(false))),
+        Clause::Pattern { pattern: p, .. } => assert_eq!(p[2], PatternEl::Const(Value::Bool(false))),
         _ => panic!("expected Pattern"),
     }
 }
@@ -469,7 +470,7 @@ fn value_boolean_false() {
 fn value_keyword_simple() {
     let q = parse_query("[:find ?e :where [?e :type :worksheet]]");
     match &q.where_clauses[0] {
-        Clause::Pattern(p) => {
+        Clause::Pattern { pattern: p, .. } => {
             assert_eq!(p[2], PatternEl::Const(Value::Keyword(kw("worksheet"))));
         }
         _ => panic!("expected Pattern"),
@@ -480,7 +481,7 @@ fn value_keyword_simple() {
 fn value_keyword_namespaced() {
     let q = parse_query("[:find ?e :where [?e :variable/kind :continuous]]");
     match &q.where_clauses[0] {
-        Clause::Pattern(p) => {
+        Clause::Pattern { pattern: p, .. } => {
             assert_eq!(
                 p[1],
                 PatternEl::Const(Value::Keyword(kw_ns("variable", "kind")))
@@ -498,7 +499,7 @@ fn value_keyword_namespaced() {
 fn value_wildcard() {
     let q = parse_query("[:find ?e :where [?e :name _]]");
     match &q.where_clauses[0] {
-        Clause::Pattern(p) => assert_eq!(p[2], PatternEl::Blank),
+        Clause::Pattern { pattern: p, .. } => assert_eq!(p[2], PatternEl::Blank),
         _ => panic!("expected Pattern"),
     }
 }
@@ -598,7 +599,7 @@ fn bind_string_input() {
     let mut q = parse_query("[:find ?e :in $ ?uuid :where [?e :bp/uuid ?uuid]]");
     bind_inputs(&mut q, &[("?uuid", Value::Str("abc".into()))]);
     match &q.where_clauses[0] {
-        Clause::Pattern(p) => {
+        Clause::Pattern { pattern: p, .. } => {
             assert_eq!(p[2], PatternEl::Const(Value::Str("abc".into())));
         }
         _ => panic!("expected Pattern"),
@@ -610,7 +611,7 @@ fn bind_long_input() {
     let mut q = parse_query("[:find ?name :in $ ?eid :where [?eid :name ?name]]");
     bind_inputs(&mut q, &[("?eid", Value::Long(42))]);
     match &q.where_clauses[0] {
-        Clause::Pattern(p) => {
+        Clause::Pattern { pattern: p, .. } => {
             assert_eq!(p[0], PatternEl::Const(Value::Long(42)));
         }
         _ => panic!("expected Pattern"),
@@ -654,11 +655,11 @@ fn bind_multiple_inputs() {
         ],
     );
     match &q.where_clauses[0] {
-        Clause::Pattern(p) => assert_eq!(p[2], PatternEl::Const(Value::Str("Alice".into()))),
+        Clause::Pattern { pattern: p, .. } => assert_eq!(p[2], PatternEl::Const(Value::Str("Alice".into()))),
         _ => panic!("expected Pattern"),
     }
     match &q.where_clauses[1] {
-        Clause::Pattern(p) => assert_eq!(p[2], PatternEl::Const(Value::Long(30))),
+        Clause::Pattern { pattern: p, .. } => assert_eq!(p[2], PatternEl::Const(Value::Long(30))),
         _ => panic!("expected Pattern"),
     }
 }
@@ -669,12 +670,12 @@ fn bind_leaves_unbound_vars_alone() {
     bind_inputs(&mut q, &[("?age", Value::Long(30))]);
     // ?name should remain a Var
     match &q.where_clauses[0] {
-        Clause::Pattern(p) => assert_eq!(p[2], PatternEl::Var("?name".into())),
+        Clause::Pattern { pattern: p, .. } => assert_eq!(p[2], PatternEl::Var("?name".into())),
         _ => panic!("expected Pattern"),
     }
     // ?age should be Const
     match &q.where_clauses[1] {
-        Clause::Pattern(p) => assert_eq!(p[2], PatternEl::Const(Value::Long(30))),
+        Clause::Pattern { pattern: p, .. } => assert_eq!(p[2], PatternEl::Const(Value::Long(30))),
         _ => panic!("expected Pattern"),
     }
 }
@@ -1034,7 +1035,7 @@ fn comments_inside_strings_preserved() {
         "[:find ?e :where [?e :name \";; not a comment\"]]",
     );
     assert_eq!(q.where_clauses.len(), 1);
-    if let Clause::Pattern(parts) = &q.where_clauses[0] {
+    if let Clause::Pattern { pattern: parts, .. } = &q.where_clauses[0] {
         assert_eq!(parts[2], PatternEl::Const(Value::Str(";; not a comment".into())));
     } else {
         panic!("expected pattern clause");
@@ -1575,4 +1576,431 @@ fn pred_equality_aliases() {
         &db, "[:find ?name :where [?e :name ?name] [?e :age ?a] [(not= ?a 30)]]", "", &[],
     );
     assert_eq!(result2.len(), 3);
+}
+
+// ---------------------------------------------------------------------------
+// Phase 5.1: re-pattern
+// ---------------------------------------------------------------------------
+
+#[test]
+fn fn_expr_re_pattern_chain() {
+    // Mirrors behave solver pattern: str → re-pattern → re-find
+    let db = age_db();
+    let result = run_query_with_inputs(
+        &db,
+        "[:find ?name :where [_ :name ?name] [(str \"(?i)\" \"ali\") ?pat] [(re-pattern ?pat) ?re] [(re-find ?re ?name)]]",
+        "",
+        &[],
+    );
+    // "(?i)ali" should case-insensitively match "Alice"
+    assert_eq!(result.len(), 1);
+    assert_eq!(result[0][0], Value::Str("Alice".into()));
+}
+
+#[test]
+fn fn_expr_re_pattern_no_match() {
+    let db = age_db();
+    let result = run_query_with_inputs(
+        &db,
+        "[:find ?name :where [_ :name ?name] [(re-pattern \"^Z\") ?re] [(re-find ?re ?name)]]",
+        "",
+        &[],
+    );
+    assert_eq!(result.len(), 0);
+}
+
+// ---------------------------------------------------------------------------
+// Phase 5.2: Collection input bindings
+// ---------------------------------------------------------------------------
+
+/// Run a query with collection bindings, returning projected result tuples.
+fn run_query_with_coll_inputs(
+    db: &DataScriptDB,
+    query_edn: &str,
+    scalar_inputs: &[(&str, Value)],
+    coll_inputs: &[(&str, Vec<Value>)],
+) -> Vec<Vec<Value>> {
+    let mut q = parse_query(query_edn);
+    bind_inputs(&mut q, scalar_inputs);
+    let coll_map: std::collections::HashMap<String, Vec<Value>> = coll_inputs
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.clone()))
+        .collect();
+    let initial_rels = build_collection_relations(&q.in_bindings, &coll_map);
+    let result = resolve_query_with_initial(db, &q.where_clauses, &Rules::new(), initial_rels);
+    let projected = project(&result, &q.find.vars());
+    projected.tuples
+}
+
+#[test]
+fn parse_in_collection_binding() {
+    let q = parse_query("[:find ?e :in $ [?uuid ...] :where [?e :name ?uuid]]");
+    assert_eq!(q.in_bindings.len(), 1);
+    match &q.in_bindings[0] {
+        InBinding::Coll(v) => assert_eq!(v, "?uuid"),
+        other => panic!("Expected Coll, got {:?}", other),
+    }
+}
+
+#[test]
+fn parse_in_tuple_binding() {
+    let q = parse_query("[:find ?e :in $ [[?a ?b]] :where [?e :name ?a]]");
+    assert_eq!(q.in_bindings.len(), 1);
+    match &q.in_bindings[0] {
+        InBinding::Tuple(vars) => {
+            assert_eq!(vars, &vec!["?a".to_string(), "?b".to_string()]);
+        }
+        other => panic!("Expected Tuple, got {:?}", other),
+    }
+}
+
+#[test]
+fn parse_in_scalar_binding() {
+    let q = parse_query("[:find ?e :in $ ?name :where [?e :name ?name]]");
+    assert_eq!(q.in_bindings.len(), 1);
+    match &q.in_bindings[0] {
+        InBinding::Scalar(v) => assert_eq!(v, "?name"),
+        other => panic!("Expected Scalar, got {:?}", other),
+    }
+}
+
+#[test]
+fn parse_in_mixed_bindings() {
+    let q = parse_query("[:find ?e :in $ % ?x [?y ...] :where [?e :name ?x]]");
+    // $ and % are skipped; ?x is scalar, [?y ...] is coll
+    assert_eq!(q.in_bindings.len(), 2);
+    assert!(matches!(&q.in_bindings[0], InBinding::Scalar(v) if v == "?x"));
+    assert!(matches!(&q.in_bindings[1], InBinding::Coll(v) if v == "?y"));
+}
+
+#[test]
+fn coll_binding_query() {
+    let db = age_db();
+    // Find entities whose name is in the given collection
+    let result = run_query_with_coll_inputs(
+        &db,
+        "[:find ?e :in $ [?name ...] :where [?e :name ?name]]",
+        &[],
+        &[("?name", vec![
+            Value::Str("Alice".into()),
+            Value::Str("Carol".into()),
+        ])],
+    );
+    assert_eq!(result.len(), 2);
+    let mut eids: Vec<i64> = result.iter().map(|r| match r[0] { Value::Long(n) => n, _ => panic!() }).collect();
+    eids.sort();
+    // Alice is e=1, Carol is e=3
+    assert_eq!(eids, vec![1, 3]);
+}
+
+#[test]
+fn coll_binding_empty() {
+    let db = age_db();
+    let result = run_query_with_coll_inputs(
+        &db,
+        "[:find ?e :in $ [?name ...] :where [?e :name ?name]]",
+        &[],
+        &[("?name", vec![])],
+    );
+    assert_eq!(result.len(), 0);
+}
+
+#[test]
+fn coll_binding_single_element() {
+    let db = age_db();
+    let result = run_query_with_coll_inputs(
+        &db,
+        "[:find ?name :in $ [?name ...] :where [_ :name ?name]]",
+        &[],
+        &[("?name", vec![Value::Str("Bob".into())])],
+    );
+    assert_eq!(result.len(), 1);
+    assert_eq!(result[0][0], Value::Str("Bob".into()));
+}
+
+#[test]
+fn coll_binding_with_join() {
+    let db = age_db();
+    // Collection of names, join with age
+    let result = run_query_with_coll_inputs(
+        &db,
+        "[:find ?name ?age :in $ [?name ...] :where [?e :name ?name] [?e :age ?age]]",
+        &[],
+        &[("?name", vec![
+            Value::Str("Alice".into()),
+            Value::Str("Dave".into()),
+        ])],
+    );
+    assert_eq!(result.len(), 2);
+    let alice = result.iter().find(|r| r[0] == Value::Str("Alice".into())).unwrap();
+    assert_eq!(alice[1], Value::Long(30));
+    let dave = result.iter().find(|r| r[0] == Value::Str("Dave".into())).unwrap();
+    assert_eq!(dave[1], Value::Long(40));
+}
+
+// ---------------------------------------------------------------------------
+// Phase 5.3: Database-aware fn-exprs (get-else, get-some, missing?)
+// ---------------------------------------------------------------------------
+
+fn optional_db() -> DataScriptDB {
+    // Some entities have :score, some don't. :hidden is rare.
+    let mut schema = Schema::default();
+    schema.attrs.insert(kw("name"), AttrSchema { index: true, ..Default::default() });
+    schema.attrs.insert(kw("score"), AttrSchema::default());
+    schema.attrs.insert(kw("hidden"), AttrSchema::default());
+    schema.attrs.insert(kw("tag"), AttrSchema::default());
+    let mut db = DataScriptDB::empty(schema);
+    db.with_datom(d(1, "name", Value::Str("Alice".into()), 1));
+    db.with_datom(d(1, "score", Value::Long(95), 1));
+    db.with_datom(d(2, "name", Value::Str("Bob".into()), 1));
+    // Bob has no :score
+    db.with_datom(d(3, "name", Value::Str("Carol".into()), 1));
+    db.with_datom(d(3, "score", Value::Long(80), 1));
+    db.with_datom(d(3, "hidden", Value::Bool(true), 1));
+    db.with_datom(d(4, "name", Value::Str("Dave".into()), 1));
+    db.with_datom(d(4, "tag", Value::Str("vip".into()), 1));
+    db
+}
+
+#[test]
+fn parse_db_fn_get_else() {
+    let q = parse_query(
+        "[:find ?val :where [?e :name _] [(get-else $ ?e :score 0) ?val]]",
+    );
+    assert_eq!(q.where_clauses.len(), 2);
+    match &q.where_clauses[1] {
+        Clause::DbFnExpr { name, args, binding } => {
+            assert_eq!(name, "get-else");
+            assert_eq!(binding, "?val");
+            assert_eq!(args.len(), 4); // $ ?e :score 0
+        }
+        other => panic!("Expected DbFnExpr, got {:?}", other),
+    }
+}
+
+#[test]
+fn db_fn_get_else_found() {
+    let db = optional_db();
+    let result = run_query_with_inputs(
+        &db,
+        "[:find ?name ?val :where [?e :name ?name] [(get-else $ ?e :score 0) ?val]]",
+        "", &[],
+    );
+    assert_eq!(result.len(), 4);
+    let alice = result.iter().find(|r| r[0] == Value::Str("Alice".into())).unwrap();
+    assert_eq!(alice[1], Value::Long(95));
+    let carol = result.iter().find(|r| r[0] == Value::Str("Carol".into())).unwrap();
+    assert_eq!(carol[1], Value::Long(80));
+}
+
+#[test]
+fn db_fn_get_else_missing() {
+    let db = optional_db();
+    let result = run_query_with_inputs(
+        &db,
+        "[:find ?name ?val :where [?e :name ?name] [(get-else $ ?e :score 0) ?val]]",
+        "", &[],
+    );
+    let bob = result.iter().find(|r| r[0] == Value::Str("Bob".into())).unwrap();
+    assert_eq!(bob[1], Value::Long(0)); // default value
+    let dave = result.iter().find(|r| r[0] == Value::Str("Dave".into())).unwrap();
+    assert_eq!(dave[1], Value::Long(0)); // default value
+}
+
+#[test]
+fn db_fn_get_else_false_default() {
+    let db = optional_db();
+    let result = run_query_with_inputs(
+        &db,
+        "[:find ?name ?h :where [?e :name ?name] [(get-else $ ?e :hidden false) ?h]]",
+        "", &[],
+    );
+    // Carol has :hidden true; others get default false
+    let carol = result.iter().find(|r| r[0] == Value::Str("Carol".into())).unwrap();
+    assert_eq!(carol[1], Value::Bool(true));
+    let alice = result.iter().find(|r| r[0] == Value::Str("Alice".into())).unwrap();
+    assert_eq!(alice[1], Value::Bool(false));
+}
+
+#[test]
+fn db_fn_get_some_first() {
+    let db = optional_db();
+    // Alice has :score → should return it
+    let result = run_query_with_inputs(
+        &db,
+        "[:find ?name ?val :where [?e :name ?name] [(get-some $ ?e :score :tag) ?val]]",
+        "", &[],
+    );
+    let alice = result.iter().find(|r| r[0] == Value::Str("Alice".into())).unwrap();
+    assert_eq!(alice[1], Value::Long(95));
+}
+
+#[test]
+fn db_fn_get_some_second() {
+    let db = optional_db();
+    // Dave has no :score but has :tag → should return tag
+    let result = run_query_with_inputs(
+        &db,
+        "[:find ?name ?val :where [?e :name ?name] [(get-some $ ?e :score :tag) ?val]]",
+        "", &[],
+    );
+    let dave = result.iter().find(|r| r[0] == Value::Str("Dave".into())).unwrap();
+    assert_eq!(dave[1], Value::Str("vip".into()));
+}
+
+#[test]
+fn db_fn_get_some_none() {
+    let db = optional_db();
+    // Bob has neither :score nor :tag → should be dropped
+    let result = run_query_with_inputs(
+        &db,
+        "[:find ?name ?val :where [?e :name ?name] [(get-some $ ?e :score :tag) ?val]]",
+        "", &[],
+    );
+    assert!(result.iter().find(|r| r[0] == Value::Str("Bob".into())).is_none());
+}
+
+#[test]
+fn db_fn_missing_pred() {
+    let db = optional_db();
+    // Find entities missing :score
+    let result = run_query_with_inputs(
+        &db,
+        "[:find ?name :where [?e :name ?name] [(missing? $ ?e :score)]]",
+        "", &[],
+    );
+    let mut names: Vec<String> = result.iter().map(|r| match &r[0] {
+        Value::Str(s) => s.clone(), _ => panic!()
+    }).collect();
+    names.sort();
+    assert_eq!(names, vec!["Bob", "Dave"]);
+}
+
+#[test]
+fn db_fn_get_else_combined() {
+    let db = optional_db();
+    // Combine get-else with a predicate filter
+    let result = run_query_with_inputs(
+        &db,
+        "[:find ?name ?val :where [?e :name ?name] [(get-else $ ?e :score 0) ?val] [(> ?val 50)]]",
+        "", &[],
+    );
+    // Alice (95) and Carol (80) have score > 50; Bob and Dave get default 0
+    assert_eq!(result.len(), 2);
+    let mut names: Vec<String> = result.iter().map(|r| match &r[0] {
+        Value::Str(s) => s.clone(), _ => panic!()
+    }).collect();
+    names.sort();
+    assert_eq!(names, vec!["Alice", "Carol"]);
+}
+
+// ---------------------------------------------------------------------------
+// Phase 5.4: Multiple database sources ($ $ws)
+// ---------------------------------------------------------------------------
+
+use persistent_sorted_set::relation::MultiResolver;
+
+#[test]
+fn parse_source_prefix_pattern() {
+    let q = parse_query("[:find ?name :in $ $ws :where [$ws ?e :name ?name]]");
+    match &q.where_clauses[0] {
+        Clause::Pattern { source, pattern: p } => {
+            assert_eq!(source.as_deref(), Some("$ws"));
+            assert_eq!(p[0], PatternEl::Var("?e".into()));
+        }
+        other => panic!("Expected Pattern, got {:?}", other),
+    }
+}
+
+#[test]
+fn parse_default_source_pattern() {
+    let q = parse_query("[:find ?name :where [?e :name ?name]]");
+    match &q.where_clauses[0] {
+        Clause::Pattern { source, .. } => {
+            assert_eq!(*source, None);
+        }
+        other => panic!("Expected Pattern, got {:?}", other),
+    }
+}
+
+#[test]
+fn parse_explicit_dollar_source() {
+    // Explicit $ should be treated as default (None)
+    let q = parse_query("[:find ?name :where [$ ?e :name ?name]]");
+    match &q.where_clauses[0] {
+        Clause::Pattern { source, .. } => {
+            assert_eq!(*source, None);
+        }
+        other => panic!("Expected Pattern, got {:?}", other),
+    }
+}
+
+#[test]
+fn multi_source_query() {
+    // DB1 (VMS): entity 1 has :ref-id pointing to entity 10
+    // DB2 (WS): entity 10 has :ws-name "Worksheet A"
+    // Query: join across both databases
+
+    let mut schema1 = Schema::default();
+    schema1.attrs.insert(kw("ref-id"), AttrSchema::default());
+    schema1.attrs.insert(kw("label"), AttrSchema { index: true, ..Default::default() });
+    let mut db1 = DataScriptDB::empty(schema1);
+    db1.with_datom(d(1, "label", Value::Str("item-a".into()), 1));
+    db1.with_datom(d(1, "ref-id", Value::Long(10), 1));
+    db1.with_datom(d(2, "label", Value::Str("item-b".into()), 1));
+    db1.with_datom(d(2, "ref-id", Value::Long(20), 1));
+
+    let mut schema2 = Schema::default();
+    schema2.attrs.insert(kw("ws-name"), AttrSchema { index: true, ..Default::default() });
+    let mut db2 = DataScriptDB::empty(schema2);
+    db2.with_datom(d(10, "ws-name", Value::Str("Worksheet A".into()), 1));
+    db2.with_datom(d(20, "ws-name", Value::Str("Worksheet B".into()), 1));
+
+    let mut multi = MultiResolver::new(&db1);
+    multi.add_source("$ws".into(), &db2);
+
+    let q = parse_query(
+        "[:find ?label ?ws-name :in $ $ws :where [?e :label ?label] [?e :ref-id ?id] [$ws ?id :ws-name ?ws-name]]",
+    );
+
+    let result = resolve_query_with_initial(&multi, &q.where_clauses, &Rules::new(), vec![]);
+    let projected = project(&result, &q.find.vars());
+
+    assert_eq!(projected.tuples.len(), 2);
+    let a = projected.tuples.iter().find(|r| r[0] == Value::Str("item-a".into())).unwrap();
+    assert_eq!(a[1], Value::Str("Worksheet A".into()));
+    let b = projected.tuples.iter().find(|r| r[0] == Value::Str("item-b".into())).unwrap();
+    assert_eq!(b[1], Value::Str("Worksheet B".into()));
+}
+
+#[test]
+fn multi_source_with_predicate() {
+    // Same setup but add a predicate filter after cross-source join
+    let mut schema1 = Schema::default();
+    schema1.attrs.insert(kw("ref-id"), AttrSchema::default());
+    schema1.attrs.insert(kw("priority"), AttrSchema::default());
+    let mut db1 = DataScriptDB::empty(schema1);
+    db1.with_datom(d(1, "ref-id", Value::Long(10), 1));
+    db1.with_datom(d(1, "priority", Value::Long(5), 1));
+    db1.with_datom(d(2, "ref-id", Value::Long(20), 1));
+    db1.with_datom(d(2, "priority", Value::Long(1), 1));
+
+    let mut schema2 = Schema::default();
+    schema2.attrs.insert(kw("ws-name"), AttrSchema { index: true, ..Default::default() });
+    let mut db2 = DataScriptDB::empty(schema2);
+    db2.with_datom(d(10, "ws-name", Value::Str("High".into()), 1));
+    db2.with_datom(d(20, "ws-name", Value::Str("Low".into()), 1));
+
+    let mut multi = MultiResolver::new(&db1);
+    multi.add_source("$ws".into(), &db2);
+
+    let q = parse_query(
+        "[:find ?ws-name :in $ $ws :where [?e :ref-id ?id] [?e :priority ?p] [(> ?p 3)] [$ws ?id :ws-name ?ws-name]]",
+    );
+
+    let result = resolve_query_with_initial(&multi, &q.where_clauses, &Rules::new(), vec![]);
+    let projected = project(&result, &q.find.vars());
+
+    assert_eq!(projected.tuples.len(), 1);
+    assert_eq!(projected.tuples[0][0], Value::Str("High".into()));
 }

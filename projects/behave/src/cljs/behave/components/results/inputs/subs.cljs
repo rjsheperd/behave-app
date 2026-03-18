@@ -5,6 +5,7 @@
             [behave.wizard.subs                  :refer [all-conditionals-pass?]]
             [clojure.walk                        :refer [prewalk]]
             [absurder-sql.datascript.core        :as d]
+            [absurder-sql.datascript.impl-rust   :as impl-rust]
             [absurder-sql.datascript.impl.entity :as de]
             [map-utils.interface                 :refer [index-by]]
             [re-frame.core                       :refer [reg-sub subscribe]]
@@ -42,14 +43,14 @@
 
 (defn- has-conditionally-set-group-variables? [s-uuid]
   (pos?
-   (d/q '[:find  (count ?gv) .
-          :in    $ % ?s-uuid
-          :where
-          [?s :bp/uuid ?s-uuid]
-          (group ?s ?g)
-          (group-variable ?g ?gv ?v)
-          [?gv :group-variable/conditionally-set? true]]
-        @@vms-conn rules s-uuid)))
+   (impl-rust/q '[:find  (count ?gv) .
+                  :in    $ % ?s-uuid
+                  :where
+                  [?s :bp/uuid ?s-uuid]
+                  (group ?s ?g)
+                  (group-variable ?g ?gv ?v)
+                  [?gv :group-variable/conditionally-set? true]]
+                @@vms-conn rules s-uuid)))
 
 (reg-sub
  :result.inputs/submodules
@@ -58,9 +59,10 @@
 
  (fn [worksheet [_ _ws-uuid module-id]]
    (->> module-id
-        (d/entity @@vms-conn)
+        ((fn [eid] (or (some-> (impl-rust/entity eid) impl-rust/touch)
+                       (d/entity @@vms-conn eid))))
         (:module/submodules)
-        (map d/touch)
+        (map #(or (some-> % impl-rust/touch) (d/touch %)))
         (export-entity) ;; ensures prewalk works properly
         (filter (fn [{io              :submodule/io
                       research?       :submodule/research?
@@ -79,9 +81,9 @@
 (defn- create-formatter [variable]
   (let [v-kind (:variable/kind variable)]
     (if (= v-kind :discrete)
-      (let [{llist :variable/list}  (d/pull @@vms-conn
-                                            '[{:variable/list [* {:list/options [*]}]}]
-                                            (:db/id variable))
+      (let [{llist :variable/list}  (impl-rust/pull @@vms-conn
+                                                    '[{:variable/list [* {:list/options [*]}]}]
+                                                    (:db/id variable))
             {options :list/options} llist
             options                 (index-by :list-option/value options)]
         (fn discrete-fmt [value]
@@ -93,12 +95,12 @@
 (reg-sub
  :result.inputs/table-formatters
  (fn [_ [_ gv-uuids]]
-   (let [results (d/q '[:find ?gv-uuid (pull ?v [*])
-                        :in $ % [?gv-uuid ...]
-                        :where
-                        (lookup ?gv-uuid ?gv)
-                        (group-variable _ ?gv ?v)]
-                      @@vms-conn rules gv-uuids)]
+   (let [results (impl-rust/q '[:find ?gv-uuid (pull ?v [*])
+                               :in $ % [?gv-uuid ...]
+                               :where
+                               (lookup ?gv-uuid ?gv)
+                               (group-variable _ ?gv ?v)]
+                             @@vms-conn rules gv-uuids)]
      (into {} (map
                (fn [[gv-uuid variable]]
                  [gv-uuid (create-formatter variable)])
@@ -107,7 +109,8 @@
 (reg-sub
  :result.inputs/resolve-group-name
  (fn [_ [_ group-uuid]]
-   (let [group-entity (d/entity @@vms-conn [:bp/uuid group-uuid])]
+   (let [group-entity (or (impl-rust/entity [:bp/uuid group-uuid])
+                          (d/entity @@vms-conn [:bp/uuid group-uuid]))]
      (-> (or @(<t (:group/result-translation-key group-entity))
              @(<t (:group/translation-key group-entity)))
          s/capitalize->words))))

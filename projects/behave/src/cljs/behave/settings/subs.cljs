@@ -1,6 +1,7 @@
 (ns behave.settings.subs
   (:require [re-frame.core    :as rf]
             [absurder-sql.datascript.core :as d]
+            [absurder-sql.datascript.impl-rust :as impl-rust]
             [behave.vms.store :refer [vms-conn]]))
 
 (rf/reg-sub
@@ -55,20 +56,20 @@
    (rf/subscribe [:settings/local-storage-units]))
 
  (fn [cached-units _]
-   (let [domain-units (->> (d/q '[:find
-                                  ?domain-set-name ?domain-name ?domain-uuid ?dimension-uuid
-                                  ?native-domain-unit-uuid ?decimals ?english-unit-uuid ?metric-unit-uuid
-                                  :where
-                                  [?ds :domain-set/name ?domain-set-name]
-                                  [?ds :domain-set/domains ?d]
-                                  [?d :domain/name ?domain-name]
-                                  [?d :bp/uuid ?domain-uuid]
-                                  [(get-else $ ?d :domain/dimension-uuid "N/A") ?dimension-uuid]
-                                  [?d :domain/native-unit-uuid ?native-domain-unit-uuid]
-                                  [(get-else $ ?d :domain/english-unit-uuid "N/A") ?english-unit-uuid]
-                                  [(get-else $ ?d :domain/metric-unit-uuid "N/A") ?metric-unit-uuid]
-                                  [(get-else $ ?d :domain/decimals "N/A") ?decimals]]
-                                @@vms-conn)
+   (let [domain-units (->> (impl-rust/q '[:find
+                                          ?domain-set-name ?domain-name ?domain-uuid ?dimension-uuid
+                                          ?native-domain-unit-uuid ?decimals ?english-unit-uuid ?metric-unit-uuid
+                                          :where
+                                          [?ds :domain-set/name ?domain-set-name]
+                                          [?ds :domain-set/domains ?d]
+                                          [?d :domain/name ?domain-name]
+                                          [?d :bp/uuid ?domain-uuid]
+                                          [(get-else $ ?d :domain/dimension-uuid "N/A") ?dimension-uuid]
+                                          [?d :domain/native-unit-uuid ?native-domain-unit-uuid]
+                                          [(get-else $ ?d :domain/english-unit-uuid "N/A") ?english-unit-uuid]
+                                          [(get-else $ ?d :domain/metric-unit-uuid "N/A") ?metric-unit-uuid]
+                                          [(get-else $ ?d :domain/decimals "N/A") ?decimals]]
+                                        @@vms-conn)
                            (sort-by (juxt first second)))]
      (->> (map (fn [[v-domain
                      v-name

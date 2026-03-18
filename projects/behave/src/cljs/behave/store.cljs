@@ -1,5 +1,6 @@
 (ns behave.store
-  (:require [ajax.core                              :refer [ajax-request]]
+  (:require ["datascript-rs" :refer [WasmDataScript]]
+            [ajax.core                              :refer [ajax-request]]
             [ajax.edn                                :refer [edn-request-format]]
             [ajax.protocols                         :as pr]
             [austinbirch.reactive-entity            :as re]
@@ -7,6 +8,7 @@
             [behave.schema.core                     :refer [all-schemas]]
             [browser-utils.core                     :refer [download]]
             [absurder-sql.datascript.core           :as d]
+            [absurder-sql.datascript.impl-rust      :as impl-rust]
             [absurder-sql.datascript.sqlite         :as ds-sqlite]
             [absurder-sql.datascript.storage-async  :as storage-async]
             [absurder-sql.interface                 :as sql]
@@ -33,23 +35,31 @@
   (reset! sql-state {:sql-conn nil :wrapper nil :db-name nil}))
 
 (defn- init-sql-conn!
-  "Initialize a SQLite connection for `db-name` and create a storage wrapper.
-   Returns Promise of {:conn ds-conn, :wrapper wrapper, :sql-conn sql-conn}."
+  "Initialize a SQLite connection for `db-name`.
+   Tries Rust restoreFromLegacy first (handles EDN .bp7 format), falls back
+   to CLJS storage-async. Returns Promise of {:conn, :wrapper?, :sql-conn}."
   [schema db-name]
   (-> (sql/connect! db-name)
       (p/then (fn [sql-conn]
-                (let [store (ds-sqlite/sqlite-store sql-conn {:db-name db-name})]
-                  (-> (storage-async/restore-sync store)
-                      (p/then (fn [result]
-                                (if result
-                                  (let [[db wrapper] result]
-                                    {:conn     (d/conn-from-db db)
-                                     :wrapper  wrapper
-                                     :sql-conn sql-conn})
-                                  (let [wrapper (storage-async/make-sync-storage-wrapper store {})]
-                                    {:conn     (d/create-conn schema {:storage wrapper})
-                                     :wrapper  wrapper
-                                     :sql-conn sql-conn}))))))))))
+                ;; Try Rust restore first (handles legacy EDN format from .bp7)
+                (if-let [rdb (try (.restoreFromLegacy WasmDataScript db-name)
+                               (catch :default _ nil))]
+                  (let [cljs-db (impl-rust/sync-from-rust rdb)]
+                    {:conn     (d/conn-from-db cljs-db)
+                     :sql-conn sql-conn})
+                  ;; Fall back to CLJS storage-async path
+                  (let [store (ds-sqlite/sqlite-store sql-conn {:db-name db-name})]
+                    (-> (storage-async/restore-sync store)
+                        (p/then (fn [result]
+                                  (if result
+                                    (let [[db wrapper] result]
+                                      {:conn     (d/conn-from-db db)
+                                       :wrapper  wrapper
+                                       :sql-conn sql-conn})
+                                    (let [wrapper (storage-async/make-sync-storage-wrapper store {})]
+                                      {:conn     (d/create-conn schema {:storage wrapper})
+                                       :wrapper  wrapper
+                                       :sql-conn sql-conn})))))))))))
 
 (defn- init-sql-conn-from-datoms!
   "Initialize a SQLite connection for `db-name`, create a conn from `datoms`,
@@ -77,7 +87,8 @@
 
 (defn- import-sqlite-bytes!
   "Import raw SQLite bytes into a new database. Returns Promise of
-   {:conn ds-conn, :wrapper wrapper, :sql-conn sql-conn}."
+   {:conn ds-conn, :wrapper?, :sql-conn sql-conn}.
+   Tries Rust restoreFromLegacy first, falls back to CLJS storage-async."
   [db-bytes db-name]
   (-> (sql/connect! db-name)
       (p/then (fn [tmp-conn]
@@ -85,13 +96,20 @@
                     (p/then (fn [_] (sql/close! tmp-conn))))))
       (p/then (fn [_] (sql/connect! db-name)))
       (p/then (fn [sql-conn]
-                (let [store (ds-sqlite/sqlite-store sql-conn {:db-name  db-name
-                                                              :skip-ddl true})]
-                  (-> (storage-async/restore-sync store)
-                      (p/then (fn [[db wrapper]]
-                                {:conn     (d/conn-from-db db)
-                                 :wrapper  wrapper
-                                 :sql-conn sql-conn}))))))))
+                ;; Try Rust restore first
+                (if-let [rdb (try (.restoreFromLegacy WasmDataScript db-name)
+                               (catch :default _ nil))]
+                  (let [cljs-db (impl-rust/sync-from-rust rdb)]
+                    {:conn     (d/conn-from-db cljs-db)
+                     :sql-conn sql-conn})
+                  ;; Legacy fallback for older .bp7 files
+                  (let [store (ds-sqlite/sqlite-store sql-conn {:db-name  db-name
+                                                                :skip-ddl true})]
+                    (-> (storage-async/restore-sync store)
+                        (p/then (fn [[db wrapper]]
+                                  {:conn     (d/conn-from-db db)
+                                   :wrapper  wrapper
+                                   :sql-conn sql-conn})))))))))
 
 (defn- new-worksheet-tx [ds-conn ws-name ws-uuid modules]
   (let [version @(rf/subscribe [:state :app-version])
@@ -109,15 +127,30 @@
 ;;; Conn Initialization
 
 (defn- setup-conn!
-  "Wire up a DataScript conn: set the conn atom, register listener, connect
-   re-posh and reactive-entity."
+  "Wire up a DataScript conn: set the conn atom, sync to Rust worksheet DB,
+   register Rust sync listener, then connect re-posh and reactive-entity.
+   Rust sync must happen BEFORE re-posh so posh reactive queries use
+   the updated Rust DB (listeners fire in registration order)."
   [ds-conn]
   (reset! conn ds-conn)
+  ;; Sync worksheet DB to Rust BEFORE connecting re-posh
+  (let [rdb (impl-rust/sync-to-rust! @ds-conn)]
+    (impl-rust/set-named-db! "$ws" rdb @ds-conn))
+  ;; Register Rust sync listener BEFORE re-posh's listener
+  (d/listen! ds-conn :rust-sync
+    (fn [{:keys [db-after]}]
+      ;; Full re-sync on each tx (worksheet DBs are small, <1K datoms)
+      (let [rdb (impl-rust/sync-to-rust! db-after)]
+        (impl-rust/set-named-db! "$ws" rdb db-after))))
+  ;; Now connect re-posh (registers listener after ours)
   (rp/connect! ds-conn)
   (re/init! ds-conn)
   ds-conn)
 
 (defn- reset-conn-state! []
+  (when @conn
+    (d/unlisten! @conn :rust-sync))
+  (impl-rust/remove-named-db! "$ws")
   (reset! conn nil)
   (reset! worksheet-from-file? false))
 
@@ -167,12 +200,19 @@
     (js/btoa (.join chunks ""))))
 
 (defn- export-db-bytes!
-  "Persist DataScript to SQLite and export as bytes. Returns a Promise of Uint8Array."
+  "Persist DataScript to SQLite and export as bytes. Returns a Promise of Uint8Array.
+   Uses Rust storeToLegacy when available, falls back to CLJS storage-async."
   []
-  (let [{:keys [sql-conn wrapper]} @sql-state]
-    (when (and sql-conn wrapper)
-      (-> (storage-async/store-impl-sync! (d/db @conn) wrapper true)
-          (p/then (fn [_] (sql/export! sql-conn)))))))
+  (let [{:keys [sql-conn db-name wrapper]} @sql-state]
+    (when sql-conn
+      (if-let [rdb (impl-rust/named-db "$ws")]
+        ;; Rust persistence: storeToLegacy writes EDN to datascript table
+        (do (.storeToLegacy rdb db-name)
+            (sql/export! sql-conn))
+        ;; Legacy fallback (needs wrapper)
+        (when wrapper
+          (-> (storage-async/store-impl-sync! (d/db @conn) wrapper true)
+              (p/then (fn [_] (sql/export! sql-conn)))))))))
 
 (defn- save-worksheet-browser!
   "Save worksheet via browser blob download."

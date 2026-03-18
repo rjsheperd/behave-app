@@ -8,6 +8,7 @@
             [clojure.set                 :as set]
             [clojure.string              :as str]
             [absurder-sql.datascript.core :as d]
+            [absurder-sql.datascript.impl-rust :as impl-rust]
             [goog.string                 :as gstring]
             [map-utils.interface         :refer [index-by]]
             [number-utils.core           :refer [parse-float]]
@@ -36,12 +37,12 @@
 (rf/reg-sub
  :worksheet/all
  (fn [_ _]
-   (d/q '[:find ?created ?uuid
-          :in $
-          :where
-          [?e :worksheet/uuid ?uuid]
-          [?e :worksheet/created ?created]]
-        @@s/conn)))
+   (impl-rust/q-ws '[:find ?created ?uuid
+                     :in $
+                     :where
+                     [?e :worksheet/uuid ?uuid]
+                     [?e :worksheet/created ?created]]
+                   @@s/conn)))
 
 ;; Retrieve latest worksheet UUID
 (rf/reg-sub
@@ -64,7 +65,8 @@
 (rf/reg-sub
  :worksheet-entity
  (fn [_ [_ ws-uuid]]
-   (d/entity @@s/conn [:worksheet/uuid ws-uuid])))
+   (or (impl-rust/entity-ws [:worksheet/uuid ws-uuid])
+       (d/entity @@s/conn [:worksheet/uuid ws-uuid]))))
 
 (rp/reg-sub
  :worksheet/name
@@ -106,17 +108,18 @@
 (rf/reg-sub
  :worksheet/input
  (fn [_ [_ ws-uuid group-uuid repeat-id group-variable-uuid]]
-   (let [eid (d/q '[:find  ?i .
-                    :in    $ ?ws-uuid ?group-uuid ?repeat-id ?group-var-uuid
-                    :where
-                    [?w :worksheet/uuid ?ws-uuid]
-                    [?w :worksheet/input-groups ?g]
-                    [?g :input-group/group-uuid ?group-uuid]
-                    [?g :input-group/repeat-id ?repeat-id]
-                    [?g :input-group/inputs ?i]
-                    [?i :input/group-variable-uuid ?group-var-uuid]]
-                  @@s/conn ws-uuid group-uuid repeat-id group-variable-uuid)]
-     (d/touch (d/entity @@s/conn eid)))))
+   (let [eid (impl-rust/q-ws '[:find  ?i .
+                              :in    $ ?ws-uuid ?group-uuid ?repeat-id ?group-var-uuid
+                              :where
+                              [?w :worksheet/uuid ?ws-uuid]
+                              [?w :worksheet/input-groups ?g]
+                              [?g :input-group/group-uuid ?group-uuid]
+                              [?g :input-group/repeat-id ?repeat-id]
+                              [?g :input-group/inputs ?i]
+                              [?i :input/group-variable-uuid ?group-var-uuid]]
+                            @@s/conn ws-uuid group-uuid repeat-id group-variable-uuid)]
+     (or (some-> (impl-rust/entity-ws eid) impl-rust/touch)
+         (d/touch (d/entity @@s/conn eid))))))
 
 ;; Get the value of a particular input
 (rp/reg-sub
@@ -258,7 +261,9 @@
                                       [?w :worksheet/input-groups ?g]
                                       [?g :input-group/inputs ?i]]
                                     [ws-uuid]])]
-     (map #(d/entity @@s/conn %) input-eids))))
+     (map #(or (impl-rust/entity-ws %)
+               (d/entity @@s/conn %))
+          input-eids))))
 
 (rf/reg-sub
  :worksheet/all-inputs-vector
@@ -287,20 +292,21 @@
                              :english :variable/english-unit-uuid
                              :metric  :variable/metric-unit-uuid)]
      (into []
-           (d/q '[:find  ?group-uuid ?repeat-id ?gv-uuid ?unit-uuid
-                  :in    $ $ws % ?ws-uuid ?units-system
-                  :where
-                  [$ws ?w :worksheet/uuid ?ws-uuid]
-                  [$ws ?w :worksheet/input-groups ?g]
-                  [$ws ?g :input-group/group-uuid ?group-uuid]
-                  [$ws ?g :input-group/repeat-id ?repeat-id]
-                  [$ws ?g :input-group/inputs ?i]
-                  [$ws ?i :input/group-variable-uuid ?gv-uuid]
-                  (lookup ?gv-uuid ?gv)
-                  (group-variable _ ?gv ?v)
-                  [?v :variable/kind :continuous]
-                  [?v ?units-system-attr ?unit-uuid]]
-                @@vms-conn @@s/conn rules ws-uuid units-system-attr)))))
+           (impl-rust/q '[:find  ?group-uuid ?repeat-id ?gv-uuid ?unit-uuid
+                           :in    $ $ws % ?ws-uuid ?units-system
+                           :where
+                           [$ws ?w :worksheet/uuid ?ws-uuid]
+                           [$ws ?w :worksheet/input-groups ?g]
+                           [$ws ?g :input-group/group-uuid ?group-uuid]
+                           [$ws ?g :input-group/repeat-id ?repeat-id]
+                           [$ws ?g :input-group/inputs ?i]
+                           [$ws ?i :input/group-variable-uuid ?gv-uuid]
+                           (lookup ?gv-uuid ?gv)
+                           (group-variable _ ?gv ?v)
+                           [?v :variable/kind :continuous]
+                           [?v ?units-system-attr ?unit-uuid]]
+                         @@vms-conn @@s/conn rules ws-uuid units-system-attr)))))
+
 
 (rf/reg-sub
  :worksheet/all-domain-level-units
@@ -312,22 +318,23 @@
                              :metric  :domain/metric-unit-uuid
                              :domain/native-unit-uuid)]
      (into []
-           (d/q '[:find  ?group-uuid ?repeat-id ?gv-uuid ?unit-uuid
-                  :in    $ $ws % ?ws-uuid ?units-system-attr
-                  :where
-                  [$ws ?w :worksheet/uuid ?ws-uuid]
-                  [$ws ?w :worksheet/input-groups ?g]
-                  [$ws ?g :input-group/group-uuid ?group-uuid]
-                  [$ws ?g :input-group/repeat-id ?repeat-id]
-                  [$ws ?g :input-group/inputs ?i]
-                  [$ws ?i :input/group-variable-uuid ?gv-uuid]
-                  (lookup ?gv-uuid ?gv)
-                  (group-variable _ ?gv ?v)
-                  [?v :variable/kind :continuous]
-                  [?v :variable/domain-uuid ?domain-uuid]
-                  [?d :bp/uuid ?domain-uuid]
-                  [?d ?units-system-attr ?unit-uuid]]
-                @@vms-conn @@s/conn rules ws-uuid units-system-attr)))))
+           (impl-rust/q '[:find  ?group-uuid ?repeat-id ?gv-uuid ?unit-uuid
+                           :in    $ $ws % ?ws-uuid ?units-system-attr
+                           :where
+                           [$ws ?w :worksheet/uuid ?ws-uuid]
+                           [$ws ?w :worksheet/input-groups ?g]
+                           [$ws ?g :input-group/group-uuid ?group-uuid]
+                           [$ws ?g :input-group/repeat-id ?repeat-id]
+                           [$ws ?g :input-group/inputs ?i]
+                           [$ws ?i :input/group-variable-uuid ?gv-uuid]
+                           (lookup ?gv-uuid ?gv)
+                           (group-variable _ ?gv ?v)
+                           [?v :variable/kind :continuous]
+                           [?v :variable/domain-uuid ?domain-uuid]
+                           [?d :bp/uuid ?domain-uuid]
+                           [?d ?units-system-attr ?unit-uuid]]
+                         @@vms-conn @@s/conn rules ws-uuid units-system-attr)))))
+
 
 (rf/reg-sub
  :worksheet/all-cached-units
@@ -339,56 +346,56 @@
          (comp (filter (fn [[_ _ _ domain-uuid]] (contains? units-settings domain-uuid)))
                (map (fn [[group-uuid repeat-uuid gv-uuid domain-uuid]]
                       [group-uuid repeat-uuid gv-uuid (get-in units-settings [domain-uuid :unit-uuid])])))
-         (d/q '[:find  ?group-uuid ?repeat-id ?gv-uuid ?domain-uuid
-                :in    $ $ws % ?ws-uuid
-                :where
-                [$ws ?w :worksheet/uuid ?ws-uuid]
-                [$ws ?w :worksheet/input-groups ?g]
-                [$ws ?g :input-group/group-uuid ?group-uuid]
-                [$ws ?g :input-group/repeat-id ?repeat-id]
-                [$ws ?g :input-group/inputs ?i]
-                [$ws ?i :input/group-variable-uuid ?gv-uuid]
-                (lookup ?gv-uuid ?gv)
-                (group-variable _ ?gv ?v)
-                [?v :variable/kind :continuous]
-                [?v :variable/domain-uuid ?domain-uuid]
-                [?d :bp/uuid ?domain-uuid]]
-              @@vms-conn @@s/conn rules ws-uuid))))
+         (impl-rust/q '[:find  ?group-uuid ?repeat-id ?gv-uuid ?domain-uuid
+                        :in    $ $ws % ?ws-uuid
+                        :where
+                        [$ws ?w :worksheet/uuid ?ws-uuid]
+                        [$ws ?w :worksheet/input-groups ?g]
+                        [$ws ?g :input-group/group-uuid ?group-uuid]
+                        [$ws ?g :input-group/repeat-id ?repeat-id]
+                        [$ws ?g :input-group/inputs ?i]
+                        [$ws ?i :input/group-variable-uuid ?gv-uuid]
+                        (lookup ?gv-uuid ?gv)
+                        (group-variable _ ?gv ?v)
+                        [?v :variable/kind :continuous]
+                        [?v :variable/domain-uuid ?domain-uuid]
+                        [?d :bp/uuid ?domain-uuid]]
+                      @@vms-conn @@s/conn rules ws-uuid))))
 
 ;; deprecated because this is using `:input/units`
 (rf/reg-sub
  :worksheet/all-custom-units-deprecated
  (fn [_ [_ ws-uuid]]
-   (d/q '[:find  ?group-uuid ?repeat-id ?gv-uuid ?unit-uuid
-          :in    $ $ws % ?ws-uuid
-          :where
-          [$ws ?w :worksheet/uuid ?ws-uuid]
-          [$ws ?w :worksheet/input-groups ?g]
-          [$ws ?g :input-group/group-uuid ?group-uuid]
-          [$ws ?g :input-group/repeat-id ?repeat-id]
-          [$ws ?g :input-group/inputs ?i]
-          [$ws ?i :input/group-variable-uuid ?gv-uuid]
-          (lookup ?gv-uuid ?gv)
-          (group-variable _ ?gv ?v)
-          [$ws ?i :input/units ?unit-uuid]]
-        @@vms-conn @@s/conn rules ws-uuid)))
+   (impl-rust/q '[:find  ?group-uuid ?repeat-id ?gv-uuid ?unit-uuid
+                  :in    $ $ws % ?ws-uuid
+                  :where
+                  [$ws ?w :worksheet/uuid ?ws-uuid]
+                  [$ws ?w :worksheet/input-groups ?g]
+                  [$ws ?g :input-group/group-uuid ?group-uuid]
+                  [$ws ?g :input-group/repeat-id ?repeat-id]
+                  [$ws ?g :input-group/inputs ?i]
+                  [$ws ?i :input/group-variable-uuid ?gv-uuid]
+                  (lookup ?gv-uuid ?gv)
+                  (group-variable _ ?gv ?v)
+                  [$ws ?i :input/units ?unit-uuid]]
+                @@vms-conn @@s/conn rules ws-uuid)))
 
 (rf/reg-sub
  :worksheet/all-custom-units-using-input-units-uuids
  (fn [_ [_ ws-uuid]]
-   (d/q '[:find  ?group-uuid ?repeat-id ?gv-uuid ?unit-uuid
-          :in    $ $ws % ?ws-uuid
-          :where
-          [$ws ?w :worksheet/uuid ?ws-uuid]
-          [$ws ?w :worksheet/input-groups ?g]
-          [$ws ?g :input-group/group-uuid ?group-uuid]
-          [$ws ?g :input-group/repeat-id ?repeat-id]
-          [$ws ?g :input-group/inputs ?i]
-          [$ws ?i :input/group-variable-uuid ?gv-uuid]
-          (lookup ?gv-uuid ?gv)
-          (group-variable _ ?gv ?v)
-          [$ws ?i :input/units-uuid ?unit-uuid]]
-        @@vms-conn @@s/conn rules ws-uuid)))
+   (impl-rust/q '[:find  ?group-uuid ?repeat-id ?gv-uuid ?unit-uuid
+                  :in    $ $ws % ?ws-uuid
+                  :where
+                  [$ws ?w :worksheet/uuid ?ws-uuid]
+                  [$ws ?w :worksheet/input-groups ?g]
+                  [$ws ?g :input-group/group-uuid ?group-uuid]
+                  [$ws ?g :input-group/repeat-id ?repeat-id]
+                  [$ws ?g :input-group/inputs ?i]
+                  [$ws ?i :input/group-variable-uuid ?gv-uuid]
+                  (lookup ?gv-uuid ?gv)
+                  (group-variable _ ?gv ?v)
+                  [$ws ?i :input/units-uuid ?unit-uuid]]
+                @@vms-conn @@s/conn rules ws-uuid)))
 
 (rf/reg-sub
  :worksheet/all-custom-units
@@ -495,19 +502,19 @@
  (fn [[_ ws-uuid]]
    (rf/subscribe [:worksheet ws-uuid]))
  (fn [worksheet [_ ws-uuid]]
-   (->> (d/q '[:find  ?gv ?hide-result
-               :in    $ $ws % ?ws-uuid
-               :where
-               [$ws ?w :worksheet/uuid ?ws-uuid]
-               [$ws ?w :worksheet/outputs ?o]
-               [$ws ?o :output/group-variable-uuid ?uuid]
-               [$ws ?o :output/enabled? true]
-               (lookup ?uuid ?gv)
-               [(get-else $ ?gv :group-variable/hide-result? false) ?hide-result]]
-             @@vms-conn
-             @@s/conn
-             rules
-             ws-uuid)
+   (->> (impl-rust/q '[:find  ?gv ?hide-result
+                       :in    $ $ws % ?ws-uuid
+                       :where
+                       [$ws ?w :worksheet/uuid ?ws-uuid]
+                       [$ws ?w :worksheet/outputs ?o]
+                       [$ws ?o :output/group-variable-uuid ?uuid]
+                       [$ws ?o :output/enabled? true]
+                       (lookup ?uuid ?gv)
+                       [(get-else $ ?gv :group-variable/hide-result? false) ?hide-result]]
+                     @@vms-conn
+                     @@s/conn
+                     rules
+                     ws-uuid)
         (remove (fn [[_ hide-result?]] (true? hide-result?)))
         (map first)
         (map (fn [gv] @(rf/subscribe [:vms/entity-from-eid gv])))
@@ -521,19 +528,19 @@
 (rf/reg-sub
  :worksheet/output-uuids-filtered
  (fn [_ [_ ws-uuid]]
-   (->> (d/q '[:find  ?uuid ?hide-result
-               :in    $ $ws % ?ws-uuid
-               :where
-               [$ws ?w :worksheet/uuid ?ws-uuid]
-               [$ws ?w :worksheet/outputs ?o]
-               [$ws ?o :output/group-variable-uuid ?uuid]
-               [$ws ?o :output/enabled? true]
-               (lookup ?uuid ?gv)
-               [(get-else $ ?gv :group-variable/hide-result? false) ?hide-result]]
-             @@vms-conn
-             @@s/conn
-             rules
-             ws-uuid)
+   (->> (impl-rust/q '[:find  ?uuid ?hide-result
+                       :in    $ $ws % ?ws-uuid
+                       :where
+                       [$ws ?w :worksheet/uuid ?ws-uuid]
+                       [$ws ?w :worksheet/outputs ?o]
+                       [$ws ?o :output/group-variable-uuid ?uuid]
+                       [$ws ?o :output/enabled? true]
+                       (lookup ?uuid ?gv)
+                       [(get-else $ ?gv :group-variable/hide-result? false) ?hide-result]]
+                     @@vms-conn
+                     @@s/conn
+                     rules
+                     ws-uuid)
         (remove (fn [[_ hide-result?]] (true? hide-result?)))
         (map first))))
 
@@ -542,20 +549,20 @@
  (fn [[_ ws-uuid]]
    (rf/subscribe [:worksheet ws-uuid]))
  (fn [worksheet [_ ws-uuid]]
-   (->> (d/q '[:find  ?uuid ?hide-result ?graph-result
-               :in    $ $ws % ?ws-uuid
-               :where
-               [$ws ?w :worksheet/uuid ?ws-uuid]
-               [$ws ?w :worksheet/outputs ?o]
-               [$ws ?o :output/group-variable-uuid ?uuid]
-               [$ws ?o :output/enabled? true]
-               (lookup ?uuid ?gv)
-               [(get-else $ ?gv :group-variable/hide-result? false) ?hide-result]
-               [(get-else $ ?gv :group-variable/hide-graph? false) ?graph-result]]
-             @@vms-conn
-             @@s/conn
-             rules
-             ws-uuid)
+   (->> (impl-rust/q '[:find  ?uuid ?hide-result ?graph-result
+                       :in    $ $ws % ?ws-uuid
+                       :where
+                       [$ws ?w :worksheet/uuid ?ws-uuid]
+                       [$ws ?w :worksheet/outputs ?o]
+                       [$ws ?o :output/group-variable-uuid ?uuid]
+                       [$ws ?o :output/enabled? true]
+                       (lookup ?uuid ?gv)
+                       [(get-else $ ?gv :group-variable/hide-result? false) ?hide-result]
+                       [(get-else $ ?gv :group-variable/hide-graph? false) ?graph-result]]
+                     @@vms-conn
+                     @@s/conn
+                     rules
+                     ws-uuid)
         (remove (fn [[_ hide-result? hide-graph?]] (or hide-result? hide-graph?)))
         (map first)
         (map (fn [gv-uuid] @(rf/subscribe [:vms/entity-from-uuid gv-uuid])))
@@ -569,15 +576,15 @@
 (rf/reg-sub
  :worksheet/all-output-uuids
  (fn [_ [_ ws-uuid]]
-   (->> (d/q '[:find  [?uuid ...]
-               :in  $ ?ws-uuid
-               :where
-               [?w :worksheet/uuid ?ws-uuid]
-               [?w :worksheet/outputs ?o]
-               [?o :output/group-variable-uuid ?uuid]
-               [?o :output/enabled? true]]
-             @@s/conn
-             ws-uuid))))
+   (->> (impl-rust/q-ws '[:find  [?uuid ...]
+                          :in  $ ?ws-uuid
+                          :where
+                          [?w :worksheet/uuid ?ws-uuid]
+                          [?w :worksheet/outputs ?o]
+                          [?o :output/group-variable-uuid ?uuid]
+                          [?o :output/enabled? true]]
+                        @@s/conn
+                        ws-uuid))))
 
 (rp/reg-sub
  :worksheet/get-table-settings-attr
@@ -628,14 +635,14 @@
  (fn [table-settings-filters _]
    (remove
     (fn [[group-var-uuid]]
-      (let [kind (d/q '[:find ?kind .
-                        :in  $ ?group-var-uuid
-                        :where
-                        [?gv :bp/uuid ?group-var-uuid]
-                        [?v :variable/group-variables ?gv]
-                        [?v :variable/kind ?kind]]
-                      @@vms-conn
-                      group-var-uuid)]
+      (let [kind (impl-rust/q '[:find ?kind .
+                               :in  $ ?group-var-uuid
+                               :where
+                               [?gv :bp/uuid ?group-var-uuid]
+                               [?v :variable/group-variables ?gv]
+                               [?v :variable/kind ?kind]]
+                             @@vms-conn
+                             group-var-uuid)]
         (or (= kind :discrete)
             (= kind :text))))
     table-settings-filters)))
@@ -680,14 +687,14 @@
  (fn [table-settings-filters _]
    (remove
     (fn [[group-var-uuid]]
-      (let [kind (d/q '[:find ?kind .
-                        :in  $ ?group-var-uuid
-                        :where
-                        [?gv :bp/uuid ?group-var-uuid]
-                        [?v :variable/group-variables ?gv]
-                        [?v :variable/kind ?kind]]
-                      @@vms-conn
-                      group-var-uuid)]
+      (let [kind (impl-rust/q '[:find ?kind .
+                               :in  $ ?group-var-uuid
+                               :where
+                               [?gv :bp/uuid ?group-var-uuid]
+                               [?v :variable/group-variables ?gv]
+                               [?v :variable/kind ?kind]]
+                             @@vms-conn
+                             group-var-uuid)]
         (or (= kind :discrete)
             (= kind :text))))
     table-settings-filters)))
@@ -708,7 +715,7 @@
             (and significant-digits is-output?) (gstring/format (str "%." significant-digits "f")))))
 
       (or (= v-kind :discrete) multi-discrete?)
-      (let [{llist :variable/list}  (d/pull @@vms-conn '[{:variable/list [* {:list/options [*]}]}] (:db/id variable))
+      (let [{llist :variable/list}  (impl-rust/pull @@vms-conn '[{:variable/list [* {:list/options [*]}]}] (:db/id variable))
             {options :list/options} llist
             options                 (index-by :list-option/value options)]
         (fn discrete-fmt [value & [{:keys [export?]}]]
@@ -727,13 +734,13 @@
 (rf/reg-sub
  :worksheet/result-table-formatters
  (fn [_ [_ gv-uuids]]
-   (let [results (d/q '[:find ?gv ?gv-uuid (pull ?v [*]) ?multi-discrete
-                        :in $ % [?gv-uuid ...]
-                        :where
-                        (lookup ?gv-uuid ?gv)
-                        [(get-else $ ?gv :group-variable/discrete-multiple? false) ?multi-discrete]
-                        (group-variable _ ?gv ?v)]
-                      @@vms-conn rules gv-uuids)]
+   (let [results (impl-rust/q '[:find ?gv ?gv-uuid (pull ?v [*]) ?multi-discrete
+                               :in $ % [?gv-uuid ...]
+                               :where
+                               (lookup ?gv-uuid ?gv)
+                               [(get-else $ ?gv :group-variable/discrete-multiple? false) ?multi-discrete]
+                               (group-variable _ ?gv ?v)]
+                             @@vms-conn rules gv-uuids)]
      (into {} (map
                (fn [[gv-eid gv-uuid variable multi-discrete?]]
                  (let [is-output? @(rf/subscribe [:vms/group-variable-is-output? gv-eid])]
@@ -798,13 +805,13 @@
     [ws-uuid]}))
 
 (defn- is-directional? [gv-uuid direction]
-  (= (d/q '[:find  ?direction .
-            :in $ ?gv-uuid
-            :where
-            [?gv :bp/uuid ?gv-uuid]
-            [?gv :group-variable/direction ?direction]]
-          @@vms-conn
-          gv-uuid)
+  (= (impl-rust/q '[:find  ?direction .
+                   :in $ ?gv-uuid
+                   :where
+                   [?gv :bp/uuid ?gv-uuid]
+                   [?gv :group-variable/direction ?direction]]
+                 @@vms-conn
+                 gv-uuid)
      direction))
 
 (rf/reg-sub
@@ -947,18 +954,18 @@
  (fn [_]
    (rf/subscribe [:vms/group-variable-order]))
  (fn [gv-order [_ ws-uuid]]
-   (->> (d/q '[:find  ?gv-uuid ?repeat-id ?units ?hide-csv
-               :in    $ $ws % ?ws-uuid
-               :where
-               [$ws ?w :worksheet/uuid ?ws-uuid]
-               [$ws ?w :worksheet/result-table ?r]
-               [$ws ?r :result-table/headers ?h]
-               [$ws ?h :result-header/repeat-id ?repeat-id]
-               [$ws ?h :result-header/group-variable-uuid ?gv-uuid]
-               [$ws ?h :result-header/units ?units]
-               (lookup ?gv-uuid ?gv)
-               [(get-else $ ?gv :group-variable/hide-csv? false) ?hide-csv]]
-             @@vms-conn @@s/conn rules ws-uuid)
+   (->> (impl-rust/q '[:find  ?gv-uuid ?repeat-id ?units ?hide-csv
+                       :in    $ $ws % ?ws-uuid
+                       :where
+                       [$ws ?w :worksheet/uuid ?ws-uuid]
+                       [$ws ?w :worksheet/result-table ?r]
+                       [$ws ?r :result-table/headers ?h]
+                       [$ws ?h :result-header/repeat-id ?repeat-id]
+                       [$ws ?h :result-header/group-variable-uuid ?gv-uuid]
+                       [$ws ?h :result-header/units ?units]
+                       (lookup ?gv-uuid ?gv)
+                       [(get-else $ ?gv :group-variable/hide-csv? false) ?hide-csv]]
+                     @@vms-conn @@s/conn rules ws-uuid)
         (remove (fn [[_ _ _ hide-csv?]] hide-csv?))
         (sort-by (juxt #(.indexOf gv-order (first %))
                        #(second %))))))
@@ -981,7 +988,8 @@
                            [?w :worksheet/graph-settings ?gs]]
                   [ws-uuid]]))
  (fn [id _]
-   (d/entity @@s/conn id)))
+   (or (impl-rust/entity-ws id)
+       (d/entity @@s/conn id))))
 
 (defn- missing-input? [value]
   (or (nil? value) (empty? value)))
@@ -989,14 +997,14 @@
 (defn- process-group-for-missing-inputs [worksheet all-inputs missing-inputs? group]
   (when-let [group-variables (:group/group-variables group)]
     (if (:group/repeat? group)
-      (let [repeat-ids (d/q '[:find  [?rid ...]
-                              :in    $ ?ws-uuid ?group-uuid
-                              :where
-                              [?w :worksheet/uuid ?ws-uuid]
-                              [?w :worksheet/input-groups ?ig]
-                              [?ig :input-group/group-uuid ?group-uuid]
-                              [?ig :input-group/repeat-id ?rid]]
-                            @@s/conn (:worksheet/uuid worksheet) (:bp/uuid group))]
+      (let [repeat-ids (impl-rust/q-ws '[:find  [?rid ...]
+                                         :in    $ ?ws-uuid ?group-uuid
+                                         :where
+                                         [?w :worksheet/uuid ?ws-uuid]
+                                         [?w :worksheet/input-groups ?ig]
+                                         [?ig :input-group/group-uuid ?group-uuid]
+                                         [?ig :input-group/repeat-id ?rid]]
+                                       @@s/conn (:worksheet/uuid worksheet) (:bp/uuid group))]
         (doseq [group-variable group-variables
                 repeat-id      repeat-ids
                 :when          (not (:group-variable/conditionally-set? group-variable))]
@@ -1116,7 +1124,7 @@
  :worksheet/resolve-enum-value
 
  (fn [_ [_ variable-eid value]]
-   (let [variable                (d/pull @@vms-conn '[{:variable/list [* {:list/options [*]}]}] variable-eid)
+   (let [variable                (impl-rust/pull @@vms-conn '[{:variable/list [* {:list/options [*]}]}] variable-eid)
          {v-list :variable/list} variable
          {options :list/options} v-list
          options                 (index-by :list-option/value options)]
@@ -1128,7 +1136,7 @@
  :worksheet/resolve-enum-order
 
  (fn [_ [_ list-eid value]]
-   (let [list-entity             (d/touch (d/entity @@vms-conn list-eid))
+   (let [list-entity             (d/touch (or (impl-rust/entity list-eid) (d/entity @@vms-conn list-eid)))
          {options :list/options} list-entity
          options                 (index-by :list-option/value options)
          option                  (get options value)]
@@ -1137,60 +1145,60 @@
 (rf/reg-sub
  :worksheet/result-table-gv-uuid->units
  (fn [_ [_ ws-uuid]]
-   (let [gv-uuids+units (d/q '[:find  ?gv-uuid ?units
-                               :in $ ?ws-uuid
-                               :where
-                               [?ws :worksheet/uuid ?ws-uuid]
-                               [?ws :worksheet/result-table ?t]
-                               [?t  :result-table/headers ?h]
-                               [?h  :result-header/group-variable-uuid ?gv-uuid]
-                               [?h  :result-header/units ?units]]
-                             @@s/conn ws-uuid)]
+   (let [gv-uuids+units (impl-rust/q-ws '[:find  ?gv-uuid ?units
+                                          :in $ ?ws-uuid
+                                          :where
+                                          [?ws :worksheet/uuid ?ws-uuid]
+                                          [?ws :worksheet/result-table ?t]
+                                          [?t  :result-table/headers ?h]
+                                          [?h  :result-header/group-variable-uuid ?gv-uuid]
+                                          [?h  :result-header/units ?units]]
+                                        @@s/conn ws-uuid)]
      (into {} gv-uuids+units))))
 
 (rf/reg-sub
  :worksheet/inputs-in-domain
  (fn [_ [_ ws-uuid domain-uuid]]
-   (d/q '[:find  [?i ...]
-          :in    $ $ws % ?ws-uuid ?domain-uuid
-          :where
-          [$ws ?w :worksheet/uuid ?ws-uuid]
-          [$ws ?w :worksheet/input-groups ?g]
-          [$ws ?g :input-group/group-uuid ?group-uuid]
-          [$ws ?g :input-group/repeat-id ?repeat-id]
-          [$ws ?g :input-group/inputs ?i]
-          [$ws ?i :input/value ?value]
-          (lookup ?gv-uuid ?gv)
-          (group-variable _ ?gv ?v)
-          [?v :variable/domain-uuid ?domain-uuid]]
-        @@vms-conn @@s/conn rules ws-uuid domain-uuid)))
+   (impl-rust/q '[:find  [?i ...]
+                  :in    $ $ws % ?ws-uuid ?domain-uuid
+                  :where
+                  [$ws ?w :worksheet/uuid ?ws-uuid]
+                  [$ws ?w :worksheet/input-groups ?g]
+                  [$ws ?g :input-group/group-uuid ?group-uuid]
+                  [$ws ?g :input-group/repeat-id ?repeat-id]
+                  [$ws ?g :input-group/inputs ?i]
+                  [$ws ?i :input/value ?value]
+                  (lookup ?gv-uuid ?gv)
+                  (group-variable _ ?gv ?v)
+                  [?v :variable/domain-uuid ?domain-uuid]]
+                @@vms-conn @@s/conn rules ws-uuid domain-uuid)))
 
 (rf/reg-sub
  :worksheet/output-directions
  (fn [_ [_ ws-uuid]]
-   (d/q '[:find  [?direction ...]
-          :in    $ $ws % ?ws-uuid
-          :where
-          [$ws ?w :worksheet/uuid ?ws-uuid]
-          [$ws ?w :worksheet/outputs ?o]
-          [$ws ?o :output/group-variable-uuid ?gv-uuid]
-          [$ws ?o :output/enabled? true]
-          (lookup ?gv-uuid ?gv)
-          [?gv :group-variable/direction ?direction]]
-        @@vms-conn @@s/conn rules ws-uuid)))
+   (impl-rust/q '[:find  [?direction ...]
+                  :in    $ $ws % ?ws-uuid
+                  :where
+                  [$ws ?w :worksheet/uuid ?ws-uuid]
+                  [$ws ?w :worksheet/outputs ?o]
+                  [$ws ?o :output/group-variable-uuid ?gv-uuid]
+                  [$ws ?o :output/enabled? true]
+                  (lookup ?gv-uuid ?gv)
+                  [?gv :group-variable/direction ?direction]]
+                @@vms-conn @@s/conn rules ws-uuid)))
 
 (rf/reg-sub
  :worksheet/pivot-table-field-uuids
  (fn [_ [_ pivot-table-id]]
-   (d/q '[:find  ?gv-uuid ?order
-          :keys  gv-uuid order
-          :in    $ ?p
-          :where
-          [?p :pivot-table/columns ?c]
-          [?c :pivot-column/type :field]
-          [?c :pivot-column/group-variable-uuid ?gv-uuid]
-          [?c :pivot-column/order ?order]]
-        @@vms-conn pivot-table-id)))
+   (impl-rust/q '[:find  ?gv-uuid ?order
+                  :keys  gv-uuid order
+                  :in    $ ?p
+                  :where
+                  [?p :pivot-table/columns ?c]
+                  [?c :pivot-column/type :field]
+                  [?c :pivot-column/group-variable-uuid ?gv-uuid]
+                  [?c :pivot-column/order ?order]]
+                @@vms-conn pivot-table-id)))
 
 (rf/reg-sub
  :worksheet/pivot-table-fields
@@ -1202,14 +1210,14 @@
 (rf/reg-sub
  :worksheet/pivot-table-values
  (fn [_ [_ pivot-table-id]]
-   (d/q '[:find  ?gv-uuid ?function
-          :in    $ ?p
-          :where
-          [?p :pivot-table/columns ?c]
-          [?c :pivot-column/type :value]
-          [?c :pivot-column/group-variable-uuid ?gv-uuid]
-          [?c :pivot-column/function ?function]]
-        @@vms-conn pivot-table-id)))
+   (impl-rust/q '[:find  ?gv-uuid ?function
+                  :in    $ ?p
+                  :where
+                  [?p :pivot-table/columns ?c]
+                  [?c :pivot-column/type :value]
+                  [?c :pivot-column/group-variable-uuid ?gv-uuid]
+                  [?c :pivot-column/function ?function]]
+                @@vms-conn pivot-table-id)))
 
 (rf/reg-sub
  :worksheet/pivot-tables
@@ -1239,55 +1247,55 @@
 (rf/reg-sub
  :worksheet/output-eid
  (fn [_ [_ ws-uuid gv-uuid]]
-   (d/q '[:find  ?o .
-          :in  $ ?ws-uuid ?gv-uuid
-          :where
-          [?w :worksheet/uuid ?ws-uuid]
-          [?w :worksheet/outputs ?o]
-          [?o :output/group-variable-uuid ?gv-uuid]]
-        @@s/conn
-        ws-uuid
-        gv-uuid)))
+   (impl-rust/q-ws '[:find  ?o .
+                     :in  $ ?ws-uuid ?gv-uuid
+                     :where
+                     [?w :worksheet/uuid ?ws-uuid]
+                     [?w :worksheet/outputs ?o]
+                     [?o :output/group-variable-uuid ?gv-uuid]]
+                   @@s/conn
+                   ws-uuid
+                   gv-uuid)))
 
 (rf/reg-sub
  :worksheet/output-unit-uuid
  (fn [_ [_ ws-uuid gv-uuid]]
-   (d/q '[:find  ?unit-uuid .
-          :in  $ ?ws-uuid ?gv-uuid
-          :where
-          [?w :worksheet/uuid ?ws-uuid]
-          [?w :worksheet/outputs ?o]
-          [?o :output/group-variable-uuid ?gv-uuid]
-          [?o :output/units-uuid ?unit-uuid]]
-        @@s/conn
-        ws-uuid
-        gv-uuid)))
+   (impl-rust/q-ws '[:find  ?unit-uuid .
+                     :in  $ ?ws-uuid ?gv-uuid
+                     :where
+                     [?w :worksheet/uuid ?ws-uuid]
+                     [?w :worksheet/outputs ?o]
+                     [?o :output/group-variable-uuid ?gv-uuid]
+                     [?o :output/units-uuid ?unit-uuid]]
+                   @@s/conn
+                   ws-uuid
+                   gv-uuid)))
 
 (rf/reg-sub
  :worksheet/repeat-groups?
  (fn [_ [_ ws-uuid]]
-   (some pos? (d/q '[:find [?rid ...]
-                     :in  $ ?ws-uuid
-                     :where
-                     [?w :worksheet/uuid ?ws-uuid]
-                     [?w :worksheet/input-groups ?g]
-                     [?g :input-group/group-uuid ?g-uuid]
-                     [?g :input-group/repeat-id ?rid]]
-                   @@s/conn ws-uuid))))
+   (some pos? (impl-rust/q-ws '[:find [?rid ...]
+                                :in  $ ?ws-uuid
+                                :where
+                                [?w :worksheet/uuid ?ws-uuid]
+                                [?w :worksheet/input-groups ?g]
+                                [?g :input-group/group-uuid ?g-uuid]
+                                [?g :input-group/repeat-id ?rid]]
+                              @@s/conn ws-uuid))))
 
 (rf/reg-sub
  :worksheet/should-keep-input?
  (fn [[_ _ws-uuid gv-uuid]]
    (rf/subscribe [:vms/group-variable-heirarchy gv-uuid]))
  (fn [hierarchy-eids [_ ws-uuid _gv-uuid]]
-   (let [[submodule & groups] (mapv #(d/pull @@vms-conn
-                                             '[:db/id
-                                               :group/name
-                                               :group/translation-key
-                                               :group/conditionals-operator
-                                               :submodule/name
-                                               :submodule/conditionals-operator]
-                                             (:db/id %))
+   (let [[submodule & groups] (mapv #(impl-rust/pull @@vms-conn
+                                                    '[:db/id
+                                                      :group/name
+                                                      :group/translation-key
+                                                      :group/conditionals-operator
+                                                      :submodule/name
+                                                      :submodule/conditionals-operator]
+                                                    (:db/id %))
                                     hierarchy-eids)]
      (and
       (true? @(rf/subscribe [:wizard/show-submodule?
@@ -1312,7 +1320,9 @@
                                       [?w :worksheet/uuid ?ws-uuid]
                                       [?w :worksheet/input-groups ?g]]
                                     [ws-uuid]])]
-     (map #(d/entity @@s/conn %) input-eids))))
+     (map #(or (impl-rust/entity-ws %)
+               (d/entity @@s/conn %))
+          input-eids))))
 
 (rf/reg-sub
  :worksheet/input-eids-to-delete

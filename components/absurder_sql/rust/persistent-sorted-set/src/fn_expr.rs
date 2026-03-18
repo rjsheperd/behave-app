@@ -102,7 +102,7 @@ pub fn is_known_fn(name: &str) -> bool {
         | "true?" | "false?" | "nil?" | "some?" | "number?" | "string?" | "keyword?"
         | "not" | "identity" | "ground"
         | "=" | "==" | "not=" | "!=" | ">" | "<" | ">=" | "<=" | "compare"
-        | "re-find" | "re-matches"
+        | "re-find" | "re-matches" | "re-pattern"
         | "clojure.string/blank?" | "clojure.string/includes?"
         | "clojure.string/starts-with?" | "clojure.string/ends-with?"
         | "get" | "contains?" | "empty?"
@@ -318,6 +318,12 @@ pub fn eval_fn(name: &str, args: &[Value]) -> Option<Value> {
         }
 
         // Regex
+        "re-pattern" => {
+            // In CLJS, re-pattern returns a RegExp object. In Rust, re-find
+            // already compiles its first arg as a pattern string, so re-pattern
+            // is effectively identity.
+            args.first().cloned()
+        }
         "re-find" => {
             match args.as_ref() {
                 [Value::Str(pattern), Value::Str(s)] => {
@@ -581,6 +587,16 @@ mod tests {
             eval_fn("re-find", &[Value::Str("\\d+".into()), Value::Str("abcdef".into())]),
             None
         );
+    }
+
+    #[test]
+    fn fn_re_pattern_identity() {
+        // re-pattern returns the string unchanged — re-find compiles it
+        assert_eq!(
+            eval_fn("re-pattern", &[Value::Str("\\d+".into())]),
+            Some(Value::Str("\\d+".into()))
+        );
+        assert!(is_known_fn("re-pattern"));
     }
 
     #[test]

@@ -68,14 +68,24 @@ pub enum PatternEl {
 /// A clause in a query WHERE or rule body.
 #[derive(Clone, Debug)]
 pub enum Clause {
-    Pattern([PatternEl; 4]),
+    Pattern { source: Option<String>, pattern: [PatternEl; 4] },
     RuleCall { name: String, args: Vec<PatternEl> },
     Predicate { name: String, args: Vec<PatternEl> },
     /// Function expression: `[(fn ?a ?b) ?result]`
     FnExpr { name: String, args: Vec<PatternEl>, binding: String },
+    /// Database-aware function: `[(get-else $ ?e :attr default) ?result]`
+    /// Needs resolver access during evaluation.
+    DbFnExpr { name: String, args: Vec<PatternEl>, binding: String },
     And(Vec<Clause>),
     Or(Vec<Vec<Clause>>),
     Not(Vec<Clause>),
+}
+
+impl Clause {
+    /// Convenience constructor for a default-source pattern.
+    pub fn pattern(p: [PatternEl; 4]) -> Self {
+        Clause::Pattern { source: None, pattern: p }
+    }
 }
 
 /// A single rule branch: head args + body clauses.
@@ -93,6 +103,46 @@ pub type Rules = HashMap<String, Vec<RuleBranch>>;
 /// and used with `WasmDataScript` (WASM) without coupling.
 pub trait PatternResolver {
     fn resolve_pattern(&self, pattern: &[PatternEl; 4]) -> Relation;
+
+    /// Resolve a pattern against a named source. Default delegates to `resolve_pattern`
+    /// (single-source). Override in `MultiResolver` for multi-database queries.
+    fn resolve_pattern_from(&self, _source: &str, pattern: &[PatternEl; 4]) -> Relation {
+        self.resolve_pattern(pattern)
+    }
+}
+
+/// Multi-source resolver: dispatches patterns to different databases based on
+/// source name. Used for queries with `:in $ $ws` that cross two databases.
+pub struct MultiResolver<'a> {
+    default: &'a dyn PatternResolver,
+    sources: HashMap<String, &'a dyn PatternResolver>,
+}
+
+impl<'a> MultiResolver<'a> {
+    pub fn new(default: &'a dyn PatternResolver) -> Self {
+        Self {
+            default,
+            sources: HashMap::new(),
+        }
+    }
+
+    pub fn add_source(&mut self, name: String, resolver: &'a dyn PatternResolver) {
+        self.sources.insert(name, resolver);
+    }
+}
+
+impl<'a> PatternResolver for MultiResolver<'a> {
+    fn resolve_pattern(&self, pattern: &[PatternEl; 4]) -> Relation {
+        self.default.resolve_pattern(pattern)
+    }
+
+    fn resolve_pattern_from(&self, source: &str, pattern: &[PatternEl; 4]) -> Relation {
+        if let Some(resolver) = self.sources.get(source) {
+            resolver.resolve_pattern(pattern)
+        } else {
+            self.default.resolve_pattern(pattern)
+        }
+    }
 }
 
 /// A unit relation — no variables, one empty tuple. Identity for `prod_rel`.
@@ -457,12 +507,15 @@ fn alpha_rename(
         suffix: &str,
     ) -> Clause {
         match clause {
-            Clause::Pattern(p) => Clause::Pattern([
-                rename_el(&p[0], subst, suffix),
-                rename_el(&p[1], subst, suffix),
-                rename_el(&p[2], subst, suffix),
-                rename_el(&p[3], subst, suffix),
-            ]),
+            Clause::Pattern { source, pattern: p } => Clause::Pattern {
+                source: source.clone(),
+                pattern: [
+                    rename_el(&p[0], subst, suffix),
+                    rename_el(&p[1], subst, suffix),
+                    rename_el(&p[2], subst, suffix),
+                    rename_el(&p[3], subst, suffix),
+                ],
+            },
             Clause::RuleCall { name, args } => Clause::RuleCall {
                 name: name.clone(),
                 args: args.iter().map(|a| rename_el(a, subst, suffix)).collect(),
@@ -472,6 +525,11 @@ fn alpha_rename(
                 args: args.iter().map(|a| rename_el(a, subst, suffix)).collect(),
             },
             Clause::FnExpr { name, args, binding } => Clause::FnExpr {
+                name: name.clone(),
+                args: args.iter().map(|a| rename_el(a, subst, suffix)).collect(),
+                binding: rename_var(binding, subst, suffix),
+            },
+            Clause::DbFnExpr { name, args, binding } => Clause::DbFnExpr {
                 name: name.clone(),
                 args: args.iter().map(|a| rename_el(a, subst, suffix)).collect(),
                 binding: rename_var(binding, subst, suffix),
@@ -502,9 +560,239 @@ fn alpha_rename(
 /// Prevents infinite loops on cyclic data. Sufficient for deep hierarchies.
 const MAX_RULE_DEPTH: usize = 64;
 
+// ---------------------------------------------------------------------------
+// Database-aware fn-exprs: get-else, get-some, missing?
+// ---------------------------------------------------------------------------
+
+/// Apply a database-aware function expression.
+///
+/// Unlike pure fn-exprs, these have access to the resolver (database) and can
+/// perform searches. The first arg is always `$` (source var, ignored — the
+/// resolver IS the db).
+fn apply_db_fn_expr<R: PatternResolver>(
+    resolver: &R,
+    ctx: &mut Vec<Relation>,
+    name: &str,
+    args: &[PatternEl],
+    binding: &str,
+) {
+    // Collapse context first so all vars are available
+    if ctx.len() > 1 {
+        let collapsed = collapse_ctx(std::mem::take(ctx));
+        *ctx = vec![collapsed];
+    }
+
+    match name {
+        "get-else" => apply_get_else(resolver, ctx, args, binding),
+        "get-some" => apply_get_some(resolver, ctx, args, binding),
+        "missing?" => apply_missing(resolver, ctx, args),
+        _ => {} // Unknown DB fn — no-op
+    }
+}
+
+/// `(get-else $ ?e :attr default-val) ?result`
+///
+/// For each tuple: search resolver for [e, attr]. If found → bind value,
+/// if not → bind default. Appends result as new column.
+fn apply_get_else<R: PatternResolver>(
+    resolver: &R,
+    ctx: &mut Vec<Relation>,
+    args: &[PatternEl],
+    binding: &str,
+) {
+    // args: [$ ?e :attr default-value]
+    // Skip args[0] ($), entity is args[1], attr is args[2], default is args[3]
+    if args.len() < 4 { return; }
+
+    let attr_el = &args[2];
+    let default_el = &args[3];
+
+    for rel in ctx.iter_mut() {
+        // Find the entity variable
+        let e_var = match &args[1] {
+            PatternEl::Var(v) => v.as_str(),
+            _ => continue,
+        };
+        if !rel.attrs.contains_key(e_var) { continue; }
+
+        let e_idx = rel.attrs[e_var];
+        let attr = match attr_el {
+            PatternEl::Const(Value::Keyword(a)) => a.clone(),
+            _ => continue,
+        };
+        let default_val = match default_el {
+            PatternEl::Const(v) => v.clone(),
+            _ => Value::Nil,
+        };
+
+        let mut new_attrs = rel.attrs.clone();
+        let binding_col = new_attrs.len();
+        new_attrs.insert(binding.to_string(), binding_col);
+
+        let new_tuples: Vec<Tuple> = rel
+            .tuples
+            .iter()
+            .map(|tuple| {
+                let eid = match &tuple[e_idx] {
+                    Value::Long(n) | Value::Ref(n) => *n,
+                    _ => return {
+                        let mut t = tuple.clone();
+                        t.push(default_val.clone());
+                        t
+                    },
+                };
+
+                // Search the database for [eid, attr]
+                let pattern = [
+                    PatternEl::Const(Value::Long(eid)),
+                    PatternEl::Const(Value::Keyword(attr.clone())),
+                    PatternEl::Var("__v".into()),
+                    PatternEl::Blank,
+                ];
+                let search_rel = resolver.resolve_pattern(&pattern);
+
+                let value = if let Some(first_tuple) = search_rel.tuples.first() {
+                    // The var __v is at column 0 in the search result
+                    if let Some(&v_idx) = search_rel.attrs.get("__v") {
+                        first_tuple[v_idx].clone()
+                    } else {
+                        default_val.clone()
+                    }
+                } else {
+                    default_val.clone()
+                };
+
+                let mut t = tuple.clone();
+                t.push(value);
+                t
+            })
+            .collect();
+
+        *rel = Relation::new(new_attrs, new_tuples);
+        return;
+    }
+}
+
+/// `(get-some $ ?e :attr1 :attr2 ...) ?result`
+///
+/// For each tuple: try each attr in order; bind first found value.
+/// Tuples where no attr is found are dropped.
+fn apply_get_some<R: PatternResolver>(
+    resolver: &R,
+    ctx: &mut Vec<Relation>,
+    args: &[PatternEl],
+    binding: &str,
+) {
+    // args: [$ ?e :attr1 :attr2 ...]
+    if args.len() < 3 { return; }
+
+    let attr_els: Vec<&PatternEl> = args[2..].iter().collect();
+
+    for rel in ctx.iter_mut() {
+        let e_var = match &args[1] {
+            PatternEl::Var(v) => v.as_str(),
+            _ => continue,
+        };
+        if !rel.attrs.contains_key(e_var) { continue; }
+
+        let e_idx = rel.attrs[e_var];
+
+        let mut new_attrs = rel.attrs.clone();
+        let binding_col = new_attrs.len();
+        new_attrs.insert(binding.to_string(), binding_col);
+
+        let new_tuples: Vec<Tuple> = rel
+            .tuples
+            .iter()
+            .filter_map(|tuple| {
+                let eid = match &tuple[e_idx] {
+                    Value::Long(n) | Value::Ref(n) => *n,
+                    _ => return None,
+                };
+
+                for attr_el in &attr_els {
+                    let attr = match attr_el {
+                        PatternEl::Const(Value::Keyword(a)) => a.clone(),
+                        _ => continue,
+                    };
+                    let pattern = [
+                        PatternEl::Const(Value::Long(eid)),
+                        PatternEl::Const(Value::Keyword(attr)),
+                        PatternEl::Var("__v".into()),
+                        PatternEl::Blank,
+                    ];
+                    let search_rel = resolver.resolve_pattern(&pattern);
+                    if let Some(first_tuple) = search_rel.tuples.first() {
+                        if let Some(&v_idx) = search_rel.attrs.get("__v") {
+                            let mut t = tuple.clone();
+                            t.push(first_tuple[v_idx].clone());
+                            return Some(t);
+                        }
+                    }
+                }
+                None // No attr found → drop tuple
+            })
+            .collect();
+
+        *rel = Relation::new(new_attrs, new_tuples);
+        return;
+    }
+}
+
+/// `(missing? $ ?e :attr)` — predicate (no binding)
+///
+/// Keeps tuples where the entity does NOT have the given attribute.
+fn apply_missing<R: PatternResolver>(
+    resolver: &R,
+    ctx: &mut Vec<Relation>,
+    args: &[PatternEl],
+) {
+    // args: [$ ?e :attr]
+    if args.len() < 3 { return; }
+
+    for rel in ctx.iter_mut() {
+        let e_var = match &args[1] {
+            PatternEl::Var(v) => v.as_str(),
+            _ => continue,
+        };
+        if !rel.attrs.contains_key(e_var) { continue; }
+
+        let e_idx = rel.attrs[e_var];
+        let attr = match &args[2] {
+            PatternEl::Const(Value::Keyword(a)) => a.clone(),
+            _ => continue,
+        };
+
+        let new_tuples: Vec<Tuple> = rel
+            .tuples
+            .iter()
+            .filter(|tuple| {
+                let eid = match &tuple[e_idx] {
+                    Value::Long(n) | Value::Ref(n) => *n,
+                    _ => return true, // non-numeric → keep (can't search)
+                };
+                let pattern = [
+                    PatternEl::Const(Value::Long(eid)),
+                    PatternEl::Const(Value::Keyword(attr.clone())),
+                    PatternEl::Blank,
+                    PatternEl::Blank,
+                ];
+                let search_rel = resolver.resolve_pattern(&pattern);
+                search_rel.tuples.is_empty() // Keep only if NOT found
+            })
+            .cloned()
+            .collect();
+
+        *rel = Relation::new(rel.attrs.clone(), new_tuples);
+        return;
+    }
+}
+
 /// Apply a predicate filter to the context relations.
+///
+/// If the predicate's variables span multiple relations in the context,
+/// joins them first (like CLJS `rel-prod-by-attrs`).
 fn apply_predicate(ctx: &mut Vec<Relation>, name: &str, args: &[PatternEl]) {
-    // Find the relation that contains the vars referenced by the predicate
     let pred_vars: Vec<&str> = args
         .iter()
         .filter_map(|el| match el {
@@ -517,7 +805,17 @@ fn apply_predicate(ctx: &mut Vec<Relation>, name: &str, args: &[PatternEl]) {
         return;
     }
 
-    // Find which relation(s) contain these vars and apply filter in-place
+    // Check if any single relation has all the vars
+    let has_single = ctx.iter().any(|rel| {
+        pred_vars.iter().all(|v| rel.attrs.contains_key(*v))
+    });
+
+    if !has_single && ctx.len() > 1 {
+        // Vars span multiple relations — collapse context to join them
+        let collapsed = collapse_ctx(std::mem::take(ctx));
+        *ctx = vec![collapsed];
+    }
+
     for rel in ctx.iter_mut() {
         let has_all = pred_vars.iter().all(|v| rel.attrs.contains_key(*v));
         if !has_all {
@@ -703,8 +1001,12 @@ fn resolve_clause_depth<R: PatternResolver>(
     seq_id: &mut usize,
 ) {
     match clause {
-        Clause::Pattern(p) => {
-            let rel = resolver.resolve_pattern(p);
+        Clause::Pattern { source, pattern: p } => {
+            let rel = if let Some(src) = source {
+                resolver.resolve_pattern_from(src, p)
+            } else {
+                resolver.resolve_pattern(p)
+            };
             *ctx = collapse_rels(ctx, rel);
         }
         Clause::RuleCall { name, args } => {
@@ -749,6 +1051,9 @@ fn resolve_clause_depth<R: PatternResolver>(
         Clause::FnExpr { name, args, binding } => {
             crate::fn_expr::apply_fn_expr(ctx, name, args, binding);
         }
+        Clause::DbFnExpr { name, args, binding } => {
+            apply_db_fn_expr(resolver, ctx, name, args, binding);
+        }
     }
 }
 
@@ -759,7 +1064,18 @@ pub fn resolve_query<R: PatternResolver>(
     clauses: &[Clause],
     rules: &Rules,
 ) -> Relation {
-    let mut ctx: Vec<Relation> = Vec::new();
+    resolve_query_with_initial(resolver, clauses, rules, vec![])
+}
+
+/// Resolve a query with initial relations pre-seeded into the context.
+/// Used for collection input bindings where each element is a row.
+pub fn resolve_query_with_initial<R: PatternResolver>(
+    resolver: &R,
+    clauses: &[Clause],
+    rules: &Rules,
+    initial_rels: Vec<Relation>,
+) -> Relation {
+    let mut ctx: Vec<Relation> = initial_rels;
     let mut seq_id: usize = 0;
     for clause in clauses {
         resolve_clause_depth(resolver, &mut ctx, clause, rules, 0, &mut seq_id);

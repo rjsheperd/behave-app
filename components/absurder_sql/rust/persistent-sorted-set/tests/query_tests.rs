@@ -12,7 +12,7 @@ use persistent_sorted_set::datom::{Datom, Value};
 use persistent_sorted_set::db::{DataScriptDB, TX0};
 use persistent_sorted_set::relation::{
     collapse_rels, hash_join, project, subtract_rel, sum_rel,
-    Clause, PatternEl, Relation, RuleBranch, Rules, Tuple, Var,
+    Clause, MultiResolver, PatternEl, Relation, RuleBranch, Rules, Tuple, Var,
     resolve_query, solve_rule,
 };
 use persistent_sorted_set::schema::{
@@ -861,7 +861,7 @@ fn rule_simple_lookup() {
     let mut rules: Rules = HashMap::new();
     rules.insert("lookup".into(), vec![RuleBranch {
         head_args: vec!["?uuid".into(), "?e".into()],
-        body: vec![Clause::Pattern([
+        body: vec![Clause::pattern([
             pe_var("?e"), pe_kw("uuid"), pe_var("?uuid"), pe_blank(),
         ])],
     }]);
@@ -889,9 +889,9 @@ fn rule_multi_clause() {
     rules.insert("named-group".into(), vec![RuleBranch {
         head_args: vec!["?uuid".into(), "?name".into()],
         body: vec![
-            Clause::Pattern([pe_var("?e"), pe_kw("uuid"), pe_var("?uuid"), pe_blank()]),
-            Clause::Pattern([pe_var("?e"), pe_kw("name"), pe_var("?name"), pe_blank()]),
-            Clause::Pattern([pe_var("?e"), pe_kw("type"), pe_const(Value::Keyword(kw("group"))), pe_blank()]),
+            Clause::pattern([pe_var("?e"), pe_kw("uuid"), pe_var("?uuid"), pe_blank()]),
+            Clause::pattern([pe_var("?e"), pe_kw("name"), pe_var("?name"), pe_blank()]),
+            Clause::pattern([pe_var("?e"), pe_kw("type"), pe_const(Value::Keyword(kw("group"))), pe_blank()]),
         ],
     }]);
 
@@ -920,15 +920,15 @@ fn rule_multi_branch() {
         RuleBranch {
             head_args: vec!["?e".into(), "?name".into()],
             body: vec![
-                Clause::Pattern([pe_var("?e"), pe_kw("type"), pe_const(Value::Keyword(kw("group"))), pe_blank()]),
-                Clause::Pattern([pe_var("?e"), pe_kw("name"), pe_var("?name"), pe_blank()]),
+                Clause::pattern([pe_var("?e"), pe_kw("type"), pe_const(Value::Keyword(kw("group"))), pe_blank()]),
+                Clause::pattern([pe_var("?e"), pe_kw("name"), pe_var("?name"), pe_blank()]),
             ],
         },
         RuleBranch {
             head_args: vec!["?e".into(), "?name".into()],
             body: vec![
-                Clause::Pattern([pe_var("?e"), pe_kw("type"), pe_const(Value::Keyword(kw("variable"))), pe_blank()]),
-                Clause::Pattern([pe_var("?e"), pe_kw("name"), pe_var("?name"), pe_blank()]),
+                Clause::pattern([pe_var("?e"), pe_kw("type"), pe_const(Value::Keyword(kw("variable"))), pe_blank()]),
+                Clause::pattern([pe_var("?e"), pe_kw("name"), pe_var("?name"), pe_blank()]),
             ],
         },
     ]);
@@ -965,7 +965,7 @@ fn rule_recursive_children() {
         // Base case: direct child
         RuleBranch {
             head_args: vec!["?g".into(), "?s".into()],
-            body: vec![Clause::Pattern([
+            body: vec![Clause::pattern([
                 pe_var("?g"), pe_kw("groups"), pe_var("?s"), pe_blank(),
             ])],
         },
@@ -973,7 +973,7 @@ fn rule_recursive_children() {
         RuleBranch {
             head_args: vec!["?g".into(), "?s".into()],
             body: vec![
-                Clause::Pattern([pe_var("?g"), pe_kw("groups"), pe_var("?x"), pe_blank()]),
+                Clause::pattern([pe_var("?g"), pe_kw("groups"), pe_var("?x"), pe_blank()]),
                 Clause::RuleCall {
                     name: "subgroup".into(),
                     args: vec![pe_var("?x"), pe_var("?s")],
@@ -1013,14 +1013,14 @@ fn rule_recursive_deep() {
     rules.insert("descendant".into(), vec![
         RuleBranch {
             head_args: vec!["?a".into(), "?d".into()],
-            body: vec![Clause::Pattern([
+            body: vec![Clause::pattern([
                 pe_var("?a"), pe_kw("child"), pe_var("?d"), pe_blank(),
             ])],
         },
         RuleBranch {
             head_args: vec!["?a".into(), "?d".into()],
             body: vec![
-                Clause::Pattern([pe_var("?a"), pe_kw("child"), pe_var("?x"), pe_blank()]),
+                Clause::pattern([pe_var("?a"), pe_kw("child"), pe_var("?x"), pe_blank()]),
                 Clause::RuleCall {
                     name: "descendant".into(),
                     args: vec![pe_var("?x"), pe_var("?d")],
@@ -1057,14 +1057,14 @@ fn rule_calls_rule() {
     rules.insert("subgroup".into(), vec![
         RuleBranch {
             head_args: vec!["?g".into(), "?s".into()],
-            body: vec![Clause::Pattern([
+            body: vec![Clause::pattern([
                 pe_var("?g"), pe_kw("groups"), pe_var("?s"), pe_blank(),
             ])],
         },
         RuleBranch {
             head_args: vec!["?g".into(), "?s".into()],
             body: vec![
-                Clause::Pattern([pe_var("?g"), pe_kw("groups"), pe_var("?x"), pe_blank()]),
+                Clause::pattern([pe_var("?g"), pe_kw("groups"), pe_var("?x"), pe_blank()]),
                 Clause::RuleCall {
                     name: "subgroup".into(),
                     args: vec![pe_var("?x"), pe_var("?s")],
@@ -1081,7 +1081,7 @@ fn rule_calls_rule() {
                 name: "subgroup".into(),
                 args: vec![pe_var("?g"), pe_var("?s")],
             },
-            Clause::Pattern([pe_var("?s"), pe_kw("name"), pe_var("?name"), pe_blank()]),
+            Clause::pattern([pe_var("?s"), pe_kw("name"), pe_var("?name"), pe_blank()]),
         ],
     }]);
 
@@ -1115,8 +1115,8 @@ fn rule_predicate_guard() {
     rules.insert("numeric-var".into(), vec![RuleBranch {
         head_args: vec!["?e".into(), "?v".into()],
         body: vec![
-            Clause::Pattern([pe_var("?e"), pe_kw("type"), pe_const(Value::Keyword(kw("variable"))), pe_blank()]),
-            Clause::Pattern([pe_var("?e"), pe_kw("val"), pe_var("?v"), pe_blank()]),
+            Clause::pattern([pe_var("?e"), pe_kw("type"), pe_const(Value::Keyword(kw("variable"))), pe_blank()]),
+            Clause::pattern([pe_var("?e"), pe_kw("val"), pe_var("?v"), pe_blank()]),
             Clause::Predicate {
                 name: "number?".into(),
                 args: vec![pe_var("?v")],
@@ -1144,7 +1144,7 @@ fn rule_no_match() {
     let mut rules: Rules = HashMap::new();
     rules.insert("nonexistent-type".into(), vec![RuleBranch {
         head_args: vec!["?e".into()],
-        body: vec![Clause::Pattern([
+        body: vec![Clause::pattern([
             pe_var("?e"), pe_kw("type"), pe_const(Value::Keyword(kw("bogus"))), pe_blank(),
         ])],
     }]);
@@ -1172,14 +1172,14 @@ fn rule_recursive_guard_prevents_loop() {
     rules.insert("reachable".into(), vec![
         RuleBranch {
             head_args: vec!["?a".into(), "?b".into()],
-            body: vec![Clause::Pattern([
+            body: vec![Clause::pattern([
                 pe_var("?a"), pe_kw("link"), pe_var("?b"), pe_blank(),
             ])],
         },
         RuleBranch {
             head_args: vec!["?a".into(), "?b".into()],
             body: vec![
-                Clause::Pattern([pe_var("?a"), pe_kw("link"), pe_var("?x"), pe_blank()]),
+                Clause::pattern([pe_var("?a"), pe_kw("link"), pe_var("?x"), pe_blank()]),
                 Clause::RuleCall {
                     name: "reachable".into(),
                     args: vec![pe_var("?x"), pe_var("?b")],
@@ -1220,7 +1220,7 @@ fn resolve_clause_with_rules_in_query() {
     let mut rules: Rules = HashMap::new();
     rules.insert("lookup".into(), vec![RuleBranch {
         head_args: vec!["?uuid".into(), "?e".into()],
-        body: vec![Clause::Pattern([
+        body: vec![Clause::pattern([
             pe_var("?e"), pe_kw("uuid"), pe_var("?uuid"), pe_blank(),
         ])],
     }]);
@@ -1230,7 +1230,7 @@ fn resolve_clause_with_rules_in_query() {
             name: "lookup".into(),
             args: vec![pe_const(Value::Str("uuid-10".into())), pe_var("?e")],
         },
-        Clause::Pattern([pe_var("?e"), pe_kw("name"), pe_var("?name"), pe_blank()]),
+        Clause::pattern([pe_var("?e"), pe_kw("name"), pe_var("?name"), pe_blank()]),
     ];
 
     let result = resolve_query(&db, &clauses, &rules);
@@ -1247,14 +1247,14 @@ fn resolve_clause_or() {
 
     let clauses = vec![
         Clause::Or(vec![
-            vec![Clause::Pattern([
+            vec![Clause::pattern([
                 pe_var("?e"), pe_kw("type"), pe_const(Value::Keyword(kw("group"))), pe_blank(),
             ])],
-            vec![Clause::Pattern([
+            vec![Clause::pattern([
                 pe_var("?e"), pe_kw("type"), pe_const(Value::Keyword(kw("variable"))), pe_blank(),
             ])],
         ]),
-        Clause::Pattern([pe_var("?e"), pe_kw("name"), pe_var("?name"), pe_blank()]),
+        Clause::pattern([pe_var("?e"), pe_kw("name"), pe_var("?name"), pe_blank()]),
     ];
 
     let result = resolve_query(&db, &clauses, &rules);
@@ -1268,9 +1268,9 @@ fn resolve_clause_not() {
     let rules: Rules = HashMap::new();
 
     let clauses = vec![
-        Clause::Pattern([pe_var("?e"), pe_kw("type"), pe_var("?t"), pe_blank()]),
+        Clause::pattern([pe_var("?e"), pe_kw("type"), pe_var("?t"), pe_blank()]),
         Clause::Not(vec![
-            Clause::Pattern([pe_var("?e"), pe_kw("type"), pe_const(Value::Keyword(kw("group"))), pe_blank()]),
+            Clause::pattern([pe_var("?e"), pe_kw("type"), pe_const(Value::Keyword(kw("group"))), pe_blank()]),
         ]),
     ];
 
@@ -1293,7 +1293,7 @@ fn resolve_clause_predicate_comparison() {
     let rules: Rules = HashMap::new();
 
     let clauses = vec![
-        Clause::Pattern([pe_var("?e"), pe_kw("val"), pe_var("?v"), pe_blank()]),
+        Clause::pattern([pe_var("?e"), pe_kw("val"), pe_var("?v"), pe_blank()]),
         Clause::Predicate {
             name: ">".into(),
             args: vec![pe_var("?v"), pe_const(Value::Long(40))],
@@ -1305,4 +1305,218 @@ fn resolve_clause_predicate_comparison() {
     assert!(result.tuples.len() >= 1);
     let e_idx = result.attrs["?e"];
     assert!(result.tuples.iter().any(|t| t[e_idx] == Value::Long(11)));
+}
+
+// ---------------------------------------------------------------------------
+// Multi-source queries (Phase 5.4)
+// ---------------------------------------------------------------------------
+
+/// Build a second "workspace" database for multi-source tests.
+fn workspace_db() -> DataScriptDB {
+    let schema = Schema::default();
+    let mut db = DataScriptDB::empty(schema);
+    db.with_datoms(vec![
+        d(1, "name", Value::Str("Alice".into()), 1),
+        d(1, "role", Value::Str("admin".into()), 1),
+        d(2, "name", Value::Str("Bob".into()), 1),
+        d(2, "role", Value::Str("viewer".into()), 1),
+    ]);
+    db
+}
+
+#[test]
+fn multi_source_basic_query() {
+    // Query: [:find ?name ?role
+    //         :in $ $ws
+    //         :where [$ws ?e :name ?name]
+    //                [$ws ?e :role ?role]]
+    // Both clauses target $ws — should return workspace data only.
+    let default_db = people_db();
+    let ws_db = workspace_db();
+
+    let mut multi = MultiResolver::new(&default_db);
+    multi.add_source("$ws".to_string(), &ws_db);
+
+    let clauses = vec![
+        Clause::Pattern {
+            source: Some("$ws".into()),
+            pattern: [
+                PatternEl::Var("?e".into()),
+                PatternEl::Const(kw_val("name")),
+                PatternEl::Var("?name".into()),
+                PatternEl::Blank,
+            ],
+        },
+        Clause::Pattern {
+            source: Some("$ws".into()),
+            pattern: [
+                PatternEl::Var("?e".into()),
+                PatternEl::Const(kw_val("role")),
+                PatternEl::Var("?role".into()),
+                PatternEl::Blank,
+            ],
+        },
+    ];
+
+    let rules: Rules = HashMap::new();
+    let result = resolve_query(&multi, &clauses, &rules);
+
+    let name_idx = result.attrs["?name"];
+    let role_idx = result.attrs["?role"];
+    assert_eq!(result.tuples.len(), 2);
+
+    let mut pairs: Vec<(String, String)> = result.tuples.iter().map(|t| {
+        let n = match &t[name_idx] { Value::Str(s) => s.clone(), _ => panic!() };
+        let r = match &t[role_idx] { Value::Str(s) => s.clone(), _ => panic!() };
+        (n, r)
+    }).collect();
+    pairs.sort();
+    assert_eq!(pairs, vec![
+        ("Alice".into(), "admin".into()),
+        ("Bob".into(), "viewer".into()),
+    ]);
+}
+
+#[test]
+fn multi_source_cross_db_join() {
+    // Query: [:find ?name ?role
+    //         :in $ $ws
+    //         :where [?e :name ?name]       ;; from default ($)
+    //                [$ws ?w :name ?name]    ;; join on name from $ws
+    //                [$ws ?w :role ?role]]
+    // This joins default and workspace on shared :name values.
+    let mut default_db = DataScriptDB::empty(Schema::default());
+    default_db.with_datoms(vec![
+        d(1, "name", Value::Str("Alice".into()), 1),
+        d(2, "name", Value::Str("Carol".into()), 1),
+    ]);
+
+    let ws_db = workspace_db(); // has Alice(admin), Bob(viewer)
+
+    let mut multi = MultiResolver::new(&default_db);
+    multi.add_source("$ws".to_string(), &ws_db);
+
+    let clauses = vec![
+        Clause::Pattern {
+            source: None, // default $
+            pattern: [
+                PatternEl::Var("?e".into()),
+                PatternEl::Const(kw_val("name")),
+                PatternEl::Var("?name".into()),
+                PatternEl::Blank,
+            ],
+        },
+        Clause::Pattern {
+            source: Some("$ws".into()),
+            pattern: [
+                PatternEl::Var("?w".into()),
+                PatternEl::Const(kw_val("name")),
+                PatternEl::Var("?name".into()),
+                PatternEl::Blank,
+            ],
+        },
+        Clause::Pattern {
+            source: Some("$ws".into()),
+            pattern: [
+                PatternEl::Var("?w".into()),
+                PatternEl::Const(kw_val("role")),
+                PatternEl::Var("?role".into()),
+                PatternEl::Blank,
+            ],
+        },
+    ];
+
+    let rules: Rules = HashMap::new();
+    let result = resolve_query(&multi, &clauses, &rules);
+
+    // Only Alice appears in both DBs
+    let name_idx = result.attrs["?name"];
+    let role_idx = result.attrs["?role"];
+    assert_eq!(result.tuples.len(), 1);
+    assert_eq!(result.tuples[0][name_idx], Value::Str("Alice".into()));
+    assert_eq!(result.tuples[0][role_idx], Value::Str("admin".into()));
+}
+
+#[test]
+fn multi_source_default_fallback() {
+    // Patterns without a source should resolve against the default db.
+    let default_db = people_db();
+    let ws_db = workspace_db();
+
+    let mut multi = MultiResolver::new(&default_db);
+    multi.add_source("$ws".to_string(), &ws_db);
+
+    let clauses = vec![
+        Clause::Pattern {
+            source: None,
+            pattern: [
+                PatternEl::Var("?e".into()),
+                PatternEl::Const(kw_val("name")),
+                PatternEl::Var("?name".into()),
+                PatternEl::Blank,
+            ],
+        },
+    ];
+
+    let rules: Rules = HashMap::new();
+    let result = resolve_query(&multi, &clauses, &rules);
+
+    // Should get names from default (people_db), not workspace
+    let name_idx = result.attrs["?name"];
+    let names: Vec<&str> = result.tuples.iter().map(|t| {
+        match &t[name_idx] { Value::Str(s) => s.as_str(), _ => panic!() }
+    }).collect();
+    // people_db has Alice, Bob, Carol
+    assert!(names.contains(&"Alice"));
+    assert!(names.contains(&"Bob"));
+    assert!(names.contains(&"Carol"));
+}
+
+#[test]
+fn multi_source_with_predicate() {
+    // Query: [:find ?name ?role
+    //         :in $ $ws
+    //         :where [$ws ?e :name ?name]
+    //                [$ws ?e :role ?role]
+    //                [(= ?role "admin")]]
+    let default_db = people_db();
+    let ws_db = workspace_db();
+
+    let mut multi = MultiResolver::new(&default_db);
+    multi.add_source("$ws".to_string(), &ws_db);
+
+    let clauses = vec![
+        Clause::Pattern {
+            source: Some("$ws".into()),
+            pattern: [
+                PatternEl::Var("?e".into()),
+                PatternEl::Const(kw_val("name")),
+                PatternEl::Var("?name".into()),
+                PatternEl::Blank,
+            ],
+        },
+        Clause::Pattern {
+            source: Some("$ws".into()),
+            pattern: [
+                PatternEl::Var("?e".into()),
+                PatternEl::Const(kw_val("role")),
+                PatternEl::Var("?role".into()),
+                PatternEl::Blank,
+            ],
+        },
+        Clause::Predicate {
+            name: "=".into(),
+            args: vec![
+                PatternEl::Var("?role".into()),
+                PatternEl::Const(Value::Str("admin".into())),
+            ],
+        },
+    ];
+
+    let rules: Rules = HashMap::new();
+    let result = resolve_query(&multi, &clauses, &rules);
+
+    let name_idx = result.attrs["?name"];
+    assert_eq!(result.tuples.len(), 1);
+    assert_eq!(result.tuples[0][name_idx], Value::Str("Alice".into()));
 }

@@ -1,5 +1,6 @@
 (ns behave.solver.queries
   (:require [absurder-sql.datascript.core :as d]
+            [absurder-sql.datascript.impl-rust :as impl-rust]
             [data-utils.interface :refer [is-digit? parse-int parse-float]]
             [behave.store        :as store]
             [behave.schema.core  :refer [rules]]
@@ -9,7 +10,8 @@
 (defn uuid->entity
   "Given a UUID Return a datascript entity."
   [uuid_]
-  (d/entity @@vms-conn [:bp/uuid uuid_]))
+  (or (impl-rust/entity [:bp/uuid uuid_])
+      (d/entity @@vms-conn [:bp/uuid uuid_])))
 
 ;;; VMS Queries
 
@@ -21,7 +23,7 @@
   (let [[find in+where] (split-with (complement #{:in :where}) query)
         [in where]      (split-with (complement #{:where}) in+where)
         query-after     (vec (concat find '(:in $ $ws %) (rest in) where))]
-    (apply d/q query-after @@vms-conn @@store/conn rules args)))
+    (apply impl-rust/q query-after @@vms-conn @@store/conn rules args)))
 
 (defn variable
   "Given a uuid for a group-variable or subtool-variable return its associated variable as a
@@ -54,7 +56,8 @@
   Parameter info has the form:
   [entity-id name type order]."
   [function-id]
-  (let [function-entity (d/entity @@vms-conn function-id)
+  (let [function-entity (or (impl-rust/entity function-id)
+                            (d/entity @@vms-conn function-id))
         function-params (:cpp.function/parameter function-entity)]
     (->> function-params
          (map (fn [param]
@@ -151,110 +154,109 @@
 (defn module-diagrams
   "Given a module-name #{surface contain mortality crown} return a sequence of diagram entities."
   [module-name]
-  (d/q '[:find [(pull ?d [* {:diagram/group-variable [:bp/uuid]}]) ...]
-         :in $ ?module-name
-         :where
-         [?m :module/name ?m-name]
-         [(str "(?i)" ?module-name) ?module-find]
-         [(re-pattern ?module-find) ?module-find-re]
-         [(re-find ?module-find-re ?m-name)]
-         [?m :module/diagrams ?d]]
-       @@vms-conn
-       module-name))
+  (impl-rust/q '[:find [(pull ?d [* {:diagram/group-variable [:bp/uuid]}]) ...]
+                 :in $ ?module-name
+                 :where
+                 [?m :module/name ?m-name]
+                 [(str "(?i)" ?module-name) ?module-find]
+                 [(re-pattern ?module-find) ?module-find-re]
+                 [(re-find ?module-find-re ?m-name)]
+                 [?m :module/diagrams ?d]]
+               @@vms-conn
+               module-name))
 
 (defn parameter->group-variable
   "Given a prameter entity id return the uuid for it's associated group variable."
   [parameter-id]
-  (let [param-uuid (->> parameter-id
-                        (d/entity @@vms-conn)
-                        :bp/uuid)]
-    (d/q '[:find  ?gv-uuid .
-           :in    $ ?p-uuid
-           :where
-           [?gv :group-variable/cpp-parameter ?p-uuid]
-           [?gv :bp/uuid ?gv-uuid]]
-         @@vms-conn param-uuid)))
+  (let [param-uuid (:bp/uuid (or (impl-rust/entity parameter-id)
+                                  (d/entity @@vms-conn parameter-id)))]
+    (impl-rust/q '[:find  ?gv-uuid .
+                   :in    $ ?p-uuid
+                   :where
+                   [?gv :group-variable/cpp-parameter ?p-uuid]
+                   [?gv :bp/uuid ?gv-uuid]]
+                 @@vms-conn param-uuid)))
 
 (defn class-to-group-variables
   "Given a class-name (i.e. SIGSurface), return a list of group-variable uuids that belong to that
   class."
   [class-name]
   (set
-   (d/q '[:find [?gv-uuid ...]
-          :in $ ?class-name
-          :where
-          [?c :cpp.class/name ?class-name]
-          [?c :bp/uuid ?c-uuid]
-          [?gv :group-variable/cpp-class ?c-uuid]
-          [?gv :bp/uuid ?gv-uuid]]
-        @@vms-conn class-name)))
+   (impl-rust/q '[:find [?gv-uuid ...]
+                  :in $ ?class-name
+                  :where
+                  [?c :cpp.class/name ?class-name]
+                  [?c :bp/uuid ?c-uuid]
+                  [?gv :group-variable/cpp-class ?c-uuid]
+                  [?gv :bp/uuid ?gv-uuid]]
+                @@vms-conn class-name)))
 
 (defn class-to-subtool-variables
   "Given a class-name (i.e. SIGSlopeTool), return a list of subtool-variable uuids that belong to that
   class."
   [class-name]
   (set
-   (d/q '[:find [?sv-uuid ...]
-          :in $ ?class-name
-          :where
-          [?c :cpp.class/name ?class-name]
-          [?c :bp/uuid ?c-uuid]
-          [?sv :subtool-variable/cpp-class-uuid ?c-uuid]
-          [?sv :bp/uuid ?sv-uuid]]
-        @@vms-conn class-name)))
+   (impl-rust/q '[:find [?sv-uuid ...]
+                  :in $ ?class-name
+                  :where
+                  [?c :cpp.class/name ?class-name]
+                  [?c :bp/uuid ?c-uuid]
+                  [?sv :subtool-variable/cpp-class-uuid ?c-uuid]
+                  [?sv :bp/uuid ?sv-uuid]]
+                @@vms-conn class-name)))
 
 (defn source-links
   "Given a colleciton of group-variable uuids return a map of the given uuids to it's associated `:link/destination`."
   [gv-uuids]
   (into {}
-        (d/q '[:find ?gv-uuid ?destination-uuid
-               :in $ [?gv-uuid ...]
-               :where
-               [?s :bp/uuid ?gv-uuid]
-               [?l :link/source ?s]
-               [?l :link/destination ?d]
-               [?d :bp/uuid ?destination-uuid]]
-             @@vms-conn
-             (vec gv-uuids))))
+        (impl-rust/q '[:find ?gv-uuid ?destination-uuid
+                        :in $ [?gv-uuid ...]
+                        :where
+                        [?s :bp/uuid ?gv-uuid]
+                        [?l :link/source ?s]
+                        [?l :link/destination ?d]
+                        [?d :bp/uuid ?destination-uuid]]
+                     @@vms-conn
+                     (vec gv-uuids))))
 
 (defn output-source-links
   "Obtains outpout Group Variables that serve as sources to links."
   [gv-uuids]
   (into {}
-        (d/q '[:find ?gv-uuid ?destination-uuid
-               :in $ % [?gv-uuid ...]
-               :where
-               [?s :bp/uuid ?gv-uuid]
-               [?l :link/source ?s]
-               [?l :link/destination ?d]
-               (io ?s :output)
-               [?d :bp/uuid ?destination-uuid]]
-             @@vms-conn
-             rules
-             (vec gv-uuids))))
+        (impl-rust/q '[:find ?gv-uuid ?destination-uuid
+                        :in $ % [?gv-uuid ...]
+                        :where
+                        [?s :bp/uuid ?gv-uuid]
+                        [?l :link/source ?s]
+                        [?l :link/destination ?d]
+                        (io ?s :output)
+                        [?d :bp/uuid ?destination-uuid]]
+                     @@vms-conn
+                     rules
+                     (vec gv-uuids))))
 
 (defn destination-links
   "Given a colleciton of group-variable uuids return a map of the given uuids to it's associated `:link/source`."
   [gv-uuids]
   (into {}
-        (d/q '[:find ?source-uuid ?gv-uuid
-               :in $ [?gv-uuid ...]
-               :where
-               [?d :bp/uuid ?gv-uuid]
-               [?l :link/destination ?d]
-               [?l :link/source ?s]
-               [?s :bp/uuid ?source-uuid]]
-             @@vms-conn
-             (vec gv-uuids))))
+        (impl-rust/q '[:find ?source-uuid ?gv-uuid
+                        :in $ [?gv-uuid ...]
+                        :where
+                        [?d :bp/uuid ?gv-uuid]
+                        [?l :link/destination ?d]
+                        [?l :link/source ?s]
+                        [?s :bp/uuid ?source-uuid]]
+                     @@vms-conn
+                     (vec gv-uuids))))
 
 (defn worksheet-modules
   "Given a worksheet uuid return a sequence of modules."
   [ws-uuid]
   (set
-   (d/q '[:find [?modules ...]
-          :in $ ?ws-uuid
-          :where
-          [?w :worksheet/uuid ?ws-uuid]
-          [?w :worksheet/modules ?modules]]
-        @@store/conn
-        ws-uuid)))
+   (impl-rust/q-ws '[:find [?modules ...]
+                     :in $ ?ws-uuid
+                     :where
+                     [?w :worksheet/uuid ?ws-uuid]
+                     [?w :worksheet/modules ?modules]]
+                   @@store/conn
+                   ws-uuid)))

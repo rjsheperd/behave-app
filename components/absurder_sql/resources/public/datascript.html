@@ -25,9 +25,9 @@
     <div id="status">Status: loading...</div>
 
     <h2>Transact</h2>
-    <textarea id="tx-input">[{:name "Maksim" :age 45 :aka ["Max Otto von Stierlitz" "Jack Ryan"]}
- {:name "Anna"   :age 31 :aka ["Anya"]}
- {:name "Ivan"   :age 20}]</textarea>
+    <textarea id="tx-input">[{:db/id -1 :name "Maksim" :age 45 :email "max@example.com" :aka ["Max" "Stierlitz"]}
+ {:db/id -2 :name "Anna" :age 31 :email "anna@example.com" :parent -1}
+ {:db/id -3 :name "Ivan" :age 20 :parent -1}]</textarea>
     <div>
       <button id="btn-transact">Transact</button>
       <button id="btn-save">Save</button>
@@ -39,6 +39,25 @@
     <div>
       <button id="btn-query">Query</button>
       <button id="btn-datoms">Dump Datoms</button>
+    </div>
+
+    <h2>Entity</h2>
+    <input id="entity-input" type="text" value="1" style="width:100%;font-family:monospace;font-size:0.9rem;padding:0.5rem;margin-bottom:0.5rem;" placeholder="Entity ID (number) or lookup ref [:email &quot;a@b.com&quot;]" />
+    <div>
+      <button id="btn-entity">Entity (touch)</button>
+      <button id="btn-retract-entity">Retract Entity</button>
+    </div>
+
+    <h2>Multi-Source Query</h2>
+    <p style="font-size:0.8rem;color:#666;margin-bottom:0.5rem;">
+      Creates a second DB ($ws) with workspace data, then queries across both.
+    </p>
+    <textarea id="ws-tx-input" style="height:4rem;">[{:db/id -1 :name "Maksim" :role "admin"}
+ {:db/id -2 :name "Ivan" :role "editor"}
+ {:db/id -3 :name "Nikita" :role "viewer"}]</textarea>
+    <textarea id="multi-q-input" style="height:4rem;">[:find ?n ?a ?role :in $ $ws :where [$ ?e :name ?n] [$ ?e :age ?a] [$ws ?w :name ?n] [$ws ?w :role ?role]]</textarea>
+    <div>
+      <button id="btn-multi-query">Multi-Source Query</button>
     </div>
 
     <h2>Import / Export</h2>

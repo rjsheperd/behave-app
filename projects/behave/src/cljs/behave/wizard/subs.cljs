@@ -5,6 +5,7 @@
             [behave.translate       :refer [<t bp]]
             [clojure.set            :refer [rename-keys intersection]]
             [absurder-sql.datascript.core :as d]
+            [absurder-sql.datascript.impl-rust :as impl-rust]
             [re-frame.core          :refer [reg-sub subscribe] :as rf]
             [number-utils.interface :refer [is-numeric? parse-float]]
             [string-utils.interface :refer [->kebab]]
@@ -73,8 +74,9 @@
                   (= selected-module (str/lower-case m-name))))
         (first)
         (:db/id)
-        (d/entity @@vms-conn)
-        (d/touch))))
+        ((fn [eid] (or (some-> (impl-rust/entity eid) impl-rust/touch)
+                       (d/touch (d/entity @@vms-conn eid)))))
+        )))
 
 (reg-sub
  :wizard/submodules
@@ -250,7 +252,8 @@
 (reg-sub
  :wizard/gv-uuid->default-variable-name
  (fn [_ [_ gv-uuid]]
-   (when-let [translation-key (->> (d/entity @@vms-conn [:bp/uuid gv-uuid])
+   (when-let [translation-key (->> (or (impl-rust/entity [:bp/uuid gv-uuid])
+                                      (d/entity @@vms-conn [:bp/uuid gv-uuid]))
                                    :group-variable/translation-key)]
      @(<t translation-key))))
 
@@ -258,7 +261,8 @@
 (reg-sub
  :wizard/gv-uuid->result-variable-name
  (fn [_ [_ gv-uuid]]
-   (when-let [translation-key (->> (d/entity @@vms-conn [:bp/uuid gv-uuid])
+   (when-let [translation-key (->> (or (impl-rust/entity [:bp/uuid gv-uuid])
+                                       (d/entity @@vms-conn [:bp/uuid gv-uuid]))
                                    :group-variable/result-translation-key)]
      @(<t translation-key))))
 
@@ -599,7 +603,8 @@
 (reg-sub
  :wizard/conditional-io+group-uuid
  (fn [_ [_ gv-uuid]]
-   (let [group (-> (d/entity @@vms-conn [:bp/uuid gv-uuid])
+   (let [group (-> (or (impl-rust/entity [:bp/uuid gv-uuid])
+                      (d/entity @@vms-conn [:bp/uuid gv-uuid]))
                    (:group/_group-variables))
          io    (-> group
                    (find-parent-submodule)
@@ -610,7 +615,8 @@
 (reg-sub
  :wizard/_select-actions
  (fn [_ [_ gv-uuid]]
-   (->> (d/entity @@vms-conn [:bp/uuid gv-uuid])
+   (->> (or (impl-rust/entity [:bp/uuid gv-uuid])
+            (d/entity @@vms-conn [:bp/uuid gv-uuid]))
         (:group-variable/actions)
         (filter #(= (:action/type %) :select))
         (map d/touch))))
@@ -637,7 +643,8 @@
 (reg-sub
  :wizard/_disabled-actions
  (fn [_ [_ gv-uuid]]
-   (->> (d/entity @@vms-conn [:bp/uuid gv-uuid])
+   (->> (or (impl-rust/entity [:bp/uuid gv-uuid])
+            (d/entity @@vms-conn [:bp/uuid gv-uuid]))
         (:group-variable/actions)
         (filter #(= (:action/type %) :disable))
         (map d/touch))))
@@ -699,26 +706,26 @@
 (reg-sub
  :wizard/diagram-input-gv-uuids
  (fn [_ [_ gv-uuid]]
-   (d/q '[:find  [?gv-uuid ...]
-          :in    $ ?gv
-          :where
-          [?d :diagram/group-variable ?gv]
-          [?d :diagram/input-group-variables ?g]
-          [?g  :bp/uuid ?gv-uuid]]
-        @@vms-conn [:bp/uuid gv-uuid])))
+   (impl-rust/q '[:find  [?gv-uuid ...]
+                  :in    $ ?gv
+                  :where
+                  [?d :diagram/group-variable ?gv]
+                  [?d :diagram/input-group-variables ?g]
+                  [?g  :bp/uuid ?gv-uuid]]
+                @@vms-conn [:bp/uuid gv-uuid])))
 
 (reg-sub
  :wizard/diagram-output-gv-uuids
  (fn [_]
    (rf/subscribe [:vms/group-variable-order]))
  (fn [gv-order [_ gv-uuid]]
-   (->> (d/q '[:find  [?gv-uuid ...]
-               :in    $ ?gv
-               :where
-               [?d :diagram/group-variable ?gv]
-               [?d :diagram/output-group-variables ?g]
-               [?g :bp/uuid ?gv-uuid]]
-             @@vms-conn [:bp/uuid gv-uuid])
+   (->> (impl-rust/q '[:find  [?gv-uuid ...]
+                       :in    $ ?gv
+                       :where
+                       [?d :diagram/group-variable ?gv]
+                       [?d :diagram/output-group-variables ?g]
+                       [?g :bp/uuid ?gv-uuid]]
+                     @@vms-conn [:bp/uuid gv-uuid])
         (sort-by #(.indexOf gv-order %)))))
 
 (reg-sub
@@ -781,21 +788,22 @@
 
  (fn [modules [_ _ io]]
    (letfn [(get-conditionally-set-group-variables [module-eid]
-             (d/q '[:find [?gv ...]
-                    :in $ % ?module-eid ?io
-                    :where
-                    [?module-eid :module/submodules ?s]
-                    [?s :submodule/io ?io]
-                    (group ?s ?g)
-                    [?g :group/group-variables ?gv]
-                    [?gv :group-variable/conditionally-set? true]]
-                  @@vms-conn
-                  rules
-                  module-eid
-                  io))]
+             (impl-rust/q '[:find [?gv ...]
+                            :in $ % ?module-eid ?io
+                            :where
+                            [?module-eid :module/submodules ?s]
+                            [?s :submodule/io ?io]
+                            (group ?s ?g)
+                            [?g :group/group-variables ?gv]
+                            [?gv :group-variable/conditionally-set? true]]
+                          @@vms-conn
+                          rules
+                          module-eid
+                          io))]
 
      (->> (mapcat #(get-conditionally-set-group-variables (:db/id %)) modules)
-          (map #(d/touch (d/entity @@vms-conn %)))))))
+          (map #(or (some-> (impl-rust/entity %) impl-rust/touch)
+                    (d/touch (d/entity @@vms-conn %))))))))
 
 (reg-sub
  :wizard/conditionally-set-input-data
@@ -806,14 +814,14 @@
  (fn [group-variables [_ ws-uuid]]
    (mapv (juxt
           (fn [group-variable]
-            (d/q '[:find ?g-uuid .
-                   :in $ % ?gv
-                   :where
-                   (group-variable ?g ?gv ?v)
-                   [?g :bp/uuid ?g-uuid]]
-                 @@vms-conn
-                 rules
-                 (:db/id group-variable)))
+            (impl-rust/q '[:find ?g-uuid .
+                           :in $ % ?gv
+                           :where
+                           (group-variable ?g ?gv ?v)
+                           [?g :bp/uuid ?g-uuid]]
+                         @@vms-conn
+                         rules
+                         (:db/id group-variable)))
           :bp/uuid
           #(deref (rf/subscribe [:wizard/default-option ws-uuid (:bp/uuid %)])))
          group-variables)))
@@ -831,21 +839,21 @@
 (reg-sub
  :wizard/submodule-parent
  (fn [_ [_ submodule-id]]
-   (d/q '[:find  ?module-name .
-          :in    $ % ?submodule-id
-          :where
-          (submodule ?m ?submodule-id)
-          [?m :module/name ?module-name]]
-        @@vms-conn rules submodule-id)))
+   (impl-rust/q '[:find  ?module-name .
+                  :in    $ % ?submodule-id
+                  :where
+                  (submodule ?m ?submodule-id)
+                  [?m :module/name ?module-name]]
+                @@vms-conn rules submodule-id)))
 
 (defn- parent-module-name
   [submodule-id]
-  (d/q '[:find  ?module-name .
-         :in    $ % ?submodule-id
-         :where
-         (submodule ?m ?submodule-id)
-         [?m :module/name ?module-name]]
-       @@vms-conn rules submodule-id))
+  (impl-rust/q '[:find  ?module-name .
+                 :in    $ % ?submodule-id
+                 :where
+                 (submodule ?m ?submodule-id)
+                 [?m :module/name ?module-name]]
+               @@vms-conn rules submodule-id))
 
 (defn- build-guided-submodule-path
   [rroutes ws-uuid submodule]
@@ -909,11 +917,11 @@
 
 (defn- group-variable-discrete?
   [gv-uuid]
-  (= (d/q '[:find  ?kind .
-            :in    $ % ?gv-uuid
-            :where
-            (variable-kind ?gv-uuid ?kind)]
-          @@vms-conn rules gv-uuid)
+  (= (impl-rust/q '[:find  ?kind .
+                    :in    $ % ?gv-uuid
+                    :where
+                    (variable-kind ?gv-uuid ?kind)]
+                  @@vms-conn rules gv-uuid)
      :discrete))
 
 (reg-sub
@@ -923,11 +931,11 @@
 
 (defn- group-variable-text?
   [gv-uuid]
-  (= (d/q '[:find  ?kind .
-            :in    $ % ?gv-uuid
-            :where
-            (variable-kind ?gv-uuid ?kind)]
-          @@vms-conn rules gv-uuid)
+  (= (impl-rust/q '[:find  ?kind .
+                    :in    $ % ?gv-uuid
+                    :where
+                    (variable-kind ?gv-uuid ?kind)]
+                  @@vms-conn rules gv-uuid)
      :text))
 
 (reg-sub
@@ -975,28 +983,29 @@
 
  (fn [modules _]
    (letfn [(get-search-table-filter-output-group-variables [module-eid]
-             (d/q '[:find [?gv ...]
-                    :in $ % ?module-eid
-                    :where
-                    [?module-eid :module/search-tables ?st]
-                    [?st :search-table/filters ?f]
-                    [?f :search-table-filter/group-variable ?gv]
-                    (io ?gv :output)]
-                  @@vms-conn
-                  rules
-                  module-eid))
+             (impl-rust/q '[:find [?gv ...]
+                            :in $ % ?module-eid
+                            :where
+                            [?module-eid :module/search-tables ?st]
+                            [?st :search-table/filters ?f]
+                            [?f :search-table-filter/group-variable ?gv]
+                            (io ?gv :output)]
+                          @@vms-conn
+                          rules
+                          module-eid))
            (get-search-table-column-output-group-variables [module-eid]
-             (d/q '[:find [?gv ...]
-                    :in $ % ?module-eid
-                    :where
-                    [?module-eid :module/search-tables ?st]
-                    [?st :search-table/columns ?c]
-                    [?c :search-table-column/group-variable ?gv]
-                    (io ?gv :output)]
-                  @@vms-conn
-                  rules
-                  module-eid))]
+             (impl-rust/q '[:find [?gv ...]
+                            :in $ % ?module-eid
+                            :where
+                            [?module-eid :module/search-tables ?st]
+                            [?st :search-table/columns ?c]
+                            [?c :search-table-column/group-variable ?gv]
+                            (io ?gv :output)]
+                          @@vms-conn
+                          rules
+                          module-eid))]
 
      (->> (mapcat #(get-search-table-filter-output-group-variables (:db/id %)) modules)
           (concat (mapcat #(get-search-table-column-output-group-variables (:db/id %)) modules))
-          (map #(d/touch (d/entity @@vms-conn %)))))))
+          (map #(or (some-> (impl-rust/entity %) impl-rust/touch)
+                    (d/touch (d/entity @@vms-conn %))))))))

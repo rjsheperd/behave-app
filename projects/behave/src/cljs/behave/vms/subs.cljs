@@ -10,6 +10,7 @@
             [behave.translate             :refer [<t]]
             [map-utils.interface          :refer [index-by]]
             [absurder-sql.datascript.core :as d]
+            [absurder-sql.datascript.impl-rust :as impl-rust]
             [re-frame.core                :refer [reg-sub subscribe]]))
 
 (reg-sub
@@ -137,7 +138,8 @@
                               :prioritized-results/order
                               (mapv #(:bp/uuid (:prioritized-results/group-variable %))
                                     (:application/prioritized-results
-                                     (d/entity @@vms-conn app-id))))]
+                                     (or (impl-rust/entity app-id)
+                                         (d/entity @@vms-conn app-id)))))]
      (distinct (concat prioritized-results normal-order)))))
 
 (reg-sub
@@ -148,14 +150,14 @@
 (reg-sub
  :vms/native-units
  (fn [_ [_ gv-uuid]]
-   (d/q '[:find  ?unit-uuid .
-          :in    $ % ?gv-uuid
-          :where
-          (lookup ?gv-uuid ?gv)
-          (group-variable _ ?gv ?v)
-          [?v :variable/kind :continuous]
-          [?v :variable/native-unit-uuid ?unit-uuid]]
-        @@vms-conn rules gv-uuid)))
+   (impl-rust/q '[:find  ?unit-uuid .
+                  :in    $ % ?gv-uuid
+                  :where
+                  (lookup ?gv-uuid ?gv)
+                  (group-variable _ ?gv ?v)
+                  [?v :variable/kind :continuous]
+                  [?v :variable/native-unit-uuid ?unit-uuid]]
+                @@vms-conn rules gv-uuid)))
 
 (reg-sub
  :entity-uuid->name
@@ -170,87 +172,87 @@
 (reg-sub
  :vms/translations
  (fn [_ [_ language-short-code]]
-   (->> (d/q '[:find  ?key ?translation
-               :in    $ ?short-code
-               :where
-               [?l :language/shortcode ?short-code]
-               [?l :language/translation ?t]
-               [?t :translation/key ?key]
-               [?t :translation/translation ?translation]]
-             @@vms-conn language-short-code)
+   (->> (impl-rust/q '[:find  ?key ?translation
+                       :in    $ ?short-code
+                       :where
+                       [?l :language/shortcode ?short-code]
+                       [?l :language/translation ?t]
+                       [?t :translation/key ?key]
+                       [?t :translation/translation ?translation]]
+                     @@vms-conn language-short-code)
         (into {}))))
 
 (reg-sub
  :vms/is-group-variable-discrete-multiple?
  (fn [_ [_ gv-uuid]]
-   (d/q '[:find ?discrete-multiple .
-          :in $ ?gv-uuid
-          :where
-          [?gv :bp/uuid ?gv-uuid]
-          [?gv :group-variable/discrete-multiple? ?discrete-multiple]]
-        @@vms-conn gv-uuid)))
+   (impl-rust/q '[:find ?discrete-multiple .
+                  :in $ ?gv-uuid
+                  :where
+                  [?gv :bp/uuid ?gv-uuid]
+                  [?gv :group-variable/discrete-multiple? ?discrete-multiple]]
+                @@vms-conn gv-uuid)))
 
 (reg-sub
  :vms/gv-uuid->list-eid
  (fn [_ [_ gv-uuid]]
-   (d/q '[:find ?l .
-          :in $ ?gv-uuid
-          :where
-          [?gv :bp/uuid ?gv-uuid]
-          [?v :variable/group-variables ?gv]
-          [?v :variable/list ?l]]
-        @@vms-conn gv-uuid)))
+   (impl-rust/q '[:find ?l .
+                  :in $ ?gv-uuid
+                  :where
+                  [?gv :bp/uuid ?gv-uuid]
+                  [?v :variable/group-variables ?gv]
+                  [?v :variable/list ?l]]
+                @@vms-conn gv-uuid)))
 
 (reg-sub
  :vms/group-variable-eid->variable-name
  (fn [_ [_ group-variable-eid]]
-   (d/q '[:find ?v-name .
-          :in $ ?gv
-          :where
-          [?v :variable/group-variables ?gv]
-          [?v :variable/name ?v-name]]
-        @@vms-conn group-variable-eid)))
+   (impl-rust/q '[:find ?v-name .
+                  :in $ ?gv
+                  :where
+                  [?v :variable/group-variables ?gv]
+                  [?v :variable/name ?v-name]]
+                @@vms-conn group-variable-eid)))
 
 (reg-sub
  :vms/group-variable-is-output?
  (fn [_ [_ group-variable-id]]
-   (d/q '[:find ?is-output .
-          :in $ % ?gv
-          :where
-          [?g :group/group-variables ?gv]
-          (submodule-root ?sm ?g)
-          [?sm :submodule/io ?io]
-          [(= ?io :output) ?is-output]]
-        @@vms-conn rules group-variable-id)))
+   (impl-rust/q '[:find ?is-output .
+                  :in $ % ?gv
+                  :where
+                  [?g :group/group-variables ?gv]
+                  (submodule-root ?sm ?g)
+                  [?sm :submodule/io ?io]
+                  [(= ?io :output) ?is-output]]
+                @@vms-conn rules group-variable-id)))
 
 (reg-sub
  :vms/directional-group-variable-uuids
  (fn [_]
-   (d/q '[:find  [?gv-uuid ...]
-          :in $
-          :where
-          [?gv :bp/uuid ?gv-uuid]
-          [?gv :group-variable/direction ?direction]]
-        @@vms-conn)))
+   (impl-rust/q '[:find  [?gv-uuid ...]
+                  :in $
+                  :where
+                  [?gv :bp/uuid ?gv-uuid]
+                  [?gv :group-variable/direction ?direction]]
+                @@vms-conn)))
 
 (reg-sub
  :vms/group-variable-is-directional?
  (fn [_ [_ gv-uuid direction]]
-   (= (d/q '[:find  ?direction .
-             :in $ ?gv-uuid
-             :where
-             [?gv :bp/uuid ?gv-uuid]
-             [?gv :group-variable/direction ?direction]]
-           @@vms-conn
-           gv-uuid)
+   (= (impl-rust/q '[:find  ?direction .
+                     :in $ ?gv-uuid
+                     :where
+                     [?gv :bp/uuid ?gv-uuid]
+                     [?gv :group-variable/direction ?direction]]
+                   @@vms-conn
+                   gv-uuid)
       direction)))
 
 (reg-sub
  :vms/resolve-enum-translation
  (fn [_ [_ gv-uuid value]]
-   (let [result                  (d/pull @@vms-conn '[{:variable/_group-variables
-                                                       [{:variable/list [* {:list/options [*]}]}]}]
-                                         [:bp/uuid gv-uuid])
+   (let [result                  (impl-rust/pull @@vms-conn '[{:variable/_group-variables
+                                                                [{:variable/list [* {:list/options [*]}]}]}]
+                                                [:bp/uuid gv-uuid])
          variable                (first (:variable/_group-variables result))
          {v-list :variable/list} variable
          {options :list/options} v-list
@@ -281,28 +283,28 @@
   [db group-uuid]
   ;; Use rules to find the immediate group and submodule
   (when-let [[submodule-eid immediate-group-eid]
-             (d/q '[:find [?submodule ?group]
-                    :in $ % ?group-uuid
-                    :where
-                    (lookup ?group-uuid ?group)
-                    (submodule-root ?submodule ?group)]
-                  db
-                  rules
-                  group-uuid)]
+             (impl-rust/q '[:find [?submodule ?group]
+                            :in $ % ?group-uuid
+                            :where
+                            (lookup ?group-uuid ?group)
+                            (submodule-root ?submodule ?group)]
+                          db
+                          rules
+                          group-uuid)]
 
     ;; Use the subgroup rule to find all ancestor groups
     ;; The subgroup rule: (subgroup ?parent ?child) means ?child is a subgroup of ?parent
-    (let [ancestor-eids (d/q '[:find [?ancestor ...]
-                               :in $ % ?child
-                               :where
-                               (subgroup ?ancestor ?child)]
-                             db
-                             rules
-                             immediate-group-eid)
+    (let [ancestor-eids (impl-rust/q '[:find [?ancestor ...]
+                                       :in $ % ?child
+                                       :where
+                                       (subgroup ?ancestor ?child)]
+                                     db
+                                     rules
+                                     immediate-group-eid)
 
           ;; Pull all groups with their parent references to sort them
           all-groups          (cons immediate-group-eid ancestor-eids)
-          groups-with-parents (map #(d/pull db '[:db/id {:group/_children [:db/id]}] %)
+          groups-with-parents (map #(impl-rust/pull db '[:db/id {:group/_children [:db/id]}] %)
                                    all-groups)
 
           ;; Build a map of child -> parent for quick lookup

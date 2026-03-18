@@ -12,7 +12,7 @@ use persistent_sorted_set::datom::{Attr, Datom, Value};
 use persistent_sorted_set::pull::PullSource;
 use persistent_sorted_set::relation::{
     self, Clause, PatternEl, PatternResolver, Relation, Rules, Tuple, Var,
-    collapse_rels, project, resolve_query,
+    collapse_rels, project, resolve_query, resolve_query_with_initial,
 };
 use persistent_sorted_set::schema::{ReverseSchema, Schema};
 use persistent_sorted_set::set::PersistentSortedSet;
@@ -326,6 +326,17 @@ pub fn resolve_clauses_with_rules(
     find_vars: &[Var],
 ) -> Vec<Tuple> {
     let result = resolve_query(db, clauses, rules);
+    collect_results(&result, find_vars)
+}
+
+pub fn resolve_clauses_with_rules_and_initial(
+    db: &WasmDataScript,
+    clauses: &[Clause],
+    rules: &Rules,
+    find_vars: &[Var],
+    initial_rels: Vec<Relation>,
+) -> Vec<Tuple> {
+    let result = resolve_query_with_initial(db, clauses, rules, initial_rels);
     collect_results(&result, find_vars)
 }
 

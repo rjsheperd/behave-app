@@ -8,6 +8,7 @@
             [clojure.string                :as str]
             [clojure.walk                  :refer [postwalk]]
             [absurder-sql.datascript.core   :as d]
+            [absurder-sql.datascript.impl-rust :as impl-rust]
             [re-frame.core                 :as rf]
             [number-utils.interface        :refer [is-numeric? parse-float]]
             [vimsical.re-frame.cofx.inject :as inject]
@@ -317,10 +318,10 @@
 (rf/reg-event-fx
  :wizard/navigate-to-latest-worksheet
  (fn [_ [_ workflow]]
-   (let [ws-uuid (d/q '[:find ?uuid .
-                        :in $
-                        :where [?e :worksheet/uuid ?uuid]]
-                      @@s/conn)]
+   (let [ws-uuid (impl-rust/q-ws '[:find ?uuid .
+                                   :in $
+                                   :where [?e :worksheet/uuid ?uuid]]
+                                 @@s/conn)]
      (reset! current-route-order @(rf/subscribe [:wizard/route-order ws-uuid workflow]))
      {:fx [[:dispatch [:wizard/next]]]})))
 

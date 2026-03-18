@@ -802,33 +802,110 @@ impl WasmDataScript {
             parsed.rules.clone()
         };
 
-        // Bind input parameters
+        // Bind input parameters — split into scalar bindings (pattern substitution)
+        // and collection bindings (initial relations).
+        use persistent_sorted_set::query_parser::{InBinding, build_collection_relations};
+        use crate::query::resolve_clauses_with_rules_and_initial;
+
+        let mut scalar_bindings: Vec<(String, Value)> = Vec::new();
+        let mut coll_values: std::collections::HashMap<String, Vec<Value>> = std::collections::HashMap::new();
+
         if !inputs.is_null() && !inputs.is_undefined() {
             let inputs_arr = js_sys::Array::from(&inputs);
-            let mut bindings = Vec::new();
-            for i in 0..inputs_arr.length() {
-                let pair = js_sys::Array::from(&inputs_arr.get(i));
-                if pair.length() >= 2 {
-                    if let Some(name) = pair.get(0).as_string() {
-                        let val = parse_input_value(&pair.get(1));
-                        bindings.push((name, val));
+            let mut input_idx = 0;
+
+            for binding in &parsed.in_bindings {
+                if input_idx >= inputs_arr.length() { break; }
+                match binding {
+                    InBinding::Scalar(_var) => {
+                        let pair = js_sys::Array::from(&inputs_arr.get(input_idx));
+                        if pair.length() >= 2 {
+                            if let Some(name) = pair.get(0).as_string() {
+                                let val = parse_input_value(&pair.get(1));
+                                scalar_bindings.push((name, val));
+                            }
+                        }
+                        input_idx += 1;
+                    }
+                    InBinding::Coll(var) => {
+                        let pair = js_sys::Array::from(&inputs_arr.get(input_idx));
+                        if pair.length() >= 2 {
+                            let val_js = pair.get(1);
+                            if js_sys::Array::is_array(&val_js) {
+                                let arr = js_sys::Array::from(&val_js);
+                                let values: Vec<Value> = (0..arr.length())
+                                    .map(|j| parse_input_value(&arr.get(j)))
+                                    .collect();
+                                coll_values.insert(var.clone(), values);
+                            } else {
+                                // Single value — treat as 1-element collection
+                                coll_values.insert(var.clone(), vec![parse_input_value(&val_js)]);
+                            }
+                        }
+                        input_idx += 1;
+                    }
+                    InBinding::Tuple(vars) => {
+                        let pair = js_sys::Array::from(&inputs_arr.get(input_idx));
+                        if pair.length() >= 2 {
+                            let val_js = pair.get(1);
+                            if js_sys::Array::is_array(&val_js) {
+                                let arr = js_sys::Array::from(&val_js);
+                                for (j, tv) in vars.iter().enumerate() {
+                                    if (j as u32) < arr.length() {
+                                        scalar_bindings.push((tv.clone(), parse_input_value(&arr.get(j as u32))));
+                                    }
+                                }
+                            }
+                        }
+                        input_idx += 1;
                     }
                 }
             }
-            let binding_refs: Vec<(&str, persistent_sorted_set::datom::Value)> = bindings
+
+            // If no in_bindings parsed (old-style queries), fall back to treating all as scalars
+            if parsed.in_bindings.is_empty() {
+                let inputs_arr = js_sys::Array::from(&inputs);
+                for i in 0..inputs_arr.length() {
+                    let pair = js_sys::Array::from(&inputs_arr.get(i));
+                    if pair.length() >= 2 {
+                        if let Some(name) = pair.get(0).as_string() {
+                            let val = parse_input_value(&pair.get(1));
+                            scalar_bindings.push((name, val));
+                        }
+                    }
+                }
+            }
+        }
+
+        // Apply scalar bindings (pattern substitution)
+        if !scalar_bindings.is_empty() {
+            let binding_refs: Vec<(&str, Value)> = scalar_bindings
                 .iter()
                 .map(|(k, v)| (k.as_str(), v.clone()))
                 .collect();
             bind_inputs(&mut parsed, &binding_refs);
         }
 
+        // Build initial relations for collection bindings
+        let initial_rels = build_collection_relations(&parsed.in_bindings, &coll_values);
+
         let find_vars = parsed.find.vars();
-        let result_tuples = resolve_clauses_with_rules(
-            self,
-            &parsed.where_clauses,
-            &rules,
-            &find_vars,
-        );
+        let result_tuples = if initial_rels.is_empty() {
+            resolve_clauses_with_rules(
+                self,
+                &parsed.where_clauses,
+                &rules,
+                &find_vars,
+            )
+        } else {
+            resolve_clauses_with_rules_and_initial(
+                self,
+                &parsed.where_clauses,
+                &rules,
+                &find_vars,
+                initial_rels,
+            )
+        };
 
         // Apply aggregation if any find elements are aggregates
         let result_tuples = if parsed.has_aggregates() {
@@ -912,6 +989,193 @@ impl WasmDataScript {
                     let arr = js_sys::Array::new_with_length(tuple.len() as u32);
                     for (j, val) in tuple.iter().enumerate() {
                         arr.set(j as u32, element_to_js(j, val));
+                    }
+                    arr.into()
+                } else {
+                    JsValue::NULL
+                }
+            }
+        }
+    }
+
+    /// Execute a multi-source Datalog query. `self` is the default source (`$`).
+    /// Additional sources are passed as a JS object: `{ "$ws": anotherWasmDataScript }`.
+    ///
+    /// Used for behave-style queries: `[:find ?x :in $ $ws % :where [$ws ?e :name ?x]]`
+    /// Query with multiple database sources.
+    /// `self` is the default ($) source. `source_name` + `source_db` provide one
+    /// additional source (e.g. "$ws" + workspace DB). Pass empty string/null for
+    /// single-source queries (falls back to queryEdn behavior).
+    #[wasm_bindgen(js_name = "queryEdnMulti")]
+    pub fn query_edn_multi(
+        &self,
+        query_edn: String,
+        rules_edn: JsValue,
+        inputs: JsValue,
+        source_name: String,
+        source_db: Option<WasmDataScript>,
+    ) -> JsValue {
+        use persistent_sorted_set::query_parser::{
+            parse_query, parse_rules, bind_inputs, FindSpec, InBinding,
+            build_collection_relations,
+        };
+        use persistent_sorted_set::relation::{
+            resolve_query_with_initial, MultiResolver,
+        };
+
+        let mut parsed = parse_query(&query_edn);
+
+        // Parse rules
+        let rules = if let Some(s) = rules_edn.as_string() {
+            if s.is_empty() { parsed.rules.clone() } else { parse_rules(&s) }
+        } else {
+            parsed.rules.clone()
+        };
+
+        // Build multi-resolver from sources object
+        // We need to extract WasmDataScript references from the JS sources object.
+        // Since wasm_bindgen doesn't support passing borrowed references easily,
+        // we'll resolve all additional sources upfront.
+        //
+        // For now, the multi-resolver approach works with the PatternResolver trait.
+        // The `self` is the default ($) source. Additional sources from JS would
+        // need their own WasmDataScript instances — but wasm_bindgen can't pass
+        // &WasmDataScript from JS. Instead, we'll create a QueryMultiContext on
+        // the JS side that handles source dispatch.
+        //
+        // Simpler approach: parse the query to find which patterns use which source,
+        // then resolve $ws patterns by calling a separate queryEdn on the $ws db
+        // from JS. This avoids the ownership problem.
+        //
+        // For the Rust-only path (native tests), MultiResolver works directly.
+        // For WASM, we provide queryEdnMulti as a convenience that the CLJS layer
+        // can use by passing additional WasmDataScript instances.
+
+        // Process inputs (same as queryEdn)
+        let mut scalar_bindings: Vec<(String, Value)> = Vec::new();
+        let mut coll_values: std::collections::HashMap<String, Vec<Value>> = std::collections::HashMap::new();
+
+        if !inputs.is_null() && !inputs.is_undefined() {
+            let inputs_arr = js_sys::Array::from(&inputs);
+            let mut input_idx = 0;
+            for binding in &parsed.in_bindings {
+                if input_idx >= inputs_arr.length() { break; }
+                match binding {
+                    InBinding::Scalar(_) => {
+                        let pair = js_sys::Array::from(&inputs_arr.get(input_idx));
+                        if pair.length() >= 2 {
+                            if let Some(name) = pair.get(0).as_string() {
+                                scalar_bindings.push((name, parse_input_value(&pair.get(1))));
+                            }
+                        }
+                        input_idx += 1;
+                    }
+                    InBinding::Coll(var) => {
+                        let pair = js_sys::Array::from(&inputs_arr.get(input_idx));
+                        if pair.length() >= 2 {
+                            let val_js = pair.get(1);
+                            if js_sys::Array::is_array(&val_js) {
+                                let arr = js_sys::Array::from(&val_js);
+                                let values: Vec<Value> = (0..arr.length())
+                                    .map(|j| parse_input_value(&arr.get(j)))
+                                    .collect();
+                                coll_values.insert(var.clone(), values);
+                            }
+                        }
+                        input_idx += 1;
+                    }
+                    InBinding::Tuple(vars) => {
+                        let pair = js_sys::Array::from(&inputs_arr.get(input_idx));
+                        if pair.length() >= 2 {
+                            let val_js = pair.get(1);
+                            if js_sys::Array::is_array(&val_js) {
+                                let arr = js_sys::Array::from(&val_js);
+                                for (j, tv) in vars.iter().enumerate() {
+                                    if (j as u32) < arr.length() {
+                                        scalar_bindings.push((tv.clone(), parse_input_value(&arr.get(j as u32))));
+                                    }
+                                }
+                            }
+                        }
+                        input_idx += 1;
+                    }
+                }
+            }
+            if parsed.in_bindings.is_empty() {
+                let inputs_arr = js_sys::Array::from(&inputs);
+                for i in 0..inputs_arr.length() {
+                    let pair = js_sys::Array::from(&inputs_arr.get(i));
+                    if pair.length() >= 2 {
+                        if let Some(name) = pair.get(0).as_string() {
+                            scalar_bindings.push((name, parse_input_value(&pair.get(1))));
+                        }
+                    }
+                }
+            }
+        }
+
+        if !scalar_bindings.is_empty() {
+            let binding_refs: Vec<(&str, Value)> = scalar_bindings
+                .iter().map(|(k, v)| (k.as_str(), v.clone())).collect();
+            bind_inputs(&mut parsed, &binding_refs);
+        }
+
+        let initial_rels = build_collection_relations(&parsed.in_bindings, &coll_values);
+
+        // Build multi-resolver: self = default ($), optional additional source.
+        let mut multi = MultiResolver::new(self);
+        if !source_name.is_empty() {
+            if let Some(ref db) = source_db {
+                multi.add_source(source_name, db);
+            }
+        }
+
+        let find_vars = parsed.find.vars();
+        let result = resolve_query_with_initial(
+            &multi, &parsed.where_clauses, &rules, initial_rels,
+        );
+        let result_tuples = crate::query::collect_results(&result, &find_vars);
+
+        // Apply aggregation
+        let result_tuples = if parsed.has_aggregates() {
+            persistent_sorted_set::aggregates::aggregate(&parsed.find_elements, result_tuples)
+        } else {
+            result_tuples
+        };
+
+        // Shape output (same as queryEdn)
+        match &parsed.find {
+            FindSpec::Rel(_) => {
+                let outer = js_sys::Array::new_with_length(result_tuples.len() as u32);
+                for (i, tuple) in result_tuples.iter().enumerate() {
+                    let inner = js_sys::Array::new_with_length(tuple.len() as u32);
+                    for (j, val) in tuple.iter().enumerate() {
+                        inner.set(j as u32, value_to_js(val));
+                    }
+                    outer.set(i as u32, inner.into());
+                }
+                outer.into()
+            }
+            FindSpec::Scalar(_) => {
+                result_tuples.first()
+                    .and_then(|t| t.first())
+                    .map(|v| value_to_js(v))
+                    .unwrap_or(JsValue::NULL)
+            }
+            FindSpec::Coll(_) => {
+                let arr = js_sys::Array::new_with_length(result_tuples.len() as u32);
+                for (i, tuple) in result_tuples.iter().enumerate() {
+                    if let Some(val) = tuple.first() {
+                        arr.set(i as u32, value_to_js(val));
+                    }
+                }
+                arr.into()
+            }
+            FindSpec::Tuple(_) => {
+                if let Some(tuple) = result_tuples.first() {
+                    let arr = js_sys::Array::new_with_length(tuple.len() as u32);
+                    for (j, val) in tuple.iter().enumerate() {
+                        arr.set(j as u32, value_to_js(val));
                     }
                     arr.into()
                 } else {
@@ -1375,7 +1639,7 @@ fn clause_from_js(val: &JsValue) -> Option<Clause> {
             for j in 0..4.min(pat.length()) {
                 els[j as usize] = pattern_el_from_js(&pat.get(j));
             }
-            Some(Clause::Pattern(els))
+            Some(Clause::Pattern { source: None, pattern: els })
         }
         "rule" => {
             let name = js_sys::Reflect::get(val, &JsValue::from_str("name"))

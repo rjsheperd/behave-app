@@ -304,48 +304,40 @@ production impact.
   nil/some, string/keyword, not, re-find, re-matches, starts-with, includes,
   ends-with, number, equality aliases)
 
-** 4.4 Query features: =:with=, return maps, binding forms [MEDIUM]
+** 4.4 Query features: =:with=, return maps, binding forms [MEDIUM — partially superseded]
 
-- *Files:* =rust/persistent-sorted-set/src/query_parser.rs=, =relation.rs=, =wasm_datascript.rs=
+/Note:/ Behave audit (Phase 5) found =:with= and return maps are *unused*.
+Input binding forms are needed and tracked as Phase 5.2.
 
-*** =:with= clause
+*** =:with= clause — NOT NEEDED (zero behave usage)
 
 - =:with [?vars]= includes variables in joins but excludes from final results
 - Required for correct aggregate grouping (4.1)
 - Parse =:with= in =parse_query=; pass through to =resolve_query=; strip after aggregation
 
-*** Return maps
+*** Return maps — NOT NEEDED (zero behave usage)
 
 - CLJS supports =:keys=, =:syms=, =:strs= in queries to return maps instead of tuples
 - Parse in =parse_query=; apply in =tuples_to_js= (wrap tuples as JS objects)
 
-*** Input binding forms
+*** Input binding forms → moved to Phase 5.2
 
 - Current =bind_inputs= only handles scalar bindings
-- Add support for:
-  - Tuple binding: =[[?a ?b]]= — destructures a single tuple input
-  - Collection binding: =[?a ...]= — binds each element, creating multiple bindings
-  - Relation binding: =[[?a ?b ...]]= — binds a relation (set of tuples)
-- *Test:* Each binding form; combined with queries
+- Collection binding =[?a ...]= is heavily used in behave (~15 queries)
+- See Phase 5.2 for full implementation plan
 
-** 4.5 Pull attribute options [MEDIUM]
+** 4.5 Pull attribute options [MEDIUM — NOT NEEDED for behave]
 
-- *Files:* =rust/persistent-sorted-set/src/pull_parser.rs=, =pull.rs=
-- CLJS pull supports per-attribute options:
-  - =:as= — rename attribute in result
-  - =:default= — provide default when attribute missing
-  - =:limit= — limit cardinality-many results
-  - =:xform= — transform function on results (may require JS callback)
-- Parse options in =pull_parser.rs=; apply in =pull.rs= during result construction
-- *Test:* Each option individually; combined options; edge cases (empty, nil default)
-
-** 4.6 Pull recursion depth control [LOW]
+/Note:/ Behave audit found zero usage of =:as=, =:default=, =:limit=, =:xform=
+in pull patterns. Deprioritized.
 
 - *Files:* =rust/persistent-sorted-set/src/pull_parser.rs=, =pull.rs=
-- CLJS supports integer recursion limits (e.g., =3=) and =...= (unlimited)
-- Parser already recognizes these but treats them as wildcard
-- Implement depth tracking during recursive pull resolution
-- *Test:* Depth-limited pull; unlimited pull; pull on cyclic data
+
+** 4.6 Pull recursion depth control [LOW — NOT NEEDED for behave]
+
+/Note:/ Behave audit found zero usage of recursive pull patterns. Deprioritized.
+
+- *Files:* =rust/persistent-sorted-set/src/pull_parser.rs=, =pull.rs=
 
 ** DONE 4.7 Entity API [LOW]
 
@@ -431,14 +423,11 @@ map entity, reverse ref, lookup ref, =:db/current-tx=, tx-report structure,
 sequential transactions, EDN parsing integration (basic, map, retract,
 retract entity, alias form, refs+components, mixed)
 
-** 4.9 FilteredDB [LOW]
+** 4.9 FilteredDB [LOW — NOT NEEDED for behave]
+
+/Note:/ Behave audit found zero usage of =d/filter=. Deprioritized.
 
 - *New file:* =rust/persistent-sorted-set/src/filtered_db.rs=
-- =d/filter= creates a filtered view of a database
-- Implement =FilteredDB= wrapping =Database= with a predicate function
-- =FilteredDB= implements =PatternResolver=, filtering results through the predicate
-- *Challenge:* Predicate is a CLJS function — requires JS callback mechanism
-- *Test:* Filter by attribute; filter by entity; nested filters; query against filtered DB
 
 ** 4.10 Incremental sync → superseded by 4.8
 
@@ -454,3 +443,455 @@ forms. =sync-to-rust!= remains as fallback for unsupported forms (=:db.fn/call=,
 3. Full kaocha test suite passes with Rust engine handling all queries (no CLJS fallback)
 4. Remove CLJS fallback path in =impl_rust.cljs= — all queries route through Rust
 5. Performance benchmark: Rust-only path vs mixed CLJS/Rust path on production-scale data
+
+* Phase 5: Behave Integration Parity
+
+An audit of the behave app's actual DataScript usage reveals four gaps that must
+be closed before the Rust engine can serve as a drop-in replacement. These are
+ordered by effort (lowest first) to maximize incremental value.
+
+Features confirmed *unused* by behave and therefore *not needed*: =:with=,
+=:keys/:syms/:strs= return maps, tuple input bindings =[[?a ?b]]=, pull =:as=,
+=:default=, =:limit=, =:xform=, recursive pull, =:db.fn/cas=, =:db.fn/call=,
+=d/filter= (FilteredDB), =d/seek-datoms=, =d/index-range=, aggregates.
+
+** DONE 5.1 =re-pattern= fn-expr [LOW]
+
+*** Context
+
+Behave's solver chains =re-pattern= and =re-find= as a two-step pattern:
+
+#+begin_src clojure
+;; solver/queries.cljs:158-160
+[(str "(?i)" ?module-name) ?module-find]
+[(re-pattern ?module-find) ?module-find-re]
+[(re-find ?module-find-re ?m-name)]
+#+end_src
+
+The Rust engine's =re-find= already accepts string patterns, but =re-pattern= as
+a fn-expr (which creates a regex from a string) is not implemented.
+
+*** Implementation
+
+- *File:* =rust/persistent-sorted-set/src/fn_expr.rs=
+- Add ="re-pattern"= to =eval_fn=: return the string unchanged (identity)
+  - In CLJS, =re-pattern= returns a RegExp object. In Rust, =re-find= already
+    compiles the pattern from a string, so =re-pattern= is effectively identity.
+- Add ="re-pattern"= to =is_known_fn=
+
+*** Steps
+
+1. Add ="re-pattern"= → =args.first().cloned()= case in =eval_fn= match block
+2. Add ="re-pattern"= to the =is_known_fn= match list
+3. Unit test in =fn_expr.rs=: =fn_re_pattern_identity= — =(re-pattern "abc")= → =Str("abc")=
+4. Integration test in =parser_tests.rs=: =fn_expr_re_pattern_chain= —
+   full query with =[(str "(?i)" ?name) ?pat] [(re-pattern ?pat) ?re] [(re-find ?re ?target)]=
+   verifying case-insensitive matching works end-to-end
+5. Update =QUERY_ENGINE_PLAN.org= fn-expr function list to include =re-pattern=
+
+*Also fixed:* =apply_predicate= in =relation.rs= now collapses context when
+predicate vars span multiple relations (needed for chained fn-expr → predicate
+patterns like =[(re-pattern ?pat) ?re] [(re-find ?re ?name)]=).
+
+- *Tests:* 1 unit test in =fn_expr.rs= (=fn_re_pattern_identity=) +
+  2 integration tests in =parser_tests.rs= (=fn_expr_re_pattern_chain=,
+  =fn_expr_re_pattern_no_match=)
+
+** DONE 5.2 Collection input bindings =[?x ...]= [MEDIUM]
+
+*** Context
+
+Behave uses collection bindings extensively in =:in= clauses:
+
+#+begin_src clojure
+;; worksheet/subs.cljs:186
+[:find [?g ...] :in $ % ?ws-uuid :where ...]
+
+;; Also: collection *input* bindings (not just return):
+;; worksheet/events.cljs — passes vectors of UUIDs as query inputs
+#+end_src
+
+Current Rust =bind_inputs= (=query_parser.rs:765=) only handles scalar bindings —
+it substitutes =?var= → =Const(value)= in patterns. Collection bindings require a
+different mechanism: each element creates a separate binding context, and results
+are unioned.
+
+*** Implementation
+
+- *File:* =rust/persistent-sorted-set/src/query_parser.rs=
+- *File:* =rust/datascript-rs/src/wasm_datascript.rs=
+
+**** Parser changes
+
+Extend =parse_in= to recognize binding forms:
+
+#+begin_src
+:in $ %                       → [SrcVar, RulesVar]
+:in $ ?x                      → [SrcVar, ScalarBinding("?x")]
+:in $ [?x ...]                → [SrcVar, CollBinding("?x")]
+:in $ [[?a ?b]]               → [SrcVar, TupleBinding(["?a","?b"])]
+#+end_src
+
+Add =InBinding= enum to =ParsedQuery=:
+
+#+begin_src rust
+enum InBinding {
+    Scalar(Var),
+    Coll(Var),          // [?x ...] — one binding per element
+    Tuple(Vec<Var>),    // [[?a ?b]] — destructure single tuple
+}
+#+end_src
+
+**** Resolution changes
+
+For collection bindings: instead of substituting the variable with a constant,
+inject a new relation into the context containing one row per element:
+
+#+begin_src rust
+// For :in [?x ...] with input [1, 2, 3]:
+// Create Relation { attrs: {"?x": 0}, tuples: [[1], [2], [3]] }
+// Push into context before resolving where clauses
+#+end_src
+
+For tuple bindings: destructure the input tuple into individual variable bindings
+and substitute as scalars.
+
+**** WASM changes
+
+Extend =queryEdn= input parsing to detect collection/tuple values (JS Arrays)
+and pass them as the appropriate binding type.
+
+*** Steps
+
+1. Define =InBinding= enum (=Scalar=, =Coll=, =Tuple=) in =query_parser.rs=
+2. Add =pub in_bindings: Vec<InBinding>= field to =ParsedQuery=
+3. Update =parse_in= to detect binding forms:
+   - =EdnValue::Symbol(?x)= → =InBinding::Scalar(?x)=
+   - =EdnValue::Vector([Symbol(?x), Symbol("...")])= → =InBinding::Coll(?x)=
+   - =EdnValue::Vector([Vector([?a, ?b])])= → =InBinding::Tuple([?a, ?b])=
+4. Create =bind_collection_inputs= function:
+   - For =Coll(?x)= with input =[1, 2, 3]=: build =Relation { {?x: 0}, [[1],[2],[3]] }=
+   - For =Tuple([?a, ?b])= with input =[1, "x"]=: substitute as two scalars
+   - For =Scalar=: delegate to existing =bind_inputs=
+5. Update =resolve_query= to accept optional =initial_rels: Vec<Relation>= and
+   pre-seed the context with collection-binding relations
+6. Update =queryEdn= in =wasm_datascript.rs=: when an input value is a JS Array
+   and the corresponding =InBinding= is =Coll=, build the relation instead of
+   treating it as a scalar
+
+*** Tests
+
+- =parser_tests.rs=:
+  - =parse_in_collection_binding=: =[:find ?e :in $ [?uuid ...] :where ...]= parses to =InBinding::Coll=
+  - =parse_in_tuple_binding=: =[:find ?e :in $ [[?a ?b]] :where ...]= parses to =InBinding::Tuple=
+  - =coll_binding_query=: 3-element vector input → 3 matching results
+  - =coll_binding_empty=: empty vector input → 0 results
+  - =tuple_binding_query=: =[1, "Alice"]= destructured → matching result
+
+*** Documentation
+
+- Update =QUERY_ENGINE_PLAN.org= parser section to note collection/tuple binding support
+- Mark Phase 4.4 input bindings as complete (cross-reference from 5.2)
+
+*Implementation:*
+- =InBinding= enum (=Scalar=, =Coll=, =Tuple=) + =in_bindings= field on =ParsedQuery=
+- =parse_in= returns =(Vec<String>, Vec<InBinding>)=, detects =[?x ...]=, =[[?a ?b]]=
+- =build_collection_relations= creates initial relations for =Coll= bindings
+- =resolve_query_with_initial= pre-seeds context with collection relations
+- WASM =queryEdn= updated to split inputs into scalar/coll/tuple and route accordingly
+- Empty collection → empty relation → zero results (correct DataScript behavior)
+- *Tests:* 8 integration tests (parse coll/tuple/scalar/mixed bindings, query with
+  coll join, empty coll, single element, coll+join)
+
+** DONE 5.3 Database-aware fn-exprs: =get-else=, =get-some=, =missing?= [HIGH]
+
+*** Context
+
+Behave uses =get-else= in ~6 queries for optional attribute access with defaults:
+
+#+begin_src clojure
+;; worksheet/subs.cljs:506
+[(get-else $ ?gv :group-variable/hide-result? false) ?hide-result]
+#+end_src
+
+Unlike pure fn-exprs (=str=, =+=, etc.), these functions take the database (=$=)
+as their first argument and perform internal searches. In CLJS, they're
+implemented in =built_ins.cljc:12-31=:
+
+#+begin_src clojure
+(defn- -get-else [db e a else-val]
+  (if-some [datom (first (db/-search db [(db/entid db e) a]))]
+    (:v datom) else-val))
+
+(defn- -get-some [db e & as]
+  (reduce (fn [_ a]
+    (when-some [datom (first (db/-search db [(db/entid db e) a]))]
+      (reduced [(:a datom) (:v datom)]))) nil as))
+
+(defn- -missing? [db e a]
+  (nil? (get (de/entity db e) a)))
+#+end_src
+
+*** Implementation
+
+- *File:* =rust/persistent-sorted-set/src/fn_expr.rs= (or new =db_fn_expr.rs=)
+- *File:* =rust/persistent-sorted-set/src/relation.rs=
+- *File:* =rust/persistent-sorted-set/src/query_parser.rs=
+
+**** Approach A: Extend =Clause::FnExpr= with resolver access
+
+Add a new clause variant =Clause::DbFnExpr= that carries the function name, args,
+binding variable, and a flag indicating it needs resolver access:
+
+#+begin_src rust
+Clause::DbFnExpr {
+    name: String,       // "get-else", "get-some", "missing?"
+    args: Vec<PatternEl>,
+    binding: String,
+}
+#+end_src
+
+In =resolve_clause_depth=, the =DbFnExpr= arm has access to the =resolver:
+&R: PatternResolver= and can call =resolver.resolve_pattern()= internally.
+
+**** =get-else= implementation
+
+For each tuple, resolve =?e= and =?a= from context, search the database for
+=[e a]=. If found, bind the value; if not, bind the default (last arg).
+
+#+begin_src rust
+fn apply_get_else<R: PatternResolver>(
+    resolver: &R, ctx: &mut Vec<Relation>,
+    args: &[PatternEl], binding: &str
+) {
+    // args[0] = $ (source var, ignored — resolver IS the db)
+    // args[1] = ?e (entity ref variable)
+    // args[2] = :attr (constant keyword)
+    // args[3] = default-value (constant)
+    for rel in ctx.iter_mut() {
+        // For each tuple: search(e, a) → value or default
+        // Append result as new column `binding`
+    }
+}
+#+end_src
+
+**** Parser changes
+
+In =parse_pred_expr=, when the fn-expr name is =get-else=, =get-some=, or
+=missing?=, produce =Clause::DbFnExpr= instead of =Clause::FnExpr=. The
+distinguishing feature is that the first argument is a source variable (=$=).
+
+*** Steps
+
+1. Add =Clause::DbFnExpr { name, args, binding }= variant to =Clause= enum in =relation.rs=
+2. Add match arms for =DbFnExpr= in:
+   - =resolve_clause_depth= — dispatch to =apply_db_fn_expr(resolver, ctx, ...)=
+   - =rename_clause= — alpha-rename args + binding
+   - =bind_clause= — bind args from input parameters
+3. Update =parse_pred_expr= in =query_parser.rs=:
+   - When fn-expr has a binding AND first call arg is a source var (=$=):
+     if name ∈ ={get-else, get-some, missing?}= → produce =Clause::DbFnExpr=
+   - For =missing?= with no binding (predicate form): produce =DbFnExpr= with
+     empty binding string (filter mode)
+4. Implement =apply_db_fn_expr= (new function in =relation.rs= or =db_fn_expr.rs=):
+   - *=get-else=:* for each tuple, resolve =?e= → entity ID, search
+     =resolver.resolve_pattern([e, attr, _, _])=. If datom found → bind =(:v datom)=;
+     if not → bind default (last arg). Append as new column.
+   - *=get-some=:* for each tuple, try each attr arg in order; bind first found
+     value as new column. Drop tuple if none found.
+   - *=missing?=:* for each tuple, search =[e, attr]=; *keep* tuple only if NOT
+     found (predicate filter, no new column).
+5. Handle the =PatternResolver= dependency: =resolve_clause_depth= already has
+   =resolver: &R= in scope, so the =DbFnExpr= arm can pass it directly.
+
+*** Tests
+
+- =parser_tests.rs=:
+  - =parse_db_fn_get_else=: =[(get-else $ ?e :attr 0) ?val]= → =Clause::DbFnExpr=
+  - =db_fn_get_else_found=: entity has attr → returns actual value (not default)
+  - =db_fn_get_else_missing=: entity lacks attr → returns default value
+  - =db_fn_get_else_false_default=: default is =false= → correctly returns =false= (not nil)
+  - =db_fn_get_some_first=: first attr exists → returns its value
+  - =db_fn_get_some_second=: only second attr exists → skips first, returns second
+  - =db_fn_get_some_none=: no attrs exist → tuple dropped
+  - =db_fn_missing_pred=: =[(missing? $ ?e :attr)]= correctly filters
+  - =db_fn_combined=: query mixing =get-else= with patterns + predicates
+
+*** Documentation
+
+- Update =QUERY_ENGINE_PLAN.org= built-in predicates/functions to include =get-else=, =get-some=, =missing?=
+- Add =db_fn_expr= to file inventory if a new module is created
+
+*Implementation:*
+- =Clause::DbFnExpr { name, args, binding }= variant in =relation.rs=
+- Parser detects =get-else=, =get-some=, =missing?= by name and produces =DbFnExpr=
+- =apply_db_fn_expr= dispatches to =apply_get_else=, =apply_get_some=, =apply_missing=
+- Each function uses =resolver.resolve_pattern()= to search the DB per tuple
+- =get-else=: appends column with found value or default
+- =get-some=: tries attrs in order, drops tuple if none found
+- =missing?=: predicate (no binding), filters tuples where attr IS found
+- Context collapsed before evaluation so all vars are available
+- *Tests:* 9 integration tests (parse, found/missing/false-default, get-some
+  first/second/none, missing predicate, combined with other predicates)
+
+** DONE 5.4 Multiple database sources (=$ $ws %=) [HIGH — ~8 hours]
+
+*** Context
+
+Behave's most complex queries cross two databases — VMS (vocabulary) and the
+active worksheet:
+
+#+begin_src clojure
+;; solver/queries.cljs:23-24 — q-vms builds the query dynamically:
+(apply d/q query-after @@vms-conn @@store/conn rules args)
+;; where query-after = [:find ... :in $ $ws % ... :where [$ws ?e :attr ?v] ...]
+#+end_src
+
+The =$= prefix on patterns determines which database resolves them. =$ws= patterns
+search the worksheet DB; unprefixed =$= patterns search the VMS DB.
+
+*** Implementation
+
+- *File:* =rust/persistent-sorted-set/src/query_parser.rs=
+- *File:* =rust/persistent-sorted-set/src/relation.rs=
+- *File:* =rust/datascript-rs/src/wasm_datascript.rs=
+
+**** Parser changes
+
+1. Parse source variables in =:in= clause: track =$=, =$ws=, etc. as named sources
+2. Parse source variable prefixes on patterns: =[$ws ?e :attr ?v]= → attach source
+   name ="$ws"= to the =Clause::Pattern=
+3. Extend =Clause::Pattern= to carry an optional source name:
+
+#+begin_src rust
+Clause::Pattern {
+    source: Option<String>,  // None = default ($), Some("$ws") = named source
+    pattern: [PatternEl; 4],
+}
+#+end_src
+
+**** Resolver changes
+
+Replace the single =PatternResolver= with a =MultiResolver= that maps source
+names to resolvers:
+
+#+begin_src rust
+struct MultiResolver<'a> {
+    sources: HashMap<String, &'a dyn PatternResolver>,
+}
+
+impl PatternResolver for MultiResolver<'_> {
+    fn resolve_pattern(&self, pattern: &[PatternEl; 4]) -> Relation {
+        // Use default source "$"
+        self.sources["$"].resolve_pattern(pattern)
+    }
+
+    fn resolve_pattern_from(&self, source: &str, pattern: &[PatternEl; 4]) -> Relation {
+        self.sources[source].resolve_pattern(pattern)
+    }
+}
+#+end_src
+
+Update =resolve_clause_depth= to pass the source name from =Clause::Pattern= to
+the resolver.
+
+**** WASM changes
+
+Extend =queryEdn= to accept multiple database inputs. The =$= (default) is =self=
+(the WasmDataScript instance the method is called on). Additional sources (=$ws=)
+are passed as arguments:
+
+#+begin_src javascript
+// New: queryEdnMulti(queryEdn, rulesEdn, inputs, additionalSources)
+// where additionalSources = { "$ws": anotherWasmDataScript }
+db.queryEdnMulti(
+  '[:find ?x :in $ $ws % :where [$ws ?e :name ?x]]',
+  rulesEdn, inputs,
+  { "$ws": worksheetDb }
+)
+#+end_src
+
+Alternatively, keep the existing =queryEdn= signature and add a separate method
+for multi-source queries.
+
+**** CLJS routing
+
+In the integration layer (=core.cljc= or =impl_rust.cljs=), when =d/q= is called
+with multiple DB inputs, detect which are Rust-backed and construct the multi-source
+call:
+
+#+begin_src clojure
+;; If both DBs have registered Rust instances:
+(.queryEdnMulti vms-rust-db query-edn rules-edn inputs
+                #js {"$ws" ws-rust-db})
+;; If only one has Rust, fall back to CLJS for the whole query
+#+end_src
+
+*** Steps
+
+1. Extend =Clause::Pattern= from =([PatternEl; 4])= to
+   ={ source: Option<String>, pattern: [PatternEl; 4] }=
+2. Update *all* match sites for =Clause::Pattern= across:
+   - =relation.rs=: =resolve_clause_depth=, =rename_clause=, =collapse_ctx=
+   - =query_parser.rs=: =parse_pred_expr=, =bind_clause=, =parse_where_clause=
+   - =wasm_datascript.rs=: =clause_from_js=
+   - =tests/query_tests.rs=: all =Clause::Pattern(...)= constructors
+   - =tests/parser_tests.rs=: all pattern matches
+3. Update =parse_where_clause= to detect source-prefixed patterns:
+   - When first vector element is =Symbol= starting with =$= and is not =?=:
+     strip it as =source=, parse remaining 4 elements as pattern
+4. Update =parse_in= to track source var names (=$=, =$ws=) in addition to
+   binding vars
+5. Create =MultiResolver= struct in =relation.rs=:
+   - =sources: HashMap<String, &dyn PatternResolver>=
+   - Implements =PatternResolver= (dispatches by source, default =$=)
+   - Add =resolve_pattern_from(&self, source, pattern)= method
+6. Update =resolve_clause_depth= to read =source= from =Clause::Pattern= and
+   call =resolve_pattern_from= on the resolver
+7. Add =queryEdnMulti= WASM export in =wasm_datascript.rs=:
+   - Signature: =queryEdnMulti(query, rules, inputs, sources: JsValue)=
+   - Parse =sources= JS object: each key (="$ws"=) maps to a =WasmDataScript= ref
+   - Build =MultiResolver= with =self= as =$= and additional sources
+8. Add CLJS routing in =impl_rust.cljs=:
+   - In =q= function: detect multiple DB inputs from =:in= clause
+   - Map each to its registered Rust instance
+   - Call =.queryEdnMulti= if all have Rust; fall back to CLJS otherwise
+
+*** Tests
+
+- =parser_tests.rs=:
+  - =parse_source_prefix_pattern=: =[$ws ?e :name ?n]= → =source: Some("$ws")=
+  - =parse_default_source_pattern=: =[?e :name ?n]= → =source: None=
+  - =multi_source_query=: two =DataScriptDB= instances, join across both
+  - =multi_source_with_rules=: rule body references =$ws= source
+  - =multi_source_with_predicate=: predicate after cross-source join
+- =query_tests.rs= (optional):
+  - =multi_resolver_dispatch=: verify correct DB is queried per source
+
+*** Documentation
+
+- Update =QUERY_ENGINE_PLAN.org= WASM API reference with =queryEdnMulti= signature + example
+- Update =QUERY_ENGINE_PLAN.org= design decisions with multi-source architecture
+- Note: this is the largest structural change — =Clause::Pattern= shape change
+  touches many files. Consider doing this as a two-step commit:
+  (a) refactor =Pattern= to struct form with =source: None= everywhere (no behavior change)
+  (b) add actual multi-source resolution
+
+** Phase 5 verification
+
+For each sub-task (5.1–5.4):
+
+1. =cargo test= — new + existing tests pass
+2. =cargo check --target wasm32-unknown-unknown= — WASM compiles
+3. =clj-kondo= — no CLJS errors
+
+End-to-end parity:
+
+4. Extract actual behave queries exercising each gap (from the audit)
+5. Populate =DataScriptDB= with representative behave-like data
+6. Run each query through Rust and CLJS engines, assert identical results
+
+Documentation (after each sub-task):
+
+7. =QUERY_ENGINE_PLAN.org= — file inventory, test counts, API reference updated
+8. =DATASCRIPT_RUST.org= — mark sub-task DONE with implementation details

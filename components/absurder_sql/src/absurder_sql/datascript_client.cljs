@@ -15,7 +15,10 @@
          :db-name  "datascript-test.db"}))
 
 (def ^:private demo-schema
-  {:aka {:db/cardinality :db.cardinality/many}})
+  {:aka    {:db/cardinality :db.cardinality/many}
+   :parent {:db/valueType :db.type/ref}
+   :child  {:db/valueType :db.type/ref :db/isComponent true}
+   :email  {:db/unique :db.unique/identity}})
 
 ;;; UI Helpers
 
@@ -74,11 +77,91 @@
       (catch :default e
         (log! (str "QUERY ERROR: " (.-message e)))))))
 
+(defn- multi-source-query! []
+  (try
+    (let [{:keys [conn]} @state
+          ws-text  (.-value (.getElementById js/document "ws-tx-input"))
+          ws-data  (reader/read-string ws-text)
+          q-text   (.-value (.getElementById js/document "multi-q-input"))
+          q-form   (reader/read-string q-text)
+          ;; Create a workspace DB with a simple schema
+          js-schema (js-obj ":role" (js-obj) ":name" (js-obj))
+          ws-rust   (.emptyDb WasmDataScript js-schema)
+          ws-datoms (js/Array.)]
+      ;; Build datoms from tx data
+      (doseq [[idx m] (map-indexed vector ws-data)]
+        (let [eid (inc idx)]
+          (doseq [[k v] (dissoc m :db/id)]
+            (.push ws-datoms #js {:e eid :a (str ":" (name k)) :v v :tx 536870913}))))
+      (let [ws-db   (.withDatoms ws-rust ws-datoms)
+            db      (d/db conn)
+            results (impl-rust/q q-form db ws-db)]
+        (log! (str "Multi-source query returned " (count results) " result(s)."))
+        (render-results! results)))
+    (catch :default e
+      (log! (str "MULTI-SOURCE ERROR: " (or (.-message e) (str e)))))))
+
 (defn- dump-datoms! []
   (let [db     (d/db (:conn @state))
         datoms (vec (d/datoms db :eavt))]
     (log! (str (count datoms) " datom(s) in DB."))
     (render-results! (mapv str datoms))))
+
+(defn- entity! []
+  (let [text (.-value (.getElementById js/document "entity-input"))]
+    (try
+      (let [eid    (reader/read-string text)
+            rdb    (impl-rust/rust-db)]
+        (if rdb
+          ;; Rust-backed entity
+          (let [e (impl-rust/entity rdb eid)]
+            (if e
+              (let [touched (impl-rust/touch e)]
+                (log! (str "Entity " eid " (Rust): " (count (seq touched)) " attr(s)."))
+                (render-results! (into {:db/id eid} touched)))
+              (do
+                (log! (str "Entity " eid " not found in Rust DB."))
+                (render-results! nil))))
+          ;; CLJS fallback
+          (let [db (d/db (:conn @state))
+                e  (d/entity db eid)]
+            (if e
+              (let [touched (d/touch e)]
+                (log! (str "Entity " eid " (CLJS): " (count (seq touched)) " attr(s)."))
+                (render-results! (into {:db/id eid} touched)))
+              (do
+                (log! (str "Entity " eid " not found."))
+                (render-results! nil))))))
+      (catch :default e
+        (log! (str "ENTITY ERROR: " (or (.-message e) (str e))))))))
+
+(defn- retract-entity! []
+  (let [text (.-value (.getElementById js/document "entity-input"))]
+    (try
+      (let [eid  (reader/read-string text)
+            conn (:conn @state)
+            rdb  (impl-rust/rust-db)]
+        (if rdb
+          ;; Rust transact path
+          (let [result (impl-rust/transact-rust!
+                         [[:db/retractEntity eid]])]
+            (if result
+              (do
+                (log! (str "Retracted entity " eid " via Rust. "
+                           (count (:tx-data result)) " datom(s) retracted."))
+                (render-results! (:tx-data result)))
+              ;; Fallback to CLJS if Rust path returned nil
+              (let [report (d/transact! conn [[:db.fn/retractEntity eid]])]
+                (log! (str "Retracted entity " eid " via CLJS. "
+                           (count (:tx-data report)) " datom(s) retracted."))
+                (render-results! (mapv str (:tx-data report))))))
+          ;; CLJS only
+          (let [report (d/transact! conn [[:db.fn/retractEntity eid]])]
+            (log! (str "Retracted entity " eid ". "
+                       (count (:tx-data report)) " datom(s) retracted."))
+            (render-results! (mapv str (:tx-data report))))))
+      (catch :default e
+        (log! (str "RETRACT ERROR: " (or (.-message e) (str e))))))))
 
 (defn- save!
   "Store the current CLJS DB to SQLite via WasmDataScript (Rust-native persistence)."
@@ -271,6 +354,12 @@
                      "click" (fn [_] (query!)))
   (.addEventListener (.getElementById js/document "btn-datoms")
                      "click" (fn [_] (dump-datoms!)))
+  (.addEventListener (.getElementById js/document "btn-multi-query")
+                     "click" (fn [_] (multi-source-query!)))
+  (.addEventListener (.getElementById js/document "btn-entity")
+                     "click" (fn [_] (entity!)))
+  (.addEventListener (.getElementById js/document "btn-retract-entity")
+                     "click" (fn [_] (retract-entity!)))
   (.addEventListener (.getElementById js/document "btn-save")
                      "click" (fn [_] (save!)))
   (.addEventListener (.getElementById js/document "btn-restore")

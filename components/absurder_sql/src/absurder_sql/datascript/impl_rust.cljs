@@ -11,17 +11,54 @@
 
 ;;; State
 
-(defonce ^:private state (atom {:rust-db nil}))
+(defonce ^:private state (atom {:rust-db nil
+                                :cljs-db nil
+                                :named-dbs {}
+                                :named-cljs-dbs {}}))
+
+(defonce rust-enabled? (atom true))
 
 (defn set-rust-db!
-  "Set the WasmDataScript instance used by `q`, `pull`, and `pull-many`."
-  [rust-db]
-  (swap! state assoc :rust-db rust-db))
+  "Set the default WasmDataScript instance (VMS) used by `q`, `pull`, and `pull-many`.
+   Optionally pass the CLJS DB value for smart query routing (Phase 3)."
+  ([rust-db]
+   (swap! state assoc :rust-db rust-db))
+  ([rust-db cljs-db]
+   (swap! state assoc :rust-db rust-db :cljs-db cljs-db)))
 
 (defn rust-db
-  "Return the current WasmDataScript instance, or nil."
+  "Return the default WasmDataScript instance, or nil."
   []
   (:rust-db @state))
+
+(defn set-named-db!
+  "Register a named WasmDataScript instance (e.g. \"$ws\" for worksheet).
+   Optionally pass the CLJS DB value for smart query routing (Phase 3)."
+  ([db-name rust-db]
+   (swap! state assoc-in [:named-dbs db-name] rust-db))
+  ([db-name rust-db cljs-db]
+   (swap! state #(-> %
+                     (assoc-in [:named-dbs db-name] rust-db)
+                     (assoc-in [:named-cljs-dbs db-name] cljs-db)))))
+
+(defn named-db
+  "Return the WasmDataScript instance for `db-name`, or nil."
+  [db-name]
+  (get-in @state [:named-dbs db-name]))
+
+(defn remove-named-db!
+  "Remove a named WasmDataScript instance."
+  [db-name]
+  (swap! state #(-> %
+                    (update :named-dbs dissoc db-name)
+                    (update :named-cljs-dbs dissoc db-name))))
+
+;; Console toggle for dev
+(when (exists? js/window)
+  (set! js/window.toggleRustEngine
+        (fn []
+          (swap! rust-enabled? not)
+          (js/console.log (str "Rust engine " (if @rust-enabled? "ENABLED" "DISABLED"))))))
 
 ;;; Schema conversion (CLJS <-> JS for WasmDataScript)
 
@@ -142,13 +179,15 @@
 
 (defn- parse-in-bindings
   "Parse :in clause symbols into a vector of role tags.
-   $ -> :db, % -> :rules, anything else -> :param with its symbol name."
+   $ -> :db, % -> :rules, $ws -> {:source \"$ws\"}, anything else -> :param."
   [in-clause]
   (mapv (fn [sym]
-          (condp = (name sym)
-            "$" :db
-            "%" :rules
-            {:param (name sym)}))
+          (let [s (if (symbol? sym) (name sym) (str sym))]
+            (cond
+              (= s "$")              :db
+              (= s "%")              :rules
+              (str/starts-with? s "$") {:source s}
+              :else                    {:param s})))
         in-clause))
 
 (defn- js-pull-result->clj
@@ -279,17 +318,27 @@
     (js-datoms->clj-datoms (.search rdb e-js a-js v-js tx-js))))
 
 (defn- rust-datoms
-  "Get datoms from a named Rust index with bounds."
+  "Get datoms from a named Rust index with bounds.
+   c0-c3 are in index-specific order (DataScript convention):
+     :eavt → c0=e, c1=a, c2=v, c3=tx
+     :aevt → c0=a, c1=e, c2=v, c3=tx
+     :avet → c0=a, c1=v, c2=e, c3=tx
+   Maps them to the (e, a, v, tx) order that .datomsIndex expects."
   [rdb index c0 c1 c2 c3]
-  (let [from-e  (if (some? c0) c0 js/undefined)
-        from-a  (if (some? c1) (keyword->attr-str c1) js/undefined)
-        from-v  js/undefined
-        from-tx js/undefined
+  (let [;; Map index-specific component ordering to (e, a, v, tx)
+        [e a v tx] (case index
+                     (:eavt "eavt") [c0 c1 c2 c3]
+                     (:aevt "aevt") [c1 c0 c2 c3]
+                     (:avet "avet") [c2 c0 c1 c3]
+                     [c0 c1 c2 c3])
+        from-e  (if (some? e) e js/undefined)
+        from-a  (if (some? a) (keyword->attr-str a) js/undefined)
+        from-v  (if (some? v) (clj->js v) js/undefined)
+        from-tx (if (some? tx) tx js/undefined)
         to-e    js/undefined
         to-a    js/undefined
         to-v    js/undefined
         to-tx   js/undefined]
-    ;; For seek-datoms, we use the index with from bounds only
     (js-datoms->clj-datoms
       (.datomsIndex rdb (name index)
                     from-e from-a from-v from-tx
@@ -305,12 +354,12 @@
     (rust-search rdb pattern))
 
   db/IIndexAccess
-  (-datoms [_ index c0 c1 _c2 _c3]
-    (rust-datoms rdb index c0 c1 nil nil))
-  (-seek-datoms [_ index c0 c1 _c2 _c3]
-    (rust-datoms rdb index c0 c1 nil nil))
-  (-rseek-datoms [_ index c0 c1 _c2 _c3]
-    (reverse (rust-datoms rdb index c0 c1 nil nil)))
+  (-datoms [_ index c0 c1 c2 c3]
+    (rust-datoms rdb index c0 c1 c2 c3))
+  (-seek-datoms [_ index c0 c1 c2 c3]
+    (rust-datoms rdb index c0 c1 c2 c3))
+  (-rseek-datoms [_ index c0 c1 c2 c3]
+    (reverse (rust-datoms rdb index c0 c1 c2 c3)))
   (-index-range [_ _attr _start _end]
     nil))
 
@@ -322,10 +371,11 @@
 
 (defn entity
   "Create a DataScript entity backed by the Rust DB.
-   Same interface as d/entity. Returns nil if entity doesn't exist."
+   Same interface as d/entity. Returns nil if entity doesn't exist or rust-enabled? is false."
   ([eid]
-   (when-let [rdb (:rust-db @state)]
-     (entity rdb eid)))
+   (when @rust-enabled?
+     (when-let [rdb (:rust-db @state)]
+       (entity rdb eid))))
   ([db-or-rdb eid]
    (if (instance? RustDBProxy db-or-rdb)
      ;; Already a proxy — use directly
@@ -333,11 +383,19 @@
      ;; Assume it's a WasmDataScript — wrap it
      (when-let [rdb (if (instance? WasmDataScript db-or-rdb)
                       db-or-rdb
-                      (:rust-db @state))]
+                      (when @rust-enabled? (:rust-db @state)))]
        (let [js-schema (.schema rdb)
              schema    (js->schema js-schema)
              proxy     (make-rust-db-proxy rdb schema)]
          (de/entity proxy eid))))))
+
+(defn entity-ws
+  "Create a DataScript entity backed by the worksheet ('$ws') Rust DB.
+   Returns nil if rust-enabled? is false or no '$ws' DB exists."
+  [eid]
+  (when @rust-enabled?
+    (when-let [rdb (get-in @state [:named-dbs "$ws"])]
+      (entity rdb eid))))
 
 (defn touch
   "Eagerly load all attributes of a Rust-backed entity.
@@ -409,56 +467,109 @@
 
 ;;; Public API
 
+(defn- q-impl
+  "Core Rust query implementation. Uses `rdb` as the primary DB."
+  [rdb query-form inputs]
+  (let [parsed-q (dp/parse-query query-form)
+        q-map      (cond-> query-form
+                     (sequential? query-form) dp/query->map)
+        in-clause  (or (:in q-map) '[$])
+        bindings   (parse-in-bindings in-clause)
+        rules-str  (atom nil)
+        params     (atom [])
+        source-name (atom "")
+        source-db   (atom nil)
+        _          (dorun
+                    (map-indexed
+                     (fn [idx binding]
+                       (let [input (nth inputs idx nil)]
+                         (cond
+                           (= :db binding)      nil
+                           (= :rules binding)   (reset! rules-str
+                                                        (strip-edn-comments (pr-str input)))
+                           (:source binding)     (let [src-name (:source binding)]
+                                                   (reset! source-name src-name)
+                                                   (cond
+                                                     (instance? WasmDataScript input)
+                                                     (reset! source-db input)
+
+                                                     ;; Look up named DB if input is a CLJS DB
+                                                     :else
+                                                     (when-let [ndb (get-in @state [:named-dbs src-name])]
+                                                       (reset! source-db ndb))))
+                           (:param binding)      (swap! params conj
+                                                       #js [(str "?" (:param binding))
+                                                            (clj->js input)]))))
+                     bindings))
+        query-edn  (strip-edn-comments (pr-str query-form))
+        rules-edn  (or @rules-str "")
+        inputs-js  (apply array @params)
+        js-result  (if (seq @source-name)
+                     (.queryEdnMulti rdb query-edn rules-edn inputs-js
+                                     @source-name @source-db)
+                     (.queryEdn rdb query-edn rules-edn inputs-js))]
+    (rust-result->clj js-result parsed-q)))
+
+(defn- resolve-rust-db
+  "Given the first input (the $ DB), find the correct WasmDataScript instance.
+   Checks stored CLJS DB identity to route posh queries to the right Rust DB."
+  [db-input]
+  (let [s @state]
+    (or
+     ;; Check if DB matches the default VMS CLJS DB
+     (when (and (:cljs-db s) db-input (identical? db-input (:cljs-db s)))
+       (:rust-db s))
+     ;; Check named CLJS DBs (e.g. "$ws" worksheet)
+     (some (fn [[db-name cljs-db]]
+             (when (and cljs-db (identical? db-input cljs-db))
+               (get (:named-dbs s) db-name)))
+           (:named-cljs-dbs s))
+     ;; Default to VMS Rust DB
+     (:rust-db s))))
+
 (defn q
   "Query via the Rust engine when a rust-db is available.
    Same interface as d/q. Falls back to d/q for unsupported features
-   or when no rust-db exists."
+   or when no rust-db exists. Supports multi-source queries (`:in $ $ws`)
+   by routing through `queryEdnMulti` and looking up named DBs.
+   Detects the correct Rust DB by comparing the input DB identity with
+   tracked CLJS DBs (for posh/re-posh reactive query routing)."
   [query-form & inputs]
-  (let [rdb      (:rust-db @state)
-        parsed-q (dp/parse-query query-form)]
-    (if (or (nil? rdb) (unsupported-find? parsed-q))
+  (if (not @rust-enabled?)
+    (apply d/q query-form inputs)
+    (let [rdb (resolve-rust-db (first inputs))]
+      (if (nil? rdb)
+        (apply d/q query-form inputs)
+        (q-impl rdb query-form inputs)))))
+
+(defn q-ws
+  "Query using the worksheet Rust DB ('$ws') as the primary source.
+   Falls back to d/q when rust-enabled? is false or no '$ws' DB exists."
+  [query-form & inputs]
+  (let [rdb (get-in @state [:named-dbs "$ws"])]
+    (if (or (not @rust-enabled?) (nil? rdb))
       (apply d/q query-form inputs)
-      (let [q-map      (cond-> query-form
-                         (sequential? query-form) dp/query->map)
-            in-clause  (or (:in q-map) '[$])
-            bindings   (parse-in-bindings in-clause)
-            rules-str  (atom nil)
-            params     (atom [])
-            _          (dorun
-                        (map-indexed
-                         (fn [idx binding]
-                           (let [input (nth inputs idx nil)]
-                             (cond
-                               (= :db binding)     nil
-                               (= :rules binding)  (reset! rules-str
-                                                           (strip-edn-comments (pr-str input)))
-                               (map? binding)       (swap! params conj
-                                                          #js [(str "?" (:param binding))
-                                                               (clj->js input)]))))
-                         bindings))
-            query-edn  (strip-edn-comments (pr-str query-form))
-            rules-edn  (or @rules-str "")
-            inputs-js  (apply array @params)
-            js-result  (.queryEdn rdb query-edn rules-edn inputs-js)]
-        (rust-result->clj js-result parsed-q)))))
+      (q-impl rdb query-form inputs))))
 
 (defn pull
   "Pull an entity via the Rust engine. Same interface as d/pull.
-   Falls back to d/pull if no rust-db is available."
+   Falls back to d/pull if rust-enabled? is false or no rust-db exists."
   [db pattern eid]
-  (if-let [rdb (:rust-db @state)]
-    (let [pattern-edn (strip-edn-comments (pr-str pattern))
-          js-result   (.pull rdb pattern-edn (eid->js eid))]
-      (js-pull-result->clj js-result))
-    (d/pull db pattern eid)))
+  (let [rdb (:rust-db @state)]
+    (if (or (not @rust-enabled?) (nil? rdb))
+      (d/pull db pattern eid)
+      (let [pattern-edn (strip-edn-comments (pr-str pattern))
+            js-result   (.pull rdb pattern-edn (eid->js eid))]
+        (js-pull-result->clj js-result)))))
 
 (defn pull-many
   "Pull multiple entities via the Rust engine. Same interface as d/pull-many.
-   Falls back to d/pull-many if no rust-db is available."
+   Falls back to d/pull-many if rust-enabled? is false or no rust-db exists."
   [db pattern eids]
-  (if-let [rdb (:rust-db @state)]
-    (let [pattern-edn (strip-edn-comments (pr-str pattern))
-          eids-js     (apply array (map eid->js eids))
-          js-result   (.pullMany rdb pattern-edn eids-js)]
-      (mapv js-pull-result->clj (array-seq js-result)))
-    (d/pull-many db pattern eids)))
+  (let [rdb (:rust-db @state)]
+    (if (or (not @rust-enabled?) (nil? rdb))
+      (d/pull-many db pattern eids)
+      (let [pattern-edn (strip-edn-comments (pr-str pattern))
+            eids-js     (apply array (map eid->js eids))
+            js-result   (.pullMany rdb pattern-edn eids-js)]
+        (mapv js-pull-result->clj (array-seq js-result))))))

@@ -131,26 +131,28 @@ CLJS fallback retained only for non-Rust DBs (FilteredDB, plain collections).
 | =rust/persistent-sorted-set/src/fn_expr.rs=         | ~50 built-in query functions + fn-expr evaluation |
 | =rust/persistent-sorted-set/src/transact.rs=        | Transaction processing + =TransactableDB= trait  |
 | =rust/persistent-sorted-set/tests/transact_tests.rs= | 31 tests: transact operations + EDN integration |
+| =rust/persistent-sorted-set/tests/behave_integration_tests.rs= | 28 end-to-end behave query patterns |
 | =rust/datascript-rs/src/query.rs=                   | =PatternResolver= for =WasmDataScript= + helpers |
-| =rust/datascript-rs/src/wasm_datascript.rs=         | WASM exports + JS↔Rust parsing + transact        |
+| =rust/datascript-rs/src/wasm_datascript.rs=         | WASM exports + JS↔Rust parsing + transact + multi-source |
 
 ** Test count
 
 | Test file                    | Tests | What's covered                                    |
 |------------------------------+-------+---------------------------------------------------|
 | =relation.rs= (unit)        |    30 | hash_join, sum_rel, prod_rel, subtract, collapse   |
-| =query_tests.rs=             |    38 | Pattern queries, joins, NOT, OR, predicates, rules |
-| =parser_tests.rs=            |    91 | Find specs, clauses, values, rules, input binding, |
-|                              |       | aggregates, fn-exprs, extended predicates             |
+| =query_tests.rs=             |    42 | Pattern queries, joins, NOT, OR, predicates, rules, multi-source |
+| =parser_tests.rs=            |   110 | Find specs, clauses, values, rules, input binding, |
+|                              |       | aggregates, fn-exprs, predicates, coll, db-fns        |
 | =query_parser.rs= (unit)    |    19 | Parser internals, roundtrip                        |
 | =db.rs= (unit)              |    15 | with_datom, search dispatch, datoms/seek/rseek     |
 | =aggregates.rs= (unit)      |    13 | Sum, avg, median, variance, stddev, min/max, etc.  |
-| =fn_expr.rs= (unit)         |    20 | str, +, -, name, subs, predicates, re-find, etc.   |
+| =fn_expr.rs= (unit)         |    21 | str, +, -, name, subs, predicates, re-find, re-pattern |
 | =transact.rs= (unit)        |     7 | EDN parser internals                               |
 | =transact_tests.rs=          |    31 | Transact ops, tempids, upsert, retract, EDN        |
+| =behave_integration_tests.rs= |    28 | End-to-end behave query patterns, multi-source     |
 | Other PSS tests              |   270 | B+ tree, storage, serialization                    |
 |------------------------------+-------+---------------------------------------------------|
-| *Total*                      |   556 |                                                    |
+| *Total*                      |   613 |                                                    |
 
 ** WASM API reference
 
@@ -199,6 +201,43 @@ db.queryEdn(
   [["?root", 1]]
 )
 // → [["child_a"], ["child_b"], ["grandchild"]]
+#+end_src
+
+*** =queryEdnMulti(queryEdn: string, rulesEdn: string, inputs: Array, sourceName: string, sourceDb?: WasmDataScript): any=
+
+Multi-source variant of =queryEdn=. Adds a named database source that
+patterns can reference via source-prefixed clauses (e.g. =[$ws ?e :name ?n]=).
+
+The default source =$= is the instance the method is called on. One
+additional source can be provided via =sourceName= / =sourceDb=.
+
+#+begin_src javascript
+// mainDb has people with :name and :age
+// wsDb has workspace members with :name and :role
+const mainDb = WasmDataScript.emptyDb({":name": {}, ":age": {}});
+const wsDb   = WasmDataScript.emptyDb({":name": {}, ":role": {}});
+// ... transact data into both ...
+
+// Cross-DB join: find names+ages from main where workspace has a role
+mainDb.queryEdnMulti(
+  '[:find ?n ?a ?role :in $ $ws :where [$ ?e :name ?n] [$ ?e :age ?a] [$ws ?w :name ?n] [$ws ?w :role ?role]]',
+  '', [],
+  '$ws', wsDb
+)
+// → [["Maksim", 45, "admin"], ["Ivan", 20, "editor"]]
+#+end_src
+
+*CLJS usage:* The =impl-rust/q= function detects =:in $ $ws= automatically
+and routes through =queryEdnMulti= when a =WasmDataScript= instance is
+provided as the corresponding input.
+
+#+begin_src clojure
+(impl-rust/q '[:find ?n ?role
+               :in $ $ws
+               :where [$ ?e :name ?n]
+                      [$ws ?w :name ?n]
+                      [$ws ?w :role ?role]]
+             db ws-db)
 #+end_src
 
 *** =queryClauses(clauses: Array, rules: Object, findVars: Array): Array=
@@ -343,6 +382,12 @@ Two implementations are provided:
 =number?=, =string?=, =keyword?=, =not=, =empty?=, =re-find=, =re-matches=,
 =clojure.string/blank?=, =clojure.string/includes?=, =clojure.string/starts-with?=,
 =clojure.string/ends-with?=, and all comparison/arithmetic fns.
+
+*Database-aware (via =Clause::DbFnExpr=, access resolver):*
+
+=get-else=, =get-some=, =missing?= — search the database per-tuple during query
+evaluation. =get-else= returns found value or default; =get-some= tries attrs in
+order; =missing?= filters tuples where attr exists.
 
 Unknown predicates pass through without filtering.
 
