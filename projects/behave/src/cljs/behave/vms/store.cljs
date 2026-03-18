@@ -134,84 +134,45 @@
 
 ;;; Public Fns
 
-(defn- entity-maps->cljs-datoms
-  "Expand entity maps [{:db/id 1 :name \"Alice\"} ...] into a vector of CLJS
-   Datom objects. Handles multi-valued attributes (vectors/sets → one datom per
-   element). Pure CLJS, no WASM calls."
-  [entities]
-  (let [tx absurder-sql.datascript.db/tx0]
-    (persistent!
-      (reduce
-        (fn [acc entity]
-          (let [eid (:db/id entity)]
-            (reduce-kv
-              (fn [acc k v]
-                (if (= k :db/id)
-                  acc
-                  (if (and (coll? v) (not (string? v)) (not (map? v)))
-                    ;; Multi-valued: one datom per element
-                    (reduce (fn [acc elem]
-                              (conj! acc (absurder-sql.datascript.db/datom eid k elem tx)))
-                            acc v)
-                    (conj! acc (absurder-sql.datascript.db/datom eid k v tx)))))
-              acc entity)))
-        (transient [])
-        entities))))
-
-(defn- entity-maps->datom-array
-  "Convert a seq of entity maps [{:db/id 1 :name \"Alice\"} ...] to a flat
-   JS array of {e, a, v, tx} datom objects suitable for WasmDataScript.withDatoms.
-   Handles multi-valued attributes (vectors/sets → one datom per element)."
-  [entities schema]
-  (let [arr     (js/Array.)
-        ref-attrs (into #{}
-                    (keep (fn [[k v]]
-                            (when (= :db.type/ref (:db/valueType v)) k)))
-                    schema)]
+(defn- build-rust-db-from-entities!
+  "Build a WasmDataScript directly from entity maps.
+   Single WASM call via transactBulkString — no CLJS DataScript intermediary."
+  [entities js-schema]
+  (let [rdb (.emptyDb WasmDataScript js-schema)
+        sb  (js/Array.)]
     (doseq [entity entities
             :let [eid (:db/id entity)]
             [k v] (dissoc entity :db/id)
             :let [a-str (if (namespace k)
-                          (str ":" (namespace k) "/" (name k))
-                          (str ":" (name k)))]
-            ;; Expand multi-valued attrs (vectors/sets) into individual datoms
+                          (str (namespace k) "/" (name k))
+                          (name k))]
             val (if (and (or (vector? v) (set? v)) (not (string? v)))
-                  v
-                  [v])]
-      (.push arr #js {:e  eid
-                      :a  a-str
-                      :v  (cond
-                            (keyword? val) (if (namespace val)
-                                            (str ":" (namespace val) "/" (name val))
-                                            (str ":" (name val)))
-                            (and (integer? val) (contains? ref-attrs k)) val
-                            :else val)
-                      :tx 536870913}))
-    arr))
+                  v [v])]
+      (.push sb (str eid "\t" a-str "\t"
+                     (impl-rust/value-type+str val) "\t"
+                     536870913)))
+    (.transactBulkString rdb (.join sb "\n"))
+    rdb))
 
 (defn init! [{:keys [datoms schema]}]
-  (if @vms-conn
-    @vms-conn
-    ;; Fast path: expand entity maps → CLJS Datom objects (pure CLJS, no WASM),
-    ;; then init-db builds all 3 indexes via from-sorted-array (3 WASM calls).
-    ;; ~100x fewer WASM boundary crossings than d/transact.
-    (let [cljs-dats (entity-maps->cljs-datoms datoms)
-          cljs-db   (d/init-db cljs-dats schema)
-          conn      (d/conn-from-db cljs-db)]
-      (reset! vms-conn conn)
-      ;; Build Rust DB deferred (non-blocking, VMS is read-only)
-      (js/setTimeout
-        (fn []
-          (let [rdb (impl-rust/sync-to-rust! @conn)]
-            (impl-rust/set-rust-db! rdb @conn)))
-        0)
-      (posh! conn)
-      ;; Force posh to evaluate queries against the pre-loaded DB.
-      ;; Without this, posh's lazy reactions see an empty result because
-      ;; init-db bypassed d/transact (no after-transact event fired).
-      (d/transact conn [[:db/add 0 :posh/init true]])
-      (d/transact conn [[:db/retract 0 :posh/init true]])
-      conn)))
+  (let [js-schema (impl-rust/schema->js schema)
+        rdb       (build-rust-db-from-entities! datoms js-schema)
+        cljs-db   (impl-rust/sync-from-rust rdb)
+        conn      (d/conn-from-db cljs-db)]
+    (reset! vms-conn conn)
+    ;; Register rust-db BEFORE posh so that queries during the sentinel
+    ;; transacts route through Rust instead of falling back to CLJS d/q.
+    (impl-rust/set-rust-db! rdb @conn)
+    (posh! conn)
+    ;; Force posh to evaluate queries against the pre-loaded DB.
+    ;; Without this, posh's lazy reactions see an empty result because
+    ;; init-db bypassed d/transact (no after-transact event fired).
+    (let [sentinel (inc (:max-eid @conn))]
+      (d/transact conn [[:db/add sentinel :posh/init true]])
+      (d/transact conn [[:db/retract sentinel :posh/init true]]))
+    ;; Update cljs-db identity to match the post-transact DB value.
+    (impl-rust/set-rust-db! rdb @conn)
+    conn))
 
 ;;; Effects
 

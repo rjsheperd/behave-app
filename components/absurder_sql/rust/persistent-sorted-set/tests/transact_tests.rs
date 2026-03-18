@@ -767,3 +767,42 @@ fn ref_tempid_in_value() {
     assert_eq!(child_parent.len(), 1);
     assert_eq!(child_parent[0].v, Value::Ref(parent_eid));
 }
+
+// ---------------------------------------------------------------------------
+// Map entity with cardinality-many vector values (explode)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn map_entity_multival_vector_explode() {
+    let mut db = empty_db();
+    let entities = parse_tx_edn(
+        r#"[{:aka ["Alice" "Bob" "Charlie"]}]"#,
+        &db.rschema,
+    ).unwrap();
+    let report = transact(&mut db, entities).unwrap();
+
+    assert_eq!(report.tx_data.len(), 3, "each vector element becomes a separate datom");
+    assert_eq!(db.count(), 3);
+
+    let datoms = db.search(None, Some(&kw("aka")), None, None);
+    let vals: Vec<&str> = datoms.iter().map(|d| match &d.v {
+        Value::Str(s) => s.as_str(),
+        other => panic!("Expected Str, got {:?}", other),
+    }).collect();
+    assert!(vals.contains(&"Alice"));
+    assert!(vals.contains(&"Bob"));
+    assert!(vals.contains(&"Charlie"));
+}
+
+#[test]
+fn map_entity_multival_keyword_vector_explode() {
+    let mut db = empty_db();
+    let entities = parse_tx_edn(
+        r#"[{:aka [:surface :contain :crown]}]"#,
+        &db.rschema,
+    ).unwrap();
+    let report = transact(&mut db, entities).unwrap();
+
+    assert_eq!(report.tx_data.len(), 3, "each keyword becomes a separate datom");
+    assert_eq!(db.count(), 3);
+}

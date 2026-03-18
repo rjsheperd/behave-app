@@ -41,6 +41,32 @@ const TXMAX: i64 = 0x7FFFFFFF;
 const METADATA_ADDR: i64 = 0;
 
 // ---------------------------------------------------------------------------
+// Bulk string helpers
+// ---------------------------------------------------------------------------
+
+/// Unescape `\\t`, `\\n`, `\\\\` in string values from JS bulk serialization.
+fn unescape_bulk_str(s: &str) -> String {
+    if !s.contains('\\') {
+        return s.to_string();
+    }
+    let mut out = String::with_capacity(s.len());
+    let mut chars = s.chars();
+    while let Some(c) = chars.next() {
+        if c == '\\' {
+            match chars.next() {
+                Some('t') => out.push('\t'),
+                Some('n') => out.push('\n'),
+                Some('\\') => out.push('\\'),
+                Some(other) => { out.push('\\'); out.push(other); }
+                None => out.push('\\'),
+            }
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
 // Schema parsing from JS
 // ---------------------------------------------------------------------------
 
@@ -577,7 +603,7 @@ impl WasmDataScript {
                     }
                 }
                 "b" => Value::Bool(v_data == "true" || v_data == "1"),
-                _ => Value::Str(v_data.to_string()),
+                _ => Value::Str(unescape_bulk_str(v_data)),
             };
 
             if e > max_eid { max_eid = e; }
@@ -617,6 +643,63 @@ impl WasmDataScript {
         avet_sorted.sort_by(|a, b| cmp_datoms(IndexType::AVET, a, b));
         self.avet = PersistentSortedSet::from_sorted(
             avet_sorted, comparator_for_index(IndexType::AVET));
+    }
+
+    /// Apply resolved tx-data datoms incrementally (add/retract).
+    /// Same tab-delimited format as `transactBulkString`, but applies each
+    /// datom individually via `apply_datom` instead of rebuilding indexes.
+    /// Negative tx values indicate retractions.
+    #[wasm_bindgen(js_name = "applyTxData")]
+    pub fn apply_tx_data(&mut self, data: &str) {
+        use persistent_sorted_set::datom::{Attr, Datom, Value};
+        use persistent_sorted_set::transact::TransactableDB;
+
+        for line in data.split('\n') {
+            if line.is_empty() { continue; }
+            let mut parts = line.splitn(5, '\t');
+            let e: i64 = parts.next().unwrap_or("0").parse().unwrap_or(0);
+            let a_str = parts.next().unwrap_or("");
+            let v_type = parts.next().unwrap_or("s");
+            let v_data = parts.next().unwrap_or("");
+            let tx: i64 = parts.next().unwrap_or("0").parse().unwrap_or(0);
+
+            let attr = if a_str.is_empty() {
+                None
+            } else if let Some(idx) = a_str.find('/') {
+                Some(Attr::Keyword {
+                    ns: Some(a_str[..idx].to_string()),
+                    name: a_str[idx + 1..].to_string(),
+                })
+            } else {
+                Some(Attr::Keyword { ns: None, name: a_str.to_string() })
+            };
+
+            let val = match v_type {
+                "n" => {
+                    let n: f64 = v_data.parse().unwrap_or(0.0);
+                    if n.fract() == 0.0 && n >= i64::MIN as f64 && n <= i64::MAX as f64 {
+                        Value::Long(n as i64)
+                    } else {
+                        Value::Double(n)
+                    }
+                }
+                "r" => Value::Ref(v_data.parse().unwrap_or(0)),
+                "k" => {
+                    if let Some(idx) = v_data.find('/') {
+                        Value::Keyword(Attr::Keyword {
+                            ns: Some(v_data[..idx].to_string()),
+                            name: v_data[idx + 1..].to_string(),
+                        })
+                    } else {
+                        Value::Keyword(Attr::Keyword { ns: None, name: v_data.to_string() })
+                    }
+                }
+                "b" => Value::Bool(v_data == "true"),
+                _ => Value::Str(unescape_bulk_str(v_data)),
+            };
+
+            self.apply_datom(Datom::new(e, attr, val, tx));
+        }
     }
 
     /// Count of datoms in the EAVT index.
@@ -666,34 +749,22 @@ impl WasmDataScript {
                 Self::slice_to_array(&self.eavt, &from, &to)
             }
             (Some(e), Some(a), None, None) => {
-                let from = Datom::new(e, Some(a.clone()), Value::Nil, TX0);
-                let to = Datom::new(e, Some(a.clone()), Value::Nil, TXMAX);
-                Self::slice_to_array(&self.eavt, &from, &to)
+                Self::slice_to_array(&self.eavt, &Datom::min_for_ea(e, a), &Datom::max_for_ea(e, a))
             }
             (Some(e), Some(a), None, Some(tx)) => {
-                let from = Datom::new(e, Some(a.clone()), Value::Nil, TX0);
-                let to = Datom::new(e, Some(a.clone()), Value::Nil, TXMAX);
-                Self::slice_filter_tx(&self.eavt, &from, &to, tx)
+                Self::slice_filter_tx(&self.eavt, &Datom::min_for_ea(e, a), &Datom::max_for_ea(e, a), tx)
             }
             (Some(e), None, None, None) => {
-                let from = Datom::new(e, None, Value::Nil, TX0);
-                let to = Datom::new(e, None, Value::Nil, TXMAX);
-                Self::slice_to_array(&self.eavt, &from, &to)
+                Self::slice_to_array(&self.eavt, &Datom::min_for_e(e), &Datom::max_for_e(e))
             }
             (Some(e), None, Some(v), None) => {
-                let from = Datom::new(e, None, Value::Nil, TX0);
-                let to = Datom::new(e, None, Value::Nil, TXMAX);
-                Self::slice_filter_v(&self.eavt, &from, &to, v)
+                Self::slice_filter_v(&self.eavt, &Datom::min_for_e(e), &Datom::max_for_e(e), v)
             }
             (Some(e), None, None, Some(tx)) => {
-                let from = Datom::new(e, None, Value::Nil, TX0);
-                let to = Datom::new(e, None, Value::Nil, TXMAX);
-                Self::slice_filter_tx(&self.eavt, &from, &to, tx)
+                Self::slice_filter_tx(&self.eavt, &Datom::min_for_e(e), &Datom::max_for_e(e), tx)
             }
             (Some(e), None, Some(v), Some(tx)) => {
-                let from = Datom::new(e, None, Value::Nil, TX0);
-                let to = Datom::new(e, None, Value::Nil, TXMAX);
-                Self::slice_filter_v_tx(&self.eavt, &from, &to, v, tx)
+                Self::slice_filter_v_tx(&self.eavt, &Datom::min_for_e(e), &Datom::max_for_e(e), v, tx)
             }
             (None, Some(a), Some(v), None) => {
                 if self.is_indexed(a) {
@@ -701,8 +772,8 @@ impl WasmDataScript {
                     let to = Datom::new(EMAX, Some(a.clone()), v.clone(), TXMAX);
                     Self::slice_to_array(&self.avet, &from, &to)
                 } else {
-                    let from = Datom::new(E0, Some(a.clone()), Value::Nil, TX0);
-                    let to = Datom::new(EMAX, Some(a.clone()), Value::Nil, TXMAX);
+                    let from = Datom::new(E0, Some(a.clone()), Value::min_sentinel(), TX0);
+                    let to = Datom::new(EMAX, Some(a.clone()), Value::max_sentinel(), TXMAX);
                     Self::slice_filter_v(&self.aevt, &from, &to, v)
                 }
             }
@@ -712,19 +783,19 @@ impl WasmDataScript {
                     let to = Datom::new(EMAX, Some(a.clone()), v.clone(), TXMAX);
                     Self::slice_filter_tx(&self.avet, &from, &to, tx)
                 } else {
-                    let from = Datom::new(E0, Some(a.clone()), Value::Nil, TX0);
-                    let to = Datom::new(EMAX, Some(a.clone()), Value::Nil, TXMAX);
+                    let from = Datom::new(E0, Some(a.clone()), Value::min_sentinel(), TX0);
+                    let to = Datom::new(EMAX, Some(a.clone()), Value::max_sentinel(), TXMAX);
                     Self::slice_filter_v_tx(&self.aevt, &from, &to, v, tx)
                 }
             }
             (None, Some(a), None, None) => {
-                let from = Datom::new(E0, Some(a.clone()), Value::Nil, TX0);
-                let to = Datom::new(EMAX, Some(a.clone()), Value::Nil, TXMAX);
+                let from = Datom::new(E0, Some(a.clone()), Value::min_sentinel(), TX0);
+                let to = Datom::new(EMAX, Some(a.clone()), Value::max_sentinel(), TXMAX);
                 Self::slice_to_array(&self.aevt, &from, &to)
             }
             (None, Some(a), None, Some(tx)) => {
-                let from = Datom::new(E0, Some(a.clone()), Value::Nil, TX0);
-                let to = Datom::new(EMAX, Some(a.clone()), Value::Nil, TXMAX);
+                let from = Datom::new(E0, Some(a.clone()), Value::min_sentinel(), TX0);
+                let to = Datom::new(EMAX, Some(a.clone()), Value::max_sentinel(), TXMAX);
                 Self::slice_filter_tx(&self.aevt, &from, &to, tx)
             }
             (None, None, Some(v), None) => {

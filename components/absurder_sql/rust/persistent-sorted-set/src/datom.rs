@@ -136,6 +136,32 @@ impl PartialEq for Datom {
     }
 }
 
+impl Attr {
+    /// Attr that sorts before all real keywords (empty name, no namespace).
+    pub fn min_sentinel() -> Self {
+        Attr::Keyword { ns: None, name: String::new() }
+    }
+
+    /// Attr that sorts after all real keywords.
+    /// `Attr::Str` sorts after `Attr::Keyword` in `Ord`, and `\u{FFFF}`
+    /// sorts after all real string attrs.
+    pub fn max_sentinel() -> Self {
+        Attr::Str("\u{FFFF}".to_string())
+    }
+}
+
+impl Value {
+    /// Value that sorts before all real values (lowest `type_rank`).
+    pub fn min_sentinel() -> Self {
+        Value::Bool(false)
+    }
+
+    /// Value that sorts after all real values (highest `type_rank`).
+    pub fn max_sentinel() -> Self {
+        Value::Bytes(vec![0xFF])
+    }
+}
+
 impl Datom {
     pub fn new(e: i64, a: Option<Attr>, v: Value, tx: i64) -> Self {
         Self {
@@ -151,6 +177,56 @@ impl Datom {
     /// Transaction id without the added/retracted flag.
     pub fn tx_id(&self) -> i64 {
         if self.tx < 0 { -self.tx } else { self.tx }
+    }
+
+    /// Lower bound for slicing all datoms with entity `e`.
+    pub fn min_for_e(e: i64) -> Self {
+        Datom::new(e, Some(Attr::min_sentinel()), Value::min_sentinel(), 0)
+    }
+
+    /// Upper bound for slicing all datoms with entity `e`.
+    pub fn max_for_e(e: i64) -> Self {
+        Datom::new(e, Some(Attr::max_sentinel()), Value::max_sentinel(), i64::MAX)
+    }
+
+    /// Lower bound for slicing datoms with entity `e` and attribute `a`.
+    pub fn min_for_ea(e: i64, a: &Attr) -> Self {
+        Datom::new(e, Some(a.clone()), Value::min_sentinel(), 0)
+    }
+
+    /// Upper bound for slicing datoms with entity `e` and attribute `a`.
+    pub fn max_for_ea(e: i64, a: &Attr) -> Self {
+        Datom::new(e, Some(a.clone()), Value::max_sentinel(), i64::MAX)
+    }
+
+    /// Normalize a boundary datom used as a lower bound for slicing.
+    /// Replaces `None` attr with min sentinel and `Nil` value with min sentinel,
+    /// so the B+ tree binary search finds the true first datom.
+    pub fn as_lower_bound(self) -> Self {
+        let a = match self.a {
+            None => Some(Attr::min_sentinel()),
+            some => some,
+        };
+        let v = match self.v {
+            Value::Nil => Value::min_sentinel(),
+            other => other,
+        };
+        Datom::new(self.e, a, v, self.tx)
+    }
+
+    /// Normalize a boundary datom used as an upper bound for slicing.
+    /// Replaces `None` attr with max sentinel and `Nil` value with max sentinel,
+    /// so the B+ tree binary search finds the true last datom.
+    pub fn as_upper_bound(self) -> Self {
+        let a = match self.a {
+            None => Some(Attr::max_sentinel()),
+            some => some,
+        };
+        let v = match self.v {
+            Value::Nil => Value::max_sentinel(),
+            other => other,
+        };
+        Datom::new(self.e, a, v, self.tx)
     }
 }
 

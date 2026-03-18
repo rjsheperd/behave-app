@@ -660,12 +660,12 @@ impl WasmPSS {
         let from_opt = if from.is_undefined() || from.is_null() {
             None
         } else {
-            Some(datom_from_js(&from))
+            Some(datom_from_js(&from).as_lower_bound())
         };
         let to_opt = if to.is_undefined() || to.is_null() {
             None
         } else {
-            Some(datom_from_js(&to))
+            Some(datom_from_js(&to).as_upper_bound())
         };
         self.inner
             .slice(from_opt.as_ref(), to_opt.as_ref())
@@ -677,12 +677,12 @@ impl WasmPSS {
         let from_opt = if from.is_undefined() || from.is_null() {
             None
         } else {
-            Some(datom_from_js(&from))
+            Some(datom_from_js(&from).as_lower_bound())
         };
         let to_opt = if to.is_undefined() || to.is_null() {
             None
         } else {
-            Some(datom_from_js(&to))
+            Some(datom_from_js(&to).as_upper_bound())
         };
         self.inner
             .rslice(from_opt.as_ref(), to_opt.as_ref())

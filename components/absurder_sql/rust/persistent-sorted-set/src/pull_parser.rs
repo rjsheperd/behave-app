@@ -39,6 +39,28 @@ pub struct PullPattern {
     pub wildcard: bool,
 }
 
+/// Default wildcard pattern for auto-expanding component refs.
+/// Includes `:db/id` in `attrs` (mirrors CLJS `default-pattern-component`).
+pub fn default_wildcard_pattern() -> PullPattern {
+    let db_id = Attr::Keyword {
+        ns: Some("db".into()),
+        name: "id".into(),
+    };
+    PullPattern {
+        attrs: vec![PullAttr {
+            name: db_id.clone(),
+            as_name: db_id,
+            reverse: false,
+            multival: false,
+            ref_type: false,
+            component: false,
+            pattern: None,
+        }],
+        reverse_attrs: vec![],
+        wildcard: true,
+    }
+}
+
 // ---------------------------------------------------------------------------
 // EDN keyword → Attr conversion (reused from query_parser)
 // ---------------------------------------------------------------------------
@@ -256,6 +278,14 @@ fn parse_keyword_attr(
         let multival = rschema.is_multival(&attr);
         let ref_type = rschema.is_ref(&attr);
         let component = rschema.is_component(&attr);
+        // Auto-expand component refs with wildcard pattern (mirrors CLJS
+        // default-pattern-component). Without this, bare keywords like
+        // `:ws/inputs` return {:db/id N} instead of recursively pulling.
+        let pattern = if ref_type && component && nested_pattern.is_none() {
+            Some(default_wildcard_pattern())
+        } else {
+            nested_pattern
+        };
         PullAttr {
             name: attr.clone(),
             as_name: attr,
@@ -263,7 +293,7 @@ fn parse_keyword_attr(
             multival,
             ref_type,
             component,
-            pattern: nested_pattern,
+            pattern,
         }
     }
 }

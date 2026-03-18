@@ -251,8 +251,33 @@ fn parse_map_entity(
         } else {
             let a = attr_from_edn_keyword(&key_str);
             let is_ref = rschema.is_ref(&a);
-            let tv = parse_tx_value(v, is_ref, rschema)?;
-            attrs.push((a, tv));
+            let is_many = rschema.is_multival(&a);
+
+            // For cardinality-many attrs, explode vector/set values into
+            // individual (attr, val) pairs — matching DataScript semantics.
+            if is_many {
+                match v {
+                    EdnValue::Vector(items) | EdnValue::List(items) => {
+                        for item in items {
+                            let tv = parse_tx_value(item, is_ref, rschema)?;
+                            attrs.push((a.clone(), tv));
+                        }
+                    }
+                    EdnValue::Set(items) => {
+                        for item in items {
+                            let tv = parse_tx_value(item, is_ref, rschema)?;
+                            attrs.push((a.clone(), tv));
+                        }
+                    }
+                    _ => {
+                        let tv = parse_tx_value(v, is_ref, rschema)?;
+                        attrs.push((a, tv));
+                    }
+                }
+            } else {
+                let tv = parse_tx_value(v, is_ref, rschema)?;
+                attrs.push((a, tv));
+            }
         }
     }
 

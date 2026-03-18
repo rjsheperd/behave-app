@@ -1062,7 +1062,8 @@
  (fn [modules [_ module]]
    (when module
      (let [module     (first (filter (fn [{m-name :module/name}]
-                                       (= (->str module) (str/lower-case m-name))) modules))
+                                       (and m-name
+                                            (= (->str module) (str/lower-case m-name)))) modules))
            submodules @(rf/subscribe [:vms/pull-children :module/submodules (:db/id module)])]
        (as-> submodules $
          (filter #(= :output (:submodule/io %)) $)

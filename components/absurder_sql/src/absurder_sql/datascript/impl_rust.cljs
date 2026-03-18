@@ -53,6 +53,17 @@
                     (update :named-dbs dissoc db-name)
                     (update :named-cljs-dbs dissoc db-name))))
 
+(defn clear-all-state!
+  "Reset all WASM state. Call on page reload to clear stale references
+   from a previous page load before WASM memory is re-initialized."
+  []
+  (js/console.log "[impl-rust] clear-all-state! called"
+                   (js/Error. "stack trace"))
+  (reset! state {:rust-db        nil
+                 :cljs-db        nil
+                 :named-dbs      {}
+                 :named-cljs-dbs {}}))
+
 ;; Console toggle for dev
 (when (exists? js/window)
   (set! js/window.toggleRustEngine
@@ -136,18 +147,29 @@
 
 ;;; Sync
 
-(defn- value-type+str
+(defn- escape-bulk-str
+  "Escape tab and newline characters in string values for bulk serialization.
+   Rust side unescapes with the inverse transform."
+  [^string s]
+  (if (and (not (.includes s "\t")) (not (.includes s "\n")))
+    s
+    (-> s
+        (.replace (js/RegExp. "\\\\" "g") "\\\\")
+        (.replace (js/RegExp. "\t" "g") "\\t")
+        (.replace (js/RegExp. "\n" "g") "\\n"))))
+
+(defn value-type+str
   "Encode a value as type tag + string for bulk serialization to Rust."
   [v]
   (cond
-    (string? v)  (str "s\t" v)
+    (string? v)  (str "s\t" (escape-bulk-str v))
     (number? v)  (str "n\t" v)
     (keyword? v) (str "k\t" (if-let [ns (namespace v)]
                               (str ns "/" (name v))
                               (name v)))
     (boolean? v) (str "b\t" (if v "true" "false"))
     (nil? v)     "s\t"
-    :else        (str "s\t" v)))
+    :else        (str "s\t" (escape-bulk-str (str v)))))
 
 (defn sync-to-rust!
   "Sync a CLJS DataScript DB to a WasmDataScript instance.
@@ -168,6 +190,24 @@
         (.push sb (str (.-e d) "\t" a-str "\t" (value-type+str (.-v d)) "\t" (.-tx d)))))
     (.transactBulkString rust-db (.join sb "\n"))
     rust-db))
+
+(defn apply-tx-data!
+  "Apply resolved tx-report datoms incrementally to an existing Rust DB.
+   Much faster than full sync-to-rust! for small transactions on large DBs.
+   tx-data is a seq of CLJS Datom objects (from tx-report :tx-data)."
+  [rust-db tx-data]
+  (let [sb (js/Array.)]
+    (doseq [^db/Datom d tx-data]
+      (let [a     (.-a d)
+            a-str (if (keyword? a)
+                    (if-let [ns (namespace a)]
+                      (str ns "/" (name a))
+                      (name a))
+                    (str a))
+            ;; Positive tx = add, negative tx = retract (matches Rust convention)
+            tx    (if (db/datom-added d) (.-tx d) (- (.-tx d)))]
+        (.push sb (str (.-e d) "\t" a-str "\t" (value-type+str (.-v d)) "\t" tx))))
+    (.applyTxData rust-db (.join sb "\n"))))
 
 (defn sync-from-rust
   "Create a CLJS DataScript DB from a WasmDataScript instance.
@@ -548,7 +588,8 @@
 
 (defn- resolve-rust-db
   "Given the first input (the $ DB), find the correct WasmDataScript instance.
-   Checks stored CLJS DB identity to route posh queries to the right Rust DB."
+   Checks stored CLJS DB identity to route posh queries to the right Rust DB.
+   Falls back to the default Rust DB when no identity match is found (for q)."
   [db-input]
   (let [s @state]
     (or
@@ -563,6 +604,20 @@
      ;; Default to VMS Rust DB
      (:rust-db s))))
 
+(defn- resolve-rust-db-strict
+  "Like resolve-rust-db, but returns nil when no identity match is found.
+   Used by pull/pull-many/entid to avoid querying a stale Rust DB after
+   d/transact! creates a new CLJS DB value that no longer matches."
+  [db-input]
+  (let [s @state]
+    (or
+     (when (and (:cljs-db s) db-input (identical? db-input (:cljs-db s)))
+       (:rust-db s))
+     (some (fn [[db-name cljs-db]]
+             (when (and cljs-db (identical? db-input cljs-db))
+               (get (:named-dbs s) db-name)))
+           (:named-cljs-dbs s)))))
+
 (defn- has-db-input?
   "Returns true if the query's :in clause expects a database source ($).
    Queries without a DB (e.g. posh's internal collection re-queries with
@@ -574,6 +629,36 @@
     (some #(or (= '$ %) (and (symbol? %) (str/starts-with? (name %) "$")))
           in-clause)))
 
+(defn- has-attr-param?
+  "Returns true if any :where clause uses an input parameter in the attribute
+   position. Handles both standard [e a v] and posh-normalized [$ e a v] forms.
+   The Rust engine cannot bind keyword input params to attribute positions."
+  [query-form]
+  (let [q-map        (cond-> query-form
+                       (sequential? query-form) dp/query->map)
+        in-clause    (or (:in q-map) '[$])
+        input-params (into #{} (filter #(and (symbol? %)
+                                             (not= '$ %)
+                                             (not= '% %)
+                                             (not (str/starts-with? (name %) "$"))))
+                           in-clause)
+        where-clause (:where q-map)]
+    (some (fn [clause]
+            (when (vector? clause)
+              (let [;; Posh normalizes clauses to [$ e a v], standard is [e a v]
+                    attr-idx (cond
+                               ;; [$ e a ...] — posh normalized, attr at index 2
+                               (and (>= (count clause) 3)
+                                    (= '$ (first clause)))
+                               2
+                               ;; [e a ...] — standard, attr at index 1
+                               (>= (count clause) 2)
+                               1
+                               :else nil)]
+                (when attr-idx
+                  (contains? input-params (nth clause attr-idx))))))
+          where-clause)))
+
 (defn q
   "Query via the Rust engine when a rust-db is available.
    Same interface as d/q. Falls back to d/q for unsupported features
@@ -583,7 +668,8 @@
    tracked CLJS DBs (for posh/re-posh reactive query routing)."
   [query-form & inputs]
   (if (or (not @rust-enabled?)
-          (not (has-db-input? query-form)))
+          (not (has-db-input? query-form))
+          (has-attr-param? query-form))
     (apply d/q query-form inputs)
     (let [rdb (resolve-rust-db (first inputs))]
       (if (nil? rdb)
@@ -601,10 +687,10 @@
 
 (defn pull
   "Pull an entity via the Rust engine. Same interface as d/pull.
-   Falls back to d/pull if rust-enabled? is false or no rust-db exists.
-   Resolves the Rust DB by identity matching (for posh reactive routing)."
+   Falls back to d/pull if the CLJS DB doesn't match a registered Rust DB
+   (e.g. after d/transact! creates a new DB value)."
   [db pattern eid]
-  (let [rdb (when @rust-enabled? (resolve-rust-db db))]
+  (let [rdb (when @rust-enabled? (resolve-rust-db-strict db))]
     (if (nil? rdb)
       (d/pull db pattern eid)
       (let [pattern-edn (strip-edn-comments (pr-str pattern))
@@ -613,12 +699,22 @@
 
 (defn pull-many
   "Pull multiple entities via the Rust engine. Same interface as d/pull-many.
-   Falls back to d/pull-many if rust-enabled? is false or no rust-db exists.
-   Resolves the Rust DB by identity matching (for posh reactive routing)."
+   Falls back to d/pull-many if the CLJS DB doesn't match a registered Rust DB
+   (e.g. after d/transact! creates a new DB value)."
   [db pattern eids]
-  (let [rdb (when @rust-enabled? (resolve-rust-db db))]
+  (let [rdb (when @rust-enabled? (resolve-rust-db-strict db))]
+    (when js/goog.DEBUG
+      (js/console.log "[pull-many]" "rust?" (some? rdb)
+                       "pattern:" (pr-str pattern)
+                       "eids:" (pr-str (take 3 eids))
+                       "db-type:" (type db)
+                       "db=conn?" (identical? db (:cljs-db @state))))
     (if (nil? rdb)
-      (d/pull-many db pattern eids)
+      (let [result (d/pull-many db pattern eids)]
+        (when js/goog.DEBUG
+          (js/console.log "[pull-many] CLJS result sample:"
+                           (pr-str (take 2 result))))
+        result)
       (let [pattern-edn (strip-edn-comments (pr-str pattern))
             eids-js     (apply array (map eid->js eids))
             js-result   (.pullMany rdb pattern-edn eids-js)]
@@ -626,9 +722,9 @@
 
 (defn entid
   "Resolve an entity ID or lookup ref to a numeric eid via the Rust engine.
-   Same interface as d/entid. Falls back to d/entid when Rust is unavailable."
+   Falls back to d/entid if the CLJS DB doesn't match a registered Rust DB."
   [db eid]
-  (let [rdb (when @rust-enabled? (resolve-rust-db db))]
+  (let [rdb (when @rust-enabled? (resolve-rust-db-strict db))]
     (if (nil? rdb)
       (d/entid db eid)
       (let [result (.entid rdb (eid->js eid))]

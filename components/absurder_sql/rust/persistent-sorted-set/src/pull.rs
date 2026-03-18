@@ -5,7 +5,7 @@
 use std::collections::HashSet;
 
 use crate::datom::{Attr, Datom, Value};
-use crate::pull_parser::{PullAttr, PullPattern};
+use crate::pull_parser::{PullAttr, PullPattern, default_wildcard_pattern};
 use crate::schema::{ReverseSchema, Schema};
 
 // ---------------------------------------------------------------------------
@@ -178,11 +178,7 @@ fn make_wildcard_attr(attr: &Attr, rschema: &ReverseSchema) -> PullAttr {
 
     // For wildcard + component refs, auto-expand with wildcard pattern
     let pattern = if ref_type && component {
-        Some(PullPattern {
-            attrs: vec![],
-            reverse_attrs: vec![],
-            wildcard: true,
-        })
+        Some(default_wildcard_pattern())
     } else {
         None
     };

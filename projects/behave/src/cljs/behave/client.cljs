@@ -9,10 +9,11 @@
             [behave.components.modal         :refer [modal]]
             [behave.help.views               :refer [help-area]]
             [behave.settings.views           :as settings]
-            [behave.store                    :refer [load-store-local! load-store-minimal!]]
+            [behave.store                    :as store :refer [load-store-local! load-store-minimal!]]
             [behave.tools                    :as tools]
             [behave.translate                :refer [<t bp]]
-            [behave.vms.store                :refer [load-vms!]]
+            [behave.vms.store                :as vms :refer [load-vms!]]
+            [absurder-sql.datascript.impl-rust :as impl-rust]
             [behave.wizard.views             :as wizard]
             [behave.print.views              :refer [print-page]]
             [behave.demo.views               :refer [demo-output-diagram-page]]
@@ -158,6 +159,11 @@
   "Defines the init function to be called from window.onload()."
   [params]
   (let [params (js->clj params :keywordize-keys true)]
+    ;; Clear all stale WASM state from previous page load.
+    ;; defonce atoms survive hot reload but their WASM pointers are invalid.
+    (impl-rust/clear-all-state!)
+    (reset! vms/vms-conn nil)
+    (reset! store/conn nil)
     (reset! route-params-atom params)
     (rf/dispatch-sync [:initialize])
     (rf/dispatch-sync [:state/set :app-version (:app-version params)])

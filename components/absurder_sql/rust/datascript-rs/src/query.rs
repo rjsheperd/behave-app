@@ -64,43 +64,31 @@ pub fn search_internal(
             slice_to_vec(eavt, &from, &to)
         }
         (Some(e), Some(a), None, None) => {
-            let from = Datom::new(e, Some(a.clone()), Value::Nil, TX0);
-            let to = Datom::new(e, Some(a.clone()), Value::Nil, TXMAX);
-            slice_to_vec(eavt, &from, &to)
+            slice_to_vec(eavt, &Datom::min_for_ea(e, a), &Datom::max_for_ea(e, a))
         }
         (Some(e), Some(a), None, Some(tx)) => {
-            let from = Datom::new(e, Some(a.clone()), Value::Nil, TX0);
-            let to = Datom::new(e, Some(a.clone()), Value::Nil, TXMAX);
-            slice_to_vec(eavt, &from, &to)
+            slice_to_vec(eavt, &Datom::min_for_ea(e, a), &Datom::max_for_ea(e, a))
                 .into_iter()
                 .filter(|d| d.tx_id() == tx)
                 .collect()
         }
         (Some(e), None, None, None) => {
-            let from = Datom::new(e, None, Value::Nil, TX0);
-            let to = Datom::new(e, None, Value::Nil, TXMAX);
-            slice_to_vec(eavt, &from, &to)
+            slice_to_vec(eavt, &Datom::min_for_e(e), &Datom::max_for_e(e))
         }
         (Some(e), None, Some(v), None) => {
-            let from = Datom::new(e, None, Value::Nil, TX0);
-            let to = Datom::new(e, None, Value::Nil, TXMAX);
-            slice_to_vec(eavt, &from, &to)
+            slice_to_vec(eavt, &Datom::min_for_e(e), &Datom::max_for_e(e))
                 .into_iter()
                 .filter(|d| value_cmp(&d.v, v) == Ordering::Equal)
                 .collect()
         }
         (Some(e), None, None, Some(tx)) => {
-            let from = Datom::new(e, None, Value::Nil, TX0);
-            let to = Datom::new(e, None, Value::Nil, TXMAX);
-            slice_to_vec(eavt, &from, &to)
+            slice_to_vec(eavt, &Datom::min_for_e(e), &Datom::max_for_e(e))
                 .into_iter()
                 .filter(|d| d.tx_id() == tx)
                 .collect()
         }
         (Some(e), None, Some(v), Some(tx)) => {
-            let from = Datom::new(e, None, Value::Nil, TX0);
-            let to = Datom::new(e, None, Value::Nil, TXMAX);
-            slice_to_vec(eavt, &from, &to)
+            slice_to_vec(eavt, &Datom::min_for_e(e), &Datom::max_for_e(e))
                 .into_iter()
                 .filter(|d| value_cmp(&d.v, v) == Ordering::Equal && d.tx_id() == tx)
                 .collect()
@@ -111,8 +99,8 @@ pub fn search_internal(
                 let to = Datom::new(EMAX, Some(a.clone()), v.clone(), TXMAX);
                 slice_to_vec(avet, &from, &to)
             } else {
-                let from = Datom::new(E0, Some(a.clone()), Value::Nil, TX0);
-                let to = Datom::new(EMAX, Some(a.clone()), Value::Nil, TXMAX);
+                let from = Datom::new(E0, Some(a.clone()), Value::min_sentinel(), TX0);
+                let to = Datom::new(EMAX, Some(a.clone()), Value::max_sentinel(), TXMAX);
                 slice_to_vec(aevt, &from, &to)
                     .into_iter()
                     .filter(|d| value_cmp(&d.v, v) == Ordering::Equal)
@@ -128,8 +116,8 @@ pub fn search_internal(
                     .filter(|d| d.tx_id() == tx)
                     .collect()
             } else {
-                let from = Datom::new(E0, Some(a.clone()), Value::Nil, TX0);
-                let to = Datom::new(EMAX, Some(a.clone()), Value::Nil, TXMAX);
+                let from = Datom::new(E0, Some(a.clone()), Value::min_sentinel(), TX0);
+                let to = Datom::new(EMAX, Some(a.clone()), Value::max_sentinel(), TXMAX);
                 slice_to_vec(aevt, &from, &to)
                     .into_iter()
                     .filter(|d| value_cmp(&d.v, v) == Ordering::Equal && d.tx_id() == tx)
@@ -137,13 +125,13 @@ pub fn search_internal(
             }
         }
         (None, Some(a), None, None) => {
-            let from = Datom::new(E0, Some(a.clone()), Value::Nil, TX0);
-            let to = Datom::new(EMAX, Some(a.clone()), Value::Nil, TXMAX);
+            let from = Datom::new(E0, Some(a.clone()), Value::min_sentinel(), TX0);
+            let to = Datom::new(EMAX, Some(a.clone()), Value::max_sentinel(), TXMAX);
             slice_to_vec(aevt, &from, &to)
         }
         (None, Some(a), None, Some(tx)) => {
-            let from = Datom::new(E0, Some(a.clone()), Value::Nil, TX0);
-            let to = Datom::new(EMAX, Some(a.clone()), Value::Nil, TXMAX);
+            let from = Datom::new(E0, Some(a.clone()), Value::min_sentinel(), TX0);
+            let to = Datom::new(EMAX, Some(a.clone()), Value::max_sentinel(), TXMAX);
             slice_to_vec(aevt, &from, &to)
                 .into_iter()
                 .filter(|d| d.tx_id() == tx)

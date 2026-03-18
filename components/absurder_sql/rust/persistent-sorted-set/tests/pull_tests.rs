@@ -342,3 +342,78 @@ fn pull_deep_nesting() {
         panic!("expected Map");
     }
 }
+
+#[test]
+fn pull_bare_keyword_component_auto_expands() {
+    let db = test_db();
+    // Bare keyword :ws/inputs (component ref) — no map spec.
+    // Should auto-expand like [{:ws/inputs [*]}], not return {:db/id N}.
+    let pattern = parse_pull_pattern_edn(
+        db.schema(), db.rschema(),
+        "[:ws/inputs]"
+    );
+    let result = pull(&db, &pattern, 10).unwrap();
+    if let PullResult::Map(entries) = &result {
+        let inputs = entries.iter()
+            .find(|(k, _)| *k == kw_ns("ws", "inputs"))
+            .unwrap();
+        if let PullResult::Vec(items) = &inputs.1 {
+            assert_eq!(items.len(), 2);
+            for item in items {
+                if let PullResult::Map(ie) = item {
+                    assert!(ie.iter().any(|(k, _)| *k == kw_ns("input", "value")),
+                        "component auto-expand should include :input/value");
+                } else {
+                    panic!("expected Map for component entity");
+                }
+            }
+        } else {
+            panic!("expected Vec for multi-valued component");
+        }
+    } else {
+        panic!("expected Map");
+    }
+}
+
+#[test]
+fn pull_bare_keyword_component_matches_explicit_map_spec() {
+    let db = test_db();
+    // Bare keyword should produce same result as explicit map spec
+    let bare = parse_pull_pattern_edn(db.schema(), db.rschema(), "[:ws/inputs]");
+    let explicit = parse_pull_pattern_edn(db.schema(), db.rschema(), "[{:ws/inputs [*]}]");
+
+    let bare_result = pull(&db, &bare, 10).unwrap();
+    let explicit_result = pull(&db, &explicit, 10).unwrap();
+
+    assert_eq!(bare_result, explicit_result,
+        "bare keyword component pull should match explicit map spec with [*]");
+}
+
+#[test]
+fn pull_bare_keyword_non_component_ref_returns_db_id_only() {
+    let db = test_db();
+    // :children is a ref but NOT a component — bare keyword should return {:db/id N}
+    let pattern = parse_pull_pattern_edn(db.schema(), db.rschema(), "[:children]");
+    let result = pull(&db, &pattern, 1).unwrap();
+    if let PullResult::Map(entries) = &result {
+        let children = entries.iter()
+            .find(|(k, _)| *k == kw("children"))
+            .unwrap();
+        if let PullResult::Vec(items) = &children.1 {
+            for item in items {
+                if let PullResult::Map(ie) = item {
+                    // Non-component ref: should only have :db/id
+                    assert!(ie.iter().any(|(k, _)| *k == kw_ns("db", "id")));
+                    assert!(!ie.iter().any(|(k, _)| *k == kw("name")),
+                        "non-component bare keyword should NOT recursively pull :name");
+                } else {
+                    panic!("expected Map");
+                }
+            }
+        } else {
+            panic!("expected Vec");
+        }
+    } else {
+        panic!("expected Map");
+    }
+}
