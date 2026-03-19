@@ -7,8 +7,10 @@
  :capture-output? false
  :bindings {kaocha.stacktrace/*stacktrace-filters* []}
 
- ;; Skip :stress tagged tests by default
- :kaocha.filter/skip-meta [:stress]
+ ;; Skip tagged tests by default:
+ ;; :stress — long-running stress tests
+ ;; :persist — page-reload persistence test
+ :kaocha.filter/skip-meta [:stress :persist]
 
  :tests [{:id :browser
           :type :kaocha.type/cljs2

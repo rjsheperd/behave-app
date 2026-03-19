@@ -69,17 +69,15 @@ pub fn value_cmp(a: &Value, b: &Value) -> Ordering {
 
         (Value::Bool(a), Value::Bool(b)) => a.cmp(b),
 
-        // Numeric: Long vs Long, Double vs Double, or cross (promote to f64)
-        (Value::Long(a), Value::Long(b)) => a.cmp(b),
+        // Numeric: Long/Ref are interchangeable (DataScript treats refs as plain ints)
+        (Value::Long(a) | Value::Ref(a), Value::Long(b) | Value::Ref(b)) => a.cmp(b),
         (Value::Double(a), Value::Double(b)) => f64_cmp(*a, *b),
-        (Value::Long(a), Value::Double(b)) => f64_cmp(*a as f64, *b),
-        (Value::Double(a), Value::Long(b)) => f64_cmp(*a, *b as f64),
+        (Value::Long(a) | Value::Ref(a), Value::Double(b)) => f64_cmp(*a as f64, *b),
+        (Value::Double(a), Value::Long(b) | Value::Ref(b)) => f64_cmp(*a, *b as f64),
 
         (Value::Str(a), Value::Str(b)) => a.cmp(b),
 
         (Value::Keyword(a), Value::Keyword(b)) => a.cmp(b),
-
-        (Value::Ref(a), Value::Ref(b)) => a.cmp(b),
 
         (Value::Instant(a), Value::Instant(b)) => a.cmp(b),
 

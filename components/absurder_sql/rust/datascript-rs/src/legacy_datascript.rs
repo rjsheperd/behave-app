@@ -207,6 +207,51 @@ pub mod wasm {
             self.max_addr
         }
 
+        /// Create a LegacyStorage with an explicit max_addr (used when storing
+        /// multiple indexes sequentially to avoid address collisions).
+        pub fn new_with_max_addr(db_name: &str, settings: Settings, max_addr: i64) -> Self {
+            let mut s = Self::new(db_name, settings);
+            s.max_addr = max_addr;
+            s
+        }
+
+        /// Query the actual maximum address from the datascript table.
+        pub fn query_max_addr(db_name: &str) -> i64 {
+            let pool_key = db_name.trim_end_matches(".db");
+            let conn = connection_pool::get_or_create_connection(pool_key, {
+                let name = db_name.to_string();
+                move || {
+                    let c_path = CString::new(name.as_str()).map_err(|e| e.to_string())?;
+                    let mut db: *mut sqlite3 = ptr::null_mut();
+                    let ret = unsafe {
+                        sqlite_wasm_rs::sqlite3_open_v2(
+                            c_path.as_ptr(),
+                            &mut db,
+                            sqlite_wasm_rs::SQLITE_OPEN_READWRITE
+                                | sqlite_wasm_rs::SQLITE_OPEN_CREATE,
+                            ptr::null(),
+                        )
+                    };
+                    if ret != SQLITE_OK {
+                        return Err(format!("Failed to open SQLite: {}", name));
+                    }
+                    Ok(db)
+                }
+            }).expect("Failed to get connection for query_max_addr");
+            let db = conn.db.get();
+            let result = unsafe {
+                let ps = PreparedStmt::new(db, "SELECT COALESCE(MAX(addr), 1) FROM datascript");
+                let ret = sqlite3_step(ps.stmt);
+                if ret == SQLITE_ROW {
+                    sqlite3_column_int64(ps.stmt, 0)
+                } else {
+                    1
+                }
+            };
+            connection_pool::release_connection(pool_key);
+            result
+        }
+
         /// Check if the `datascript` table exists in the database.
         pub fn has_legacy_data(db_name: &str) -> bool {
             let pool_key = db_name.trim_end_matches(".db");

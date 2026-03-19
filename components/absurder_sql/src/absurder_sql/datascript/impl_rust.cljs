@@ -16,14 +16,23 @@
                                 :named-dbs      {}
                                 :named-cljs-dbs {}}))
 
+;; Strong reference set prevents premature GC of WasmDataScript objects.
+;; wasm-bindgen's FinalizationRegistry can free WASM objects when JS GC
+;; doesn't trace references through CLJS persistent data structures.
+(defonce ^:private live-rdbs (js/Set.))
+
 (defonce rust-enabled? (atom true))
 
 (defn set-rust-db!
   "Set the default WasmDataScript instance (VMS) used by `q`, `pull`, and `pull-many`.
    Optionally pass the CLJS DB value for smart query routing (Phase 3)."
   ([rust-db]
+   (when-let [old (:rust-db @state)] (.delete live-rdbs old))
+   (when rust-db (.add live-rdbs rust-db))
    (swap! state assoc :rust-db rust-db))
   ([rust-db cljs-db]
+   (when-let [old (:rust-db @state)] (.delete live-rdbs old))
+   (when rust-db (.add live-rdbs rust-db))
    (swap! state assoc :rust-db rust-db :cljs-db cljs-db)))
 
 (defn rust-db
@@ -35,8 +44,12 @@
   "Register a named WasmDataScript instance (e.g. \"$ws\" for worksheet).
    Optionally pass the CLJS DB value for smart query routing (Phase 3)."
   ([db-name rust-db]
+   (when-let [old (get-in @state [:named-dbs db-name])] (.delete live-rdbs old))
+   (when rust-db (.add live-rdbs rust-db))
    (swap! state assoc-in [:named-dbs db-name] rust-db))
   ([db-name rust-db cljs-db]
+   (when-let [old (get-in @state [:named-dbs db-name])] (.delete live-rdbs old))
+   (when rust-db (.add live-rdbs rust-db))
    (swap! state #(-> %
                      (assoc-in [:named-dbs db-name] rust-db)
                      (assoc-in [:named-cljs-dbs db-name] cljs-db)))))
@@ -49,6 +62,7 @@
 (defn remove-named-db!
   "Remove a named WasmDataScript instance."
   [db-name]
+  (when-let [old (get-in @state [:named-dbs db-name])] (.delete live-rdbs old))
   (swap! state #(-> %
                     (update :named-dbs dissoc db-name)
                     (update :named-cljs-dbs dissoc db-name))))
@@ -59,6 +73,7 @@
   []
   (js/console.log "[impl-rust] clear-all-state! called"
                    (js/Error. "stack trace"))
+  (.clear live-rdbs)
   (reset! state {:rust-db        nil
                  :cljs-db        nil
                  :named-dbs      {}
@@ -580,9 +595,18 @@
         query-edn   (strip-edn-comments (pr-str query-form))
         rules-edn   (or @rules-str "")
         inputs-js   (apply array @params)
+        ;; queryEdnMulti consumes source_db (wasm-bindgen zeros __wbg_ptr)
+        ;; but returns [result, source_db] so we can re-register it.
         js-result   (if (seq @source-name)
-                      (.queryEdnMulti rdb query-edn rules-edn inputs-js
-                                      @source-name @source-db)
+                      (let [ret (.queryEdnMulti rdb query-edn rules-edn inputs-js
+                                               @source-name @source-db)
+                            result     (aget ret 0)
+                            returned-db (aget ret 1)]
+                        ;; Re-register the returned source DB (new JS wrapper, same Rust struct)
+                        (when (and returned-db (not (nil? returned-db)))
+                          (swap! state assoc-in [:named-dbs @source-name] returned-db)
+                          (.add live-rdbs returned-db))
+                        result)
                       (.queryEdn rdb query-edn rules-edn inputs-js))]
     (rust-result->clj js-result parsed-q)))
 

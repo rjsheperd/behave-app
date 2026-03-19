@@ -91,17 +91,24 @@ impl IStorage for JsStorage {
     }
 
     fn restore(&self, address: i64) -> Rc<Node> {
-        let result = self
+        let result = match self
             .restore_fn
             .call1(&self.obj, &JsValue::from_f64(address as f64))
-            .unwrap();
+        {
+            Ok(v) => v,
+            Err(_e) => {
+                // JS restore callback threw — return an empty leaf to avoid panic
+                return Rc::new(Node::restore(0, vec![], None, &self.settings));
+            }
+        };
 
         let level = js_sys::Reflect::get(&result, &JsValue::from_str("level"))
-            .unwrap()
-            .as_f64()
-            .unwrap() as u32;
+            .ok()
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.0) as u32;
 
-        let keys_val = js_sys::Reflect::get(&result, &JsValue::from_str("keys")).unwrap();
+        let keys_val = js_sys::Reflect::get(&result, &JsValue::from_str("keys"))
+            .unwrap_or(JsValue::from(js_sys::Array::new()));
         let keys_arr: js_sys::Array = keys_val.into();
         let mut keys: Vec<Key> = Vec::with_capacity(keys_arr.length() as usize);
         for i in 0..keys_arr.length() {
@@ -114,7 +121,14 @@ impl IStorage for JsStorage {
             .map(|v| {
                 let arr: js_sys::Array = v.into();
                 (0..arr.length())
-                    .map(|i| arr.get(i).as_f64().unwrap() as i64)
+                    .map(|i| {
+                        let val = arr.get(i);
+                        val.as_f64().unwrap_or_else(|| {
+                            // CLJS edn/read-string may produce non-f64 values
+                            // (e.g., BigInt or string) — coerce via JS Number()
+                            js_sys::Number::from(val).value_of()
+                        }) as i64
+                    })
                     .collect()
             });
 

@@ -47,14 +47,13 @@ fn value_type_rank(v: &Value) -> u8 {
     match v {
         Value::Nil => 0,
         Value::Bool(_) => 1,
-        Value::Long(_) => 2,
+        Value::Long(_) | Value::Ref(_) => 2, // Refs are ints in DataScript
         Value::Double(_) => 3,
         Value::Str(_) => 4,
         Value::Keyword(_) => 5,
-        Value::Ref(_) => 6,
-        Value::Instant(_) => 7,
-        Value::Uuid(_) => 8,
-        Value::Bytes(_) => 9,
+        Value::Instant(_) => 6,
+        Value::Uuid(_) => 7,
+        Value::Bytes(_) => 8,
     }
 }
 

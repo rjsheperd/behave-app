@@ -266,6 +266,17 @@ impl WasmDataScript {
         let attr = datom.a.as_ref().expect("datom must have attribute");
         let indexing = self.is_indexed(attr);
 
+        // Coerce Long → Ref for ref-type attributes so the value sorts correctly
+        // (Long has type_rank 2, Ref has type_rank 6 — mixing them corrupts B+ tree order).
+        let datom = if self.rschema.is_ref(attr) {
+            match datom.v {
+                Value::Long(n) => Datom::new(datom.e, datom.a, Value::Ref(n), datom.tx),
+                _ => datom,
+            }
+        } else {
+            datom
+        };
+
         if datom.tx > 0 {
             self.eavt = self.eavt.conj(&datom);
             self.aevt = self.aevt.conj(&datom);
@@ -1186,6 +1197,10 @@ impl WasmDataScript {
     /// `self` is the default ($) source. `source_name` + `source_db` provide one
     /// additional source (e.g. "$ws" + workspace DB). Pass empty string/null for
     /// single-source queries (falls back to queryEdn behavior).
+    /// Query with multiple database sources.
+    /// `source_db` is consumed by wasm-bindgen but returned in the result
+    /// array so the caller can reclaim it.
+    /// Returns `[query_result, source_db_or_null]`.
     #[wasm_bindgen(js_name = "queryEdnMulti")]
     pub fn query_edn_multi(
         &self,
@@ -1194,7 +1209,7 @@ impl WasmDataScript {
         inputs: JsValue,
         source_name: String,
         source_db: Option<WasmDataScript>,
-    ) -> JsValue {
+    ) -> js_sys::Array {
         use persistent_sorted_set::query_parser::{
             parse_query, parse_rules, bind_inputs, FindSpec, InBinding,
             build_collection_relations,
@@ -1324,7 +1339,7 @@ impl WasmDataScript {
         };
 
         // Shape output (same as queryEdn)
-        match &parsed.find {
+        let query_result: JsValue = match &parsed.find {
             FindSpec::Rel(_) => {
                 let outer = js_sys::Array::new_with_length(result_tuples.len() as u32);
                 for (i, tuple) in result_tuples.iter().enumerate() {
@@ -1362,7 +1377,16 @@ impl WasmDataScript {
                     JsValue::NULL
                 }
             }
-        }
+        };
+
+        // Return [query_result, source_db] so the caller can reclaim the consumed DB.
+        let ret = js_sys::Array::new_with_length(2);
+        ret.set(0, query_result);
+        ret.set(1, match source_db {
+            Some(db) => db.into(),
+            None => JsValue::NULL,
+        });
+        ret
     }
 
     /// Pull an entity by pattern. Returns a JS object (nested map) or null.
@@ -1615,19 +1639,22 @@ impl WasmDataScript {
             connection_pool::release_connection(pool_key);
         }
 
-        // Store each index tree
+        // Store each index tree. Use query_max_addr to read the actual max
+        // address from the datascript table after each store, so subsequent
+        // LegacyStorage instances don't reuse addresses (new() reads max_addr
+        // from metadata at addr=0, which hasn't been updated yet).
         self.eavt.set_storage(Box::new(LegacyStorage::new(&db_name, settings.clone())));
         let eavt_root = self.eavt.store();
 
-        self.aevt.set_storage(Box::new(LegacyStorage::new(&db_name, settings.clone())));
+        self.aevt.set_storage(Box::new(LegacyStorage::new_with_max_addr(
+            &db_name, settings.clone(), LegacyStorage::query_max_addr(&db_name))));
         let aevt_root = self.aevt.store();
 
-        self.avet.set_storage(Box::new(LegacyStorage::new(&db_name, settings.clone())));
+        self.avet.set_storage(Box::new(LegacyStorage::new_with_max_addr(
+            &db_name, settings.clone(), LegacyStorage::query_max_addr(&db_name))));
         let avet_root = self.avet.store();
 
-        // Compute max_addr from the last storage instance
-        let mut meta_storage = LegacyStorage::new(&db_name, settings.clone());
-        let max_addr = meta_storage.max_addr();
+        let max_addr = LegacyStorage::query_max_addr(&db_name);
 
         let meta = LegacyMetadata {
             schema: self.schema.clone(),
@@ -1641,6 +1668,7 @@ impl WasmDataScript {
             branching_factor: settings.branching_factor(),
         };
 
+        let mut meta_storage = LegacyStorage::new_with_max_addr(&db_name, settings, max_addr);
         meta_storage.write_metadata(&meta);
     }
 

@@ -1,6 +1,7 @@
 (ns absurder-sql.datascript.async-storage-test
   (:require
    [absurder-sql.datascript.core :as d]
+   [absurder-sql.datascript.impl-rust :as impl-rust]
    [absurder-sql.datascript.persistent-sorted-set :as pss]
    [absurder-sql.datascript.sqlite :as ds-sqlite]
    [absurder-sql.datascript.protocols :as proto :refer [IStorage]]
@@ -8,7 +9,8 @@
    [absurder-sql.interface :as sql]
    [cljs.core.async :refer [go]]
    [cljs.core.async.interop :refer-macros [<p!]]
-   [cljs.test :refer [async deftest is testing use-fixtures]]))
+   [cljs.test :refer [async deftest is testing use-fixtures]]
+   ["datascript-rs" :refer [WasmDataScript]]))
 
 (defn- with-sqlite []
   (async done
@@ -73,23 +75,21 @@
                  (done)))))))
 
 (deftest restore-existing-db-test
-  (testing "store data, then restore-sync recovers it from same SQLite store"
+  (testing "Rust-native storeDb/restoreDb round-trip recovers data"
     (async done
            (go
              (try
                (let [db-name (str "restore-" (random-uuid) ".db")
                      sql-conn (<p! (sql/connect! db-name))
-                     store (ds-sqlite/sqlite-store sql-conn {:db-name db-name})
-                     wrapper (storage-async/make-sync-storage-wrapper store {})
-                     conn (d/create-conn {:name {}} {:storage wrapper})]
-                 ;; transact and store
-                 (d/transact! conn [{:db/id -1 :name "Bob"}
-                                    {:db/id -2 :name "Carol"}])
-                 (<p! (storage-async/store-impl-sync! (d/db conn) wrapper true))
-                 ;; restore from same store
-                 (let [result (<p! (storage-async/restore-sync store))
-                       [db _wrapper] result
-                       results (d/q '[:find ?n :where [_ :name ?n]] db)]
+                     schema  (clj->js {":name" {}})
+                     db      (.emptyDb WasmDataScript schema)]
+                 (.transact db (pr-str [{:db/id -1 :name "Bob"}
+                                        {:db/id -2 :name "Carol"}]))
+                 (.storeDb db db-name)
+                 (let [restored (.restoreDb WasmDataScript db-name)
+                       cljs-db  (impl-rust/sync-from-rust restored)
+                       results  (d/q '[:find ?n :where [_ :name ?n]] cljs-db)]
+                   (is (some? restored) "restoreDb should return a DB")
                    (is (= #{["Bob"] ["Carol"]} results)))
                  (<p! (sql/close! sql-conn)))
                (catch :default e
@@ -98,23 +98,22 @@
                  (done)))))))
 
 (deftest store-and-restore-sync-test
-  (testing "store a DB, then restore-sync recovers all data"
+  (testing "Rust-native storeDb/restoreDb recovers multiple entities with multiple attrs"
     (async done
            (go
              (try
                (let [db-name (str "async-store-" (random-uuid) ".db")
                      sql-conn (<p! (sql/connect! db-name))
-                     store (ds-sqlite/sqlite-store sql-conn {:db-name db-name})
-                     wrapper (storage-async/make-sync-storage-wrapper store {})
-                     conn (d/create-conn {:name {} :age {}} {:storage wrapper})]
-                 (d/transact! conn [{:db/id -1 :name "Alice" :age 30}
-                                    {:db/id -2 :name "Bob" :age 25}
-                                    {:db/id -3 :name "Carol" :age 40}])
-                 (<p! (storage-async/store-impl-sync! (d/db conn) wrapper true))
-                 (let [result (<p! (storage-async/restore-sync store))
-                       [db _] result
-                       names (d/q '[:find ?n :where [_ :name ?n]] db)
-                       ages (d/q '[:find ?n ?a :where [?e :name ?n] [?e :age ?a]] db)]
+                     schema  (clj->js {":name" {} ":age" {}})
+                     db      (.emptyDb WasmDataScript schema)]
+                 (.transact db (pr-str [{:db/id -1 :name "Alice" :age 30}
+                                        {:db/id -2 :name "Bob" :age 25}
+                                        {:db/id -3 :name "Carol" :age 40}]))
+                 (.storeDb db db-name)
+                 (let [restored (.restoreDb WasmDataScript db-name)
+                       cljs-db  (impl-rust/sync-from-rust restored)
+                       names    (d/q '[:find ?n :where [_ :name ?n]] cljs-db)
+                       ages     (d/q '[:find ?n ?a :where [?e :name ?n] [?e :age ?a]] cljs-db)]
                    (is (= #{["Alice"] ["Bob"] ["Carol"]} names))
                    (is (= #{["Alice" 30] ["Bob" 25] ["Carol" 40]} ages)))
                  (<p! (sql/close! sql-conn)))
@@ -124,38 +123,75 @@
                  (done)))))))
 
 (deftest export-import-roundtrip-test
-  (testing "export a SQLite DB with stored data, import into a fresh connection, restore"
+  (testing "Rust-native storeDb, export SQLite, import, restoreDb recovers data"
     (async done
            (go
              (try
-               ;; 1. Create and populate a DB
+               ;; 1. Create and populate via Rust, store to SQLite
                (let [db-name (str "export-src-" (random-uuid) ".db")
                      sql-conn (<p! (sql/connect! db-name))
-                     store (ds-sqlite/sqlite-store sql-conn {:db-name db-name})
-                     wrapper (storage-async/make-sync-storage-wrapper store {})
-                     conn (d/create-conn {:name {} :age {}} {:storage wrapper})]
-                 (d/transact! conn [{:db/id -1 :name "Alice" :age 30}
-                                    {:db/id -2 :name "Bob" :age 25}])
-                 (<p! (storage-async/store-impl-sync! (d/db conn) wrapper true))
+                     schema  (clj->js {":name" {} ":age" {}})
+                     db      (.emptyDb WasmDataScript schema)]
+                 (.transact db (pr-str [{:db/id -1 :name "Alice" :age 30}
+                                        {:db/id -2 :name "Bob" :age 25}]))
+                 (.storeDb db db-name)
 
                  ;; 2. Export as bytes
                  (let [db-bytes (<p! (sql/export! sql-conn))]
                    (<p! (sql/close! sql-conn))
 
-                   ;; 3. Import into a fresh connection, then reconnect
+                   ;; 3. Import into a fresh SQLite DB
                    (let [import-name (str "import-dst-" (random-uuid) ".db")
                          tmp-conn (<p! (sql/connect! import-name))]
                      (<p! (sql/import! tmp-conn db-bytes))
                      (<p! (sql/close! tmp-conn))
 
-                     ;; 4. Reconnect and restore DataScript DB
+                     ;; 4. Reconnect and restore via Rust
                      (let [import-conn (<p! (sql/connect! import-name))
-                           import-store (ds-sqlite/sqlite-store import-conn {:db-name import-name
-                                                                             :skip-ddl true})
-                           result (<p! (storage-async/restore-sync import-store))
-                           [db _] result
-                           names (d/q '[:find ?n :where [_ :name ?n]] db)
-                           ages (d/q '[:find ?n ?a :where [?e :name ?n] [?e :age ?a]] db)]
+                           restored    (.restoreDb WasmDataScript import-name)
+                           cljs-db     (impl-rust/sync-from-rust restored)
+                           names       (d/q '[:find ?n :where [_ :name ?n]] cljs-db)
+                           ages        (d/q '[:find ?n ?a :where [?e :name ?n] [?e :age ?a]] cljs-db)]
+                       (is (some? restored) "restoreDb should find data after import")
+                       (is (= #{["Alice"] ["Bob"]} names))
+                       (is (= #{["Alice" 30] ["Bob" 25]} ages))
+                       (<p! (sql/close! import-conn))))))
+               (catch :default e
+                 (is (nil? e) (str "Unexpected error: " e)))
+               (finally
+                 (done)))))))
+
+(deftest bp7-export-roundtrip-test
+  (testing "Rust transact → storeToLegacy → export → import → restoreFromLegacy (production .bp7 path)"
+    (async done
+           (go
+             (try
+               (let [db-name  (str "bp7-export-" (random-uuid) ".db")
+                     sql-conn (<p! (sql/connect! db-name))
+                     schema   (clj->js {":name" {} ":age" {}})
+                     db       (.emptyDb WasmDataScript schema)]
+                 (.transact db (pr-str [{:db/id -1 :name "Alice" :age 30}
+                                        {:db/id -2 :name "Bob" :age 25}]))
+                 (.storeToLegacy db db-name)
+                 ;; Export SQLite bytes (this is the .bp7 file content)
+                 (let [db-bytes (<p! (sql/export! sql-conn))]
+                   (is (instance? js/Uint8Array db-bytes)
+                       "export should produce a Uint8Array")
+                   (is (pos? (.-length db-bytes))
+                       "exported bytes should not be empty")
+                   (<p! (sql/close! sql-conn))
+                   ;; Import into a fresh SQLite DB (simulates opening a .bp7 file)
+                   (let [import-name (str "bp7-import-" (random-uuid) ".db")
+                         tmp-conn    (<p! (sql/connect! import-name))]
+                     (<p! (sql/import! tmp-conn db-bytes))
+                     (<p! (sql/close! tmp-conn))
+                     ;; Restore via legacy path (matches production open-worksheet!)
+                     (let [import-conn (<p! (sql/connect! import-name))
+                           restored    (.restoreFromLegacy WasmDataScript import-name)
+                           cljs-db     (impl-rust/sync-from-rust restored)
+                           names       (d/q '[:find ?n :where [_ :name ?n]] cljs-db)
+                           ages        (d/q '[:find ?n ?a :where [?e :name ?n] [?e :age ?a]] cljs-db)]
+                       (is (some? restored) "restoreFromLegacy should return a DB")
                        (is (= #{["Alice"] ["Bob"]} names))
                        (is (= #{["Alice" 30] ["Bob" 25]} ages))
                        (<p! (sql/close! import-conn))))))

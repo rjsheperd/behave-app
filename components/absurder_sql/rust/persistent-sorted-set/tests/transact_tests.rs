@@ -5,7 +5,7 @@
 use persistent_sorted_set::datom::Value;
 use persistent_sorted_set::db::{DataScriptDB, TX0};
 use persistent_sorted_set::schema::{
-    AttrSchema, Cardinality, Schema, Unique, ValueType, kw,
+    AttrSchema, Cardinality, Schema, Unique, ValueType, kw, kw_ns,
 };
 use persistent_sorted_set::transact::{
     EntityRef, TempId, TransactError, TxEntity, TxValue, parse_tx_edn, transact,
@@ -805,4 +805,98 @@ fn map_entity_multival_keyword_vector_explode() {
 
     assert_eq!(report.tx_data.len(), 3, "each keyword becomes a separate datom");
     assert_eq!(db.count(), 3);
+}
+
+// ---------------------------------------------------------------------------
+// Lookup ref in :db/add entity position
+// ---------------------------------------------------------------------------
+
+#[test]
+fn lookup_ref_in_db_add_entity_position() {
+    // Schema with unique identity attr and a ref attr
+    let mut schema = Schema::default();
+    schema.attrs.insert(kw_ns("module", "name"), AttrSchema {
+        unique: Some(Unique::Identity),
+        ..Default::default()
+    });
+    schema.attrs.insert(kw_ns("module", "variables"), AttrSchema {
+        cardinality: Cardinality::Many,
+        value_type: Some(ValueType::Ref),
+        ..Default::default()
+    });
+    schema.attrs.insert(kw_ns("variable", "name"), AttrSchema {
+        unique: Some(Unique::Identity),
+        ..Default::default()
+    });
+    schema.attrs.insert(kw_ns("variable", "unit"), AttrSchema::default());
+    let mut db = DataScriptDB::empty(schema);
+
+    // Tx 1: create a module with one variable
+    let tx1 = parse_tx_edn(
+        concat!(
+            "[{:db/id -1 :module/name \"Surface\" :module/variables [-2]}",
+            " {:db/id -2 :variable/name \"Wind Speed\" :variable/unit \"mph\"}]",
+        ),
+        &db.rschema,
+    ).unwrap();
+    transact(&mut db, tx1).unwrap();
+    assert_eq!(db.count(), 4, "Surface(name,variables) + WindSpeed(name,unit)");
+
+    // Verify Surface entity exists and has a variable ref
+    let surface_vars_before = db.search(Some(1), Some(&kw_ns("module", "variables")), None, None);
+    assert_eq!(surface_vars_before.len(), 1, "Surface should have 1 variable after tx1");
+
+    // Verify lookup ref resolves: search by unique attr value
+    let surface_lookup = db.search(None, Some(&kw_ns("module", "name")), Some(&Value::Str("Surface".into())), None);
+    assert_eq!(surface_lookup.len(), 1, "lookup for module/name=Surface should find 1 datom");
+    assert_eq!(surface_lookup[0].e, 1, "Surface entity should be eid 1");
+
+    // Tx 2: add another variable and link it via lookup ref
+    let tx2 = parse_tx_edn(
+        concat!(
+            "[{:db/id -1 :variable/name \"Fuel Moisture\" :variable/unit \"%\"}",
+            " [:db/add [:module/name \"Surface\"] :module/variables -1]]",
+        ),
+        &db.rschema,
+    ).unwrap();
+    transact(&mut db, tx2).unwrap();
+
+    // Surface should now have 2 variables
+    let surface_vars = db.search(Some(1), Some(&kw_ns("module", "variables")), None, None);
+    assert_eq!(surface_vars.len(), 2, "Surface should have 2 variables after lookup-ref add");
+}
+
+#[test]
+fn lookup_ref_in_db_retract() {
+    let mut schema = Schema::default();
+    schema.attrs.insert(kw_ns("worksheet", "uuid"), AttrSchema {
+        unique: Some(Unique::Identity),
+        ..Default::default()
+    });
+    schema.attrs.insert(kw_ns("worksheet", "modules"), AttrSchema {
+        cardinality: Cardinality::Many,
+        ..Default::default()
+    });
+    let mut db = DataScriptDB::empty(schema);
+
+    // Create entity with cardinality-many keyword values
+    let tx1 = parse_tx_edn(
+        r#"[{:worksheet/uuid "ws-1" :worksheet/modules [:surface :contain]}]"#,
+        &db.rschema,
+    ).unwrap();
+    transact(&mut db, tx1).unwrap();
+    assert_eq!(db.count(), 3, "uuid + 2 modules");
+
+    // Retract one keyword value using lookup ref as entity
+    let tx2 = parse_tx_edn(
+        r#"[[:db/retract [:worksheet/uuid "ws-1"] :worksheet/modules :contain]]"#,
+        &db.rschema,
+    ).unwrap();
+    transact(&mut db, tx2).unwrap();
+
+    // Should have 2 datoms: uuid + :surface
+    assert_eq!(db.count(), 2, "uuid + 1 remaining module after retract");
+    let modules = db.search(None, Some(&kw_ns("worksheet", "modules")), None, None);
+    assert_eq!(modules.len(), 1);
+    assert_eq!(modules[0].v, Value::Keyword(kw("surface")));
 }
