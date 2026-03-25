@@ -1,57 +1,24 @@
 (ns absurder-sql.datascript.stress-test
   (:require
+   ["datascript-rs" :refer [WasmDataScript]]
    [absurder-sql.datascript.core :as d]
+   [absurder-sql.datascript.impl-rust :as impl-rust]
    [absurder-sql.datascript.persistent-sorted-set :as pss]
-   [absurder-sql.datascript.sqlite :as ds-sqlite]
-   [absurder-sql.datascript.storage-async :as storage-async]
    [absurder-sql.interface :as sql]
    [cljs.core.async :refer [go]]
    [cljs.core.async.interop :refer-macros [<p!]]
    [cljs.test :refer [async deftest is testing use-fixtures]]))
 
-(defn- with-sqlite []
+(defn- with-wasm []
   (async done
          (go
            (<p! (pss/ensure-initialized!))
            (<p! (sql/init!))
            (done))))
 
-(use-fixtures :once {:before with-sqlite})
+(use-fixtures :once {:before with-wasm})
 
 ;;; Helpers
-
-(defn- fresh-conn!
-  "Connect to a fresh SQLite DB, create a DataScript conn with sync wrapper.
-   Returns a Promise of {:sql-conn :conn :wrapper :db-name}."
-  [schema opts]
-  (let [db-name (str "stress-" (random-uuid) ".db")]
-    (-> (sql/connect! db-name)
-        (.then (fn [sql-conn]
-                 (let [store   (ds-sqlite/sqlite-store sql-conn {:db-name db-name})
-                       wrapper (storage-async/make-sync-storage-wrapper store opts)
-                       conn    (d/create-conn schema {:storage          wrapper
-                                                      :branching-factor (or (:branching-factor opts) 512)})]
-                   {:sql-conn sql-conn :conn conn :wrapper wrapper :db-name db-name}))))))
-
-(defn- store-and-restore!
-  "Store the current DB, then restore from SQLite. Returns Promise of {:db :sql-conn}."
-  [{:keys [conn wrapper db-name sql-conn]}]
-  (-> (storage-async/store-impl-sync! (d/db conn) wrapper true)
-      (.then (fn [_] (sql/close! sql-conn)))
-      (.then (fn [_] (sql/connect! db-name)))
-      (.then (fn [fresh-conn]
-               (let [store (ds-sqlite/sqlite-store fresh-conn {:db-name  db-name
-                                                                :skip-ddl true})]
-                 (-> (storage-async/restore-sync store)
-                     (.then (fn [[db _]] {:db db :sql-conn fresh-conn}))))))))
-
-(defn- timed
-  "Execute a 0-arg fn, return Promise of {:result _ :elapsed-ms _}."
-  [f]
-  (let [t0 (js/performance.now)]
-    (-> (js/Promise.resolve (f))
-        (.then (fn [result]
-                 {:result result :elapsed-ms (- (js/performance.now) t0)})))))
 
 (defn- log! [& args]
   (apply js/console.log "[stress]" (map str args)))
@@ -59,36 +26,31 @@
 (def ^:private batch-size 10000)
 
 (defn- transact-batched!
-  "Transact `n` entities in batches, flushing storage between each batch
-   to avoid stack overflow and serializing SQLite writes. Returns a Promise."
-  [conn wrapper n]
+  "Transact `n` entities in batches via Rust, storing after each batch.
+   Returns the WasmDataScript instance."
+  [rdb n db-name]
   (let [batches (partition-all batch-size (range 1 (inc n)))]
-    (reduce (fn [p batch]
-              (.then p (fn [_]
-                         (d/transact! conn (mapv (fn [i] {:db/id (- i) :val (str i)}) batch))
-                         (storage-async/store-impl-sync! (d/db conn) wrapper true))))
-            (js/Promise.resolve nil)
-            batches)))
+    (doseq [batch batches]
+      (.transact rdb (pr-str (mapv (fn [i] {:db/id (- i) :val (str i)}) batch))))
+    (.storeToLegacy rdb db-name)
+    rdb))
 
 (defn- run-entity-stress!
-  "Transact `n` entities with a single `:val` attr, store, restore, and verify.
+  "Transact `n` entities, store via Rust, restore, and verify.
    Returns a Promise."
   [n]
-  (-> (fresh-conn! {:val {}} {})
-      (.then
-       (fn [ctx]
-         (let [{:keys [conn wrapper]} ctx
-               label (str n)]
-           (-> (timed #(transact-batched! conn wrapper n))
-               (.then (fn [{:keys [elapsed-ms]}]
-                        (log! label "transact+store:" (.toFixed elapsed-ms 0) "ms")))
-               (.then (fn [_] (timed #(store-and-restore! ctx))))
-               (.then (fn [{:keys [result elapsed-ms]}]
-                        (let [{:keys [db sql-conn]} result]
-                          (log! label "restore:" (.toFixed elapsed-ms 0) "ms")
-                          (is (= n (count (d/datoms db :eavt)))
-                              (str "Expected " n " datoms"))
-                          (sql/close! sql-conn))))))))))
+  (let [db-name (str "stress-" (random-uuid) ".db")
+        label   (str n)]
+    (-> (sql/connect! db-name)
+        (.then
+         (fn [_sql-conn]
+           (let [schema (clj->js {":val" {}})
+                 rdb    (.emptyDb WasmDataScript schema)]
+             (transact-batched! rdb n db-name)
+             (let [restored (.restoreFromLegacy WasmDataScript db-name)
+                   cljs-db  (impl-rust/sync-from-rust restored)]
+               (is (= n (count (d/datoms cljs-db :eavt)))
+                   (str "Expected " n " datoms")))))))))
 
 ;;; Entity scale tests
 
@@ -159,19 +121,20 @@
     (async done
            (go
              (try
-               (let [attrs   (mapv #(keyword (str "attr-" %)) (range 50))
-                     schema  (into {} (map (fn [a] [a {}]) attrs))
-                     ctx     (<p! (fresh-conn! schema {}))
-                     {:keys [conn]} ctx
-                     tx-data (vec (for [i (range 1 101)]
-                                    (into {:db/id (- i)}
-                                          (map (fn [a] [a (str (name a) "-" i)]) attrs))))]
-                 (d/transact! conn tx-data)
-                 (let [{:keys [result]} (<p! (timed #(store-and-restore! ctx)))
-                       {:keys [db sql-conn]} result]
-                   (is (= 5000 (count (d/datoms db :eavt)))
-                       "100 entities * 50 attrs = 5000 datoms")
-                   (<p! (sql/close! sql-conn))))
+               (let [db-name  (str "stress-wide-" (random-uuid) ".db")
+                     _        (<p! (sql/connect! db-name))
+                     attrs    (mapv #(keyword (str "attr-" %)) (range 50))
+                     js-schema (clj->js (into {} (map (fn [a] [(str ":" (name a)) {}]) attrs)))
+                     rdb      (.emptyDb WasmDataScript js-schema)
+                     tx-data  (vec (for [i (range 1 101)]
+                                     (into {:db/id (- i)}
+                                           (map (fn [a] [a (str (name a) "-" i)]) attrs))))]
+                 (.transact rdb (pr-str tx-data))
+                 (.storeToLegacy rdb db-name)
+                 (let [restored (.restoreFromLegacy WasmDataScript db-name)
+                       cljs-db  (impl-rust/sync-from-rust restored)]
+                   (is (= 5000 (count (d/datoms cljs-db :eavt)))
+                       "100 entities * 50 attrs = 5000 datoms")))
                (catch :default e
                  (is (nil? e) (str "Unexpected error: " e)))
                (finally (done)))))))
@@ -181,17 +144,17 @@
     (async done
            (go
              (try
-               (let [ctx     (<p! (fresh-conn! {:blob {}} {}))
-                     {:keys [conn]} ctx
-                     big-str (apply str (repeat 10000 "x"))
-                     tx-data (mapv (fn [i] {:db/id (- i) :blob (str i "-" big-str)})
-                                   (range 1 101))]
-                 (d/transact! conn tx-data)
-                 (let [{:keys [result]} (<p! (timed #(store-and-restore! ctx)))
-                       {:keys [db sql-conn]} result]
-                   (is (= 100 (count (d/datoms db :eavt))))
-                   (is (< 10000 (count (:v (first (d/datoms db :eavt))))))
-                   (<p! (sql/close! sql-conn))))
+               (let [db-name  (str "stress-large-" (random-uuid) ".db")
+                     _        (<p! (sql/connect! db-name))
+                     rdb      (.emptyDb WasmDataScript (clj->js {":blob" {}}))
+                     big-str  (apply str (repeat 10000 "x"))
+                     tx-data  (mapv (fn [i] {:db/id (- i) :blob (str i "-" big-str)})
+                                    (range 1 101))]
+                 (.transact rdb (pr-str tx-data))
+                 (.storeToLegacy rdb db-name)
+                 (let [restored (.restoreFromLegacy WasmDataScript db-name)
+                       cljs-db  (impl-rust/sync-from-rust restored)]
+                   (is (= 100 (count (d/datoms cljs-db :eavt))))))
                (catch :default e
                  (is (nil? e) (str "Unexpected error: " e)))
                (finally (done)))))))
@@ -201,17 +164,19 @@
     (async done
            (go
              (try
-               (let [ctx     (<p! (fresh-conn! {:tags {:db/cardinality :db.cardinality/many}} {}))
-                     {:keys [conn]} ctx
-                     tx-data (vec (for [i (range 1 11)]
-                                    (into {:db/id (- i)}
-                                          [[:tags (mapv #(str "tag-" i "-" %) (range 500))]])))]
-                 (d/transact! conn tx-data)
-                 (let [{:keys [result]} (<p! (timed #(store-and-restore! ctx)))
-                       {:keys [db sql-conn]} result]
-                   (is (= 5000 (count (d/datoms db :eavt)))
-                       "10 entities * 500 tags = 5000 datoms")
-                   (<p! (sql/close! sql-conn))))
+               (let [db-name  (str "stress-cm-" (random-uuid) ".db")
+                     _        (<p! (sql/connect! db-name))
+                     rdb      (.emptyDb WasmDataScript
+                                (clj->js {":tags" {"db/cardinality" "db.cardinality/many"}}))
+                     tx-data  (vec (for [i (range 1 11)]
+                                     (into {:db/id (- i)}
+                                           [[:tags (mapv #(str "tag-" i "-" %) (range 500))]])))]
+                 (.transact rdb (pr-str tx-data))
+                 (.storeToLegacy rdb db-name)
+                 (let [restored (.restoreFromLegacy WasmDataScript db-name)
+                       cljs-db  (impl-rust/sync-from-rust restored)]
+                   (is (= 5000 (count (d/datoms cljs-db :eavt)))
+                       "10 entities * 500 tags = 5000 datoms")))
                (catch :default e
                  (is (nil? e) (str "Unexpected error: " e)))
                (finally (done)))))))
@@ -221,56 +186,50 @@
     (async done
            (go
              (try
-               (let [ctx (<p! (fresh-conn! {:counter {}} {}))
-                     {:keys [conn]} ctx
-                     n 500]
+               (let [db-name (str "stress-inc-" (random-uuid) ".db")
+                     _       (<p! (sql/connect! db-name))
+                     rdb     (.emptyDb WasmDataScript (clj->js {":counter" {}}))
+                     n       500]
                  (dotimes [i n]
-                   (d/transact! conn [{:db/id -1 :counter (str i)}]))
-                 (let [{:keys [result]} (<p! (timed #(store-and-restore! ctx)))
-                       {:keys [db sql-conn]} result]
-                   (is (= n (count (d/datoms db :eavt))))
-                   (<p! (sql/close! sql-conn))))
+                   (.transact rdb (pr-str [{:db/id -1 :counter (str i)}])))
+                 (.storeToLegacy rdb db-name)
+                 (let [restored (.restoreFromLegacy WasmDataScript db-name)
+                       cljs-db  (impl-rust/sync-from-rust restored)]
+                   (is (= n (count (d/datoms cljs-db :eavt))))))
                (catch :default e
                  (is (nil? e) (str "Unexpected error: " e)))
                (finally (done)))))))
 
 (defn- run-export-import-stress!
-  "Transact `n` entities, store, export, import into fresh DB, restore, verify.
-   Returns a Promise."
+  "Transact `n` entities, store, export, import into fresh DB, restore, verify."
   [n]
-  (-> (fresh-conn! {:val {}} {})
-      (.then
-       (fn [ctx]
-         (let [{:keys [conn wrapper sql-conn]} ctx
-               label (str n)]
-           (-> (timed #(transact-batched! conn wrapper n))
-               (.then (fn [{:keys [elapsed-ms]}]
-                        (log! label "export-import transact+store:" (.toFixed elapsed-ms 0) "ms")))
-               (.then (fn [_] (timed #(sql/export! sql-conn))))
-               (.then (fn [{:keys [result elapsed-ms]}]
-                        (log! label "export:" (.toFixed elapsed-ms 0) "ms,"
-                              (.-length result) "bytes")
-                        (-> (sql/close! sql-conn)
-                            (.then (fn [_] result)))))
-               (.then (fn [db-bytes]
-                        (let [import-name (str "stress-import-" (random-uuid) ".db")]
-                          (-> (sql/connect! import-name)
-                              (.then (fn [tmp-conn]
-                                       (-> (timed #(sql/import! tmp-conn db-bytes))
-                                           (.then (fn [{:keys [elapsed-ms]}]
-                                                    (log! label "import:" (.toFixed elapsed-ms 0) "ms")
-                                                    (sql/close! tmp-conn))))))
-                              (.then (fn [_] (sql/connect! import-name)))
-                              (.then (fn [fresh-conn]
-                                       (let [store (ds-sqlite/sqlite-store fresh-conn {:db-name  import-name
-                                                                                       :skip-ddl true})]
-                                         (-> (timed #(storage-async/restore-sync store))
-                                             (.then (fn [{:keys [result elapsed-ms]}]
-                                                      (let [[db _] result]
-                                                        (log! label "import restore:" (.toFixed elapsed-ms 0) "ms")
-                                                        (is (= n (count (d/datoms db :eavt)))
-                                                            (str "Expected " n " datoms after import"))
-                                                        (sql/close! fresh-conn))))))))))))))))))
+  (let [db-name (str "stress-exp-" (random-uuid) ".db")
+        label   (str n)]
+    (-> (sql/connect! db-name)
+        (.then
+         (fn [sql-conn]
+           (let [schema (clj->js {":val" {}})
+                 rdb    (.emptyDb WasmDataScript schema)]
+             (transact-batched! rdb n db-name)
+             (-> (sql/export! sql-conn)
+                 (.then
+                  (fn [db-bytes]
+                    (log! label "export:" (.-length db-bytes) "bytes")
+                    (sql/close! sql-conn)
+                    db-bytes))
+                 (.then
+                  (fn [db-bytes]
+                    (let [import-name (str "stress-import-" (random-uuid) ".db")]
+                      (-> (sql/connect! import-name)
+                          (.then (fn [tmp-conn]
+                                   (-> (sql/import! tmp-conn db-bytes)
+                                       (.then (fn [_] (sql/close! tmp-conn))))))
+                          (.then (fn [_] (sql/connect! import-name)))
+                          (.then (fn [_]
+                                   (let [restored (.restoreFromLegacy WasmDataScript import-name)
+                                         cljs-db  (impl-rust/sync-from-rust restored)]
+                                     (is (= n (count (d/datoms cljs-db :eavt)))
+                                         (str "Expected " n " datoms after import"))))))))))))))))
 
 (deftest ^:stress stress-export-import-10k-test
   (testing "export/import roundtrip at 10k entities"

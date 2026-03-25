@@ -64,18 +64,19 @@
 
 (defn- test-index-html
   "Build an index.html that mirrors the production loading chain:
-   behave-min.js -> behave-min.wasm -> test.js -> init()"
+   behave-min.js -> behave-min.wasm -> test.js -> init()
+   behave-min.js must load first so createModule exists when onload.js checks for it."
   []
   (str "<!DOCTYPE html>\n"
        "<html>\n"
        "<head><title>kaocha.cljs2.shadow-runner</title><meta charset=\"utf-8\"></head>\n"
        "<body>\n"
+       "<script src=\"/js/behave-min.js\"></script>\n"
        "<script>\n"
        "window.onWASMModuleLoadedPath = \"/js/test.js\";\n"
        "window.onAppLoaded = function () { kaocha.cljs2.shadow_runner.init(); };\n"
        (inline-onload-js)
        "</script>\n"
-       "<script src=\"/js/behave-min.js\"></script>\n"
        "</body>\n"
        "</html>\n"))
 
@@ -88,7 +89,7 @@
         js-dir   (io/file test-dir "js")
         src-dir  (io/file "resources/public/js")]
     (.mkdirs js-dir)
-    (doseq [f ["behave-min.js" "behave-min.wasm"]]
+    (doseq [f ["behave-min.js" "behave-min.wasm" "sqlite.wasm"]]
       (let [src (io/file src-dir f)]
         (when (.exists src)
           (io/copy src (io/file js-dir f)))))

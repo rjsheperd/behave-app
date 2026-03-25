@@ -82,6 +82,8 @@
 
 ;;; Fixtures
 
+(use-fixtures :once {:before fx/with-wasm-init})
+
 (use-fixtures :each
   {:before (join-fixtures [fx/setup-vms! fx/setup-empty-db fx/with-new-worksheet fx/log-rf-events])
    :after  (join-fixtures [fx/teardown-db fx/stop-logging-rf-events])})

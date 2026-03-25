@@ -51,12 +51,6 @@
         :else 0))))
 
 ;; Main API functions
-(defn- propagate-storage
-  "Copy _storage from old set to new set after structural change."
-  [^WasmPSS old ^WasmPSS new]
-  (when-let [s (.-_storage old)]
-    (set! (.-_storage new) s))
-  new)
 
 (defn- kw->attr-str
   "Convert a keyword to the attribute string format for conjFieldsMut.
@@ -131,9 +125,8 @@
   ([cmp keys len opts]
    (let [js-cmp     (js-comparator cmp)
          js-arr     (if (array? keys) keys (to-array keys))
-         storage    (:storage opts)
          settings   #js {:branchingFactor (or (:branching-factor opts) 512)}]
-     (.from WasmPSS js-arr js-cmp storage settings))))
+     (.from WasmPSS js-arr js-cmp nil settings))))
 
 (defn from-sorted-array-indexed
   "Like from-sorted-array but uses Rust-native comparator for the given index
@@ -182,17 +175,8 @@
    (let [js-cmp   (js-comparator cmp)
          arr      (to-array keys)
          _        (.sort arr js-cmp)
-         storage  (:storage opts)
          settings #js {:branchingFactor (or (:branching-factor opts) 512)}]
-     (.from WasmPSS arr js-cmp storage settings))))
-
-(defn- attach-storage
-  "Attach storage adapter as a JS property on the WasmPSS instance
-   so it can be retrieved later by storage-adapter."
-  [^WasmPSS pss storage]
-  (when storage
-    (set! (.-_storage pss) storage))
-  pss)
+     (.from WasmPSS arr js-cmp nil settings))))
 
 (defn sorted-set*
   "Create a set with custom comparator, metadata and settings.
@@ -201,27 +185,19 @@
    When `:db-name` is also provided, uses unified SQLite storage
    (PSS nodes stored in AbsurderSQL's IndexedDB-backed SQLite)."
   [opts]
-  (let [storage (:storage opts)
-        db-name (:db-name opts)]
+  (let [db-name (:db-name opts)]
     (if-let [index-type (:index-type opts)]
       (if db-name
         ;; Unified SQLite path: PSS nodes in AbsurderSQL's database
         (let [settings #js {:branchingFactor (or (:branching-factor opts) 512)
                             :cacheSize       (or (:cache-size opts) 1024)}]
           (withUnifiedSqlite index-type db-name settings))
-        ;; Fast path: Rust-native comparator, JsStorage bridge for persistence
-        (let [settings #js {:branchingFactor (or (:branching-factor opts) 512)}]
-          (if (or (nil? storage) (undefined? storage))
-            (.emptyWithIndex WasmPSS index-type)
-            (attach-storage
-             (.emptyWithIndexAndStorage WasmPSS index-type storage settings)
-             storage))))
+        ;; Fast path: Rust-native comparator
+        (.emptyWithIndex WasmPSS index-type))
       ;; Legacy path: JS comparator callback
       (let [js-cmp   (js-comparator (or (:cmp opts) compare))
             settings #js {:branchingFactor (or (:branching-factor opts) 512)}]
-        (attach-storage
-         (.withComparatorAndStorage WasmPSS js-cmp storage settings)
-         storage)))))
+        (.withComparatorAndStorage WasmPSS js-cmp nil settings)))))
 
 (defn restore-by-unified-sqlite
   "Restore a set from unified SQLite storage by root address."
@@ -251,9 +227,6 @@
 
 (defn restore-by
   "Constructs lazily-loaded set from storage, root address and custom comparator.
-   Supports all operations that normal in-memory impl would,
-   will fetch missing nodes by calling IStorage::restore when needed.
-   When `:index-type` is in opts, uses fast Rust-native comparator.
    When `:db-name` is in opts, restores from unified SQLite storage."
   ([cmp address storage]
    (restore-by cmp address storage {}))
@@ -263,14 +236,10 @@
      (restore-by-unified-sqlite (:index-type opts) address db-name opts)
      (if-let [index-type (:index-type opts)]
        (let [settings #js {:branchingFactor (or (:branching-factor opts) 512)}]
-         (attach-storage
-          (.restoreWithIndex WasmPSS index-type address storage settings)
-          storage))
+         (.restoreWithIndex WasmPSS index-type address storage settings))
        (let [js-cmp   (js-comparator cmp)
              settings #js {:branchingFactor (or (:branching-factor opts) 512)}]
-         (attach-storage
-          (.restore WasmPSS js-cmp address storage settings)
-          storage))))))
+         (.restore WasmPSS js-cmp address storage settings))))))
 
 (defn restore
   "Constructs lazily-loaded set from storage and root address.
@@ -328,11 +297,11 @@
 
   ICollection
   (-conj [this key]
-    (propagate-storage this (.conj this key)))
+    (.conj this key))
 
   ISet
   (-disjoin [this key]
-    (propagate-storage this (.disj this key)))
+    (.disj this key))
 
   IFn
   (-invoke

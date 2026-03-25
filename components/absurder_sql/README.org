@@ -164,6 +164,105 @@ converting string attributes (e.g. ~":person/name"~) back to keywords.
 6. The adapter's ~store~/~restore~ methods serialize datoms as ~[e a v tx]~
    vectors via ~serializable-datom~ and delegate to the underlying ~IStorage~
 
+** Persistence formats
+
+Two SQLite-based persistence formats coexist. Both store the three B+ tree
+indexes (EAVT, AEVT, AVET) plus metadata (schema, max-eid, max-tx, root
+addresses) at addr=0.
+
+*** Binary format (~pss_nodes~ table)
+
+Used by ~.storeDb~ / ~.restoreDb~. This is the primary format for new data.
+
+#+begin_example
+CREATE TABLE IF NOT EXISTS pss_nodes (
+    addr   INTEGER PRIMARY KEY,
+    level  INTEGER NOT NULL,
+    keys   BLOB NOT NULL,
+    addrs  BLOB
+)
+#+end_example
+
+Each row is a B+ tree node. Leaf nodes (~level = 0~) store datoms in ~keys~ and
+have no ~addrs~. Branch nodes (~level > 0~) store separator datoms in ~keys~ and
+child node addresses in ~addrs~.
+
+*Datom encoding* (~datom_serde.rs~): each datom is serialized as a
+length-prefixed (u32 LE) byte sequence:
+
+#+begin_example
+[e : i64 LE] [a_type : u8] [a_data ..] [v_type : u8] [v_data ..] [tx : i64 LE]
+#+end_example
+
+Value types are tagged: ~NIL=0~, ~BOOL=1~, ~LONG=2~, ~DOUBLE=3~, ~STR=4~,
+~KEYWORD=5~, ~REF=6~, ~INSTANT=7~, ~UUID=8~, ~BYTES=9~. Multiple datoms are
+concatenated into the ~keys~ BLOB. The ~addrs~ BLOB is packed i64 LE values
+(one per child pointer).
+
+*Metadata* is stored at addr=0 with ~level = -1~. The ~keys~ BLOB contains the
+binary-encoded schema followed by ~max_eid~, ~max_tx~, and the root addresses of
+each index.
+
+*Garbage collection* (~.collectGarbage~): walks all three indexes to collect live
+addresses, diffs against all stored addresses, and deletes orphans in chunks of
+100. Should be called after transacts that retract significant data.
+
+*** Legacy EDN format (~datascript~ table)
+
+Used by ~.storeToLegacy~ / ~.restoreFromLegacy~. Required for ~.bp7~ file
+compatibility with older Behave versions.
+
+#+begin_example
+CREATE TABLE IF NOT EXISTS datascript (
+    addr    INTEGER PRIMARY KEY,
+    content TEXT
+)
+#+end_example
+
+Each row is a B+ tree node serialized as an EDN string. Leaf and branch nodes
+look like:
+
+#+begin_example
+;; Leaf
+{:level 0, :keys [[1 :person/name "Alice" 536870913]
+                   [2 :person/name "Bob"   536870913]]}
+
+;; Branch
+{:level 2, :keys [[500 :person/name "Eve" 536870913]], :addresses [100 200 300]}
+#+end_example
+
+Datoms are plain EDN vectors ~[e a v tx]~ — keywords print as ~:ns/name~,
+strings are quoted, refs are bare integers (disambiguated via the schema during
+restore).
+
+*Metadata* is stored at addr=0:
+
+#+begin_example
+{:schema    {":person/name" {":db/index" true} ...}
+ :eavt      1081805
+ :aevt      1081824
+ :avet      1081831
+ :max-eid   1741
+ :max-tx    536870913
+ :max-addr  1081831
+ :branching-factor 512}
+#+end_example
+
+*** Choosing a format
+
+| Concern            | Binary (~pss_nodes~)              | Legacy EDN (~datascript~)            |
+|--------------------+-----------------------------------+--------------------------------------|
+| Speed              | Fast — no parsing overhead        | Slower — EDN parse per node          |
+| Size               | Compact — binary datom encoding   | Larger — text representation         |
+| Debuggability      | Opaque BLOBs                      | Human-readable (inspect with ~.dump~) |
+| ~.bp7~ compat      | No                                | Yes — required for import/export     |
+| GC support         | ~.collectGarbage~                 | Not needed (full rewrite on store)   |
+| Check existence    | ~.hasStoredDb(name)~              | ~.hasLegacyDb(name)~                 |
+
+The restore path in production tries binary first (~.restoreDb~), then falls back
+to legacy (~.restoreFromLegacy~). For export, legacy is always used so that the
+resulting ~.bp7~ file is compatible with older Behave versions.
+
 ** Rust query/pull bridge (~impl_rust~)
 
 ~absurder-sql.datascript.impl-rust~ is a standalone namespace that routes
@@ -219,6 +318,184 @@ is set.
 delegates all Rust engine calls to it. It no longer contains any
 marshalling or bridge logic — only UI event handlers and persistence
 operations.
+
+* Usage
+
+All operations require WASM initialization first. The examples below assume
+these requires:
+
+#+begin_src clojure
+(require '["datascript-rs" :refer [WasmDataScript]]
+         '[absurder-sql.datascript.core :as d]
+         '[absurder-sql.datascript.impl-rust :as impl-rust]
+         '[absurder-sql.datascript.persistent-sorted-set :as pss]
+         '[absurder-sql.interface :as sql]
+         '[promesa.core :as p])
+#+end_src
+
+** Prerequisites
+
+Before any ~WasmDataScript~ calls:
+
+#+begin_src clojure
+(<p! (pss/ensure-initialized!))   ;; resolves when WASM binary is loaded
+#+end_src
+
+Before any SQLite operations:
+
+#+begin_src clojure
+(<p! (sql/init!))                 ;; initializes in-browser SQLite VFS
+#+end_src
+
+** Loading an empty DB
+
+*** Rust-first (production worksheet path)
+
+Create a ~WasmDataScript~ instance directly in Rust, transact EDN, and register
+it for query routing. Schema attributes use colon-prefixed strings on the JS
+boundary (e.g. ~":person/name"~).
+
+#+begin_src clojure
+;; 1. Build JS schema object
+(def js-schema
+  (impl-rust/schema->js
+   {:worksheet/uuid    {:db/unique :db.unique/identity}
+    :worksheet/name    {}
+    :worksheet/modules {:db/cardinality :db.cardinality/many}}))
+
+;; 2. Create empty Rust DB
+(def rdb (.emptyDb WasmDataScript js-schema))
+
+;; 3. Transact data (EDN string)
+(.transact rdb (pr-str [{:worksheet/uuid    "ws-1"
+                          :worksheet/name    "Field Run"
+                          :worksheet/modules [:surface :crown]}]))
+
+;; 4. Register as named DB for $ws queries
+(let [cljs-db (impl-rust/sync-from-rust rdb)]
+  (impl-rust/set-named-db! "$ws" rdb cljs-db))
+#+end_src
+
+*** CLJS-first (VMS init path)
+
+Create a CLJS DataScript conn, transact, sync to Rust, and register as the
+default DB.
+
+#+begin_src clojure
+;; 1. Create CLJS conn + transact
+(def conn (d/create-conn {:module/name  {:db/unique :db.unique/identity}
+                           :module/order {}}))
+(d/transact! conn [{:module/name "Surface" :module/order 1}
+                    {:module/name "Crown"   :module/order 2}])
+
+;; 2. Sync to Rust and register as default DB ($)
+(let [cljs-db @conn
+      rdb     (impl-rust/sync-to-rust! cljs-db)]
+  (impl-rust/set-rust-db! rdb cljs-db))
+#+end_src
+
+** Transact and persist to IndexedDB
+
+After initializing both WASM and SQLite, connect to a named SQLite database,
+transact, store, and flush to IndexedDB:
+
+#+begin_src clojure
+;; 1. Connect to SQLite
+(def sql-conn (<p! (sql/connect! "my-app.db")))
+
+;; 2. Transact via Rust (EDN string)
+(.transact rdb (pr-str [[:db/add [:worksheet/uuid "ws-1"]
+                          :worksheet/name "Updated Name"]]))
+
+;; 3. Store to SQLite (synchronous, writes to pss_nodes table)
+(.storeDb rdb "my-app.db")
+
+;; 4. Re-register with fresh CLJS snapshot (required after mutation)
+(let [cljs-db (impl-rust/sync-from-rust rdb)]
+  (impl-rust/set-named-db! "$ws" rdb cljs-db))
+
+;; 5. Flush VFS blocks to IndexedDB (async)
+(<p! (sql/sync! sql-conn))
+#+end_src
+
+** Export and import (.bp7 files)
+
+~.storeDb~ / ~.restoreDb~ use the newer binary format (~pss_nodes~ table).
+~.storeToLegacy~ / ~.restoreFromLegacy~ use the EDN format (~datascript~ table)
+required for ~.bp7~ file compatibility.
+
+*** Export
+
+#+begin_src clojure
+;; 1. Sync CLJS DB to Rust and store in legacy EDN format
+(let [rust-db (impl-rust/sync-to-rust! (d/db conn))]
+  (.storeToLegacy rust-db "my-app.db"))
+
+;; 2. Export SQLite as Uint8Array (the .bp7 file contents)
+(let [db-bytes (<p! (sql/export! sql-conn))]
+  ;; db-bytes is a Uint8Array — save to file, upload, etc.
+  )
+#+end_src
+
+*** Import
+
+#+begin_src clojure
+;; 1. Import raw SQLite bytes into a fresh connection
+(let [tmp-conn (<p! (sql/connect! "imported.db"))]
+  (<p! (sql/import! tmp-conn db-bytes))
+  (<p! (sql/close! tmp-conn)))
+
+;; 2. Re-open and restore DataScript from legacy EDN
+(let [sql-conn (<p! (sql/connect! "imported.db"))
+      rust-db  (.restoreFromLegacy WasmDataScript "imported.db")
+      cljs-db  (impl-rust/sync-from-rust rust-db)
+      conn     (d/conn-from-db cljs-db)]
+  ;; conn and rust-db are ready to use
+  (impl-rust/set-rust-db! rust-db cljs-db))
+#+end_src
+
+If ~.restoreFromLegacy~ returns nil (not a legacy DB), try the binary format:
+
+#+begin_src clojure
+(when-let [rust-db (.restoreDb WasmDataScript "imported.db")]
+  (let [cljs-db (impl-rust/sync-from-rust rust-db)]
+    (impl-rust/set-rust-db! rust-db cljs-db)))
+#+end_src
+
+** Multi-DB queries
+
+Register a default DB (~$~) via ~set-rust-db!~ and additional sources via
+~set-named-db!~. Cross-query using ~:in $ $ws~ syntax:
+
+#+begin_src clojure
+;; Setup (see "Loading an empty DB" above for full patterns)
+(impl-rust/set-rust-db! vms-rdb vms-cljs-db)
+(impl-rust/set-named-db! "$ws" ws-rdb ws-cljs-db)
+
+;; Cross-query: join VMS module definitions ($) with worksheet inputs ($ws)
+(impl-rust/q
+ '[:find ?var ?unit ?val
+   :in $ $ws
+   :where
+   [$ws ?i :input/variable ?var]
+   [$ws ?i :input/value ?val]
+   [$ ?v :variable/name ?var]
+   [$ ?v :variable/unit ?unit]]
+ vms-cljs-db ws-cljs-db)
+;; => #{["Wind Speed" "mph" "10"] ["Fuel Moisture" "%" "8"]}
+#+end_src
+
+Use ~impl-rust/q-ws~ to query the worksheet DB directly without cross-join:
+
+#+begin_src clojure
+(impl-rust/q-ws '[:find [?val ...]
+                  :in $ ?mod
+                  :where
+                  [?i :input/module ?mod]
+                  [?i :input/value ?val]]
+                ws-cljs-db "Surface")
+;; => ["15" "8"]
+#+end_src
 
 * Roadmap
 

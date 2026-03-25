@@ -10,8 +10,6 @@
             [absurder-sql.datascript.core           :as d]
             [absurder-sql.datascript.impl-rust      :as impl-rust]
             [absurder-sql.datascript.persistent-sorted-set :as pss]
-            [absurder-sql.datascript.sqlite         :as ds-sqlite]
-            [absurder-sql.datascript.storage-async  :as storage-async]
             [absurder-sql.interface                 :as sql]
             [ds-schema-utils.interface              :refer [->ds-schema]]
             [re-frame.core                          :as rf]
@@ -86,6 +84,7 @@
    Awaits WASM init but does not return a Promise to the caller."
   []
   (reset-conn-state!)
+  (reset-sql-state!)
   (-> (pss/ensure-initialized!)
       (p/then (fn [_]
                 (let [schema (->ds-schema all-schemas)]
@@ -98,6 +97,7 @@
    Attempts to restore an existing DB named `worksheet-<ws-uuid>.db`."
   [ws-uuid]
   (reset-conn-state!)
+  (reset-sql-state!)
   (let [schema  (->ds-schema all-schemas)
         db-name (str "worksheet-" ws-uuid ".db")]
     (swap! sql-state assoc :db-name db-name)
@@ -191,13 +191,7 @@
                                     (let [cljs-db (impl-rust/sync-from-rust rdb)
                                           ds-conn (setup-worksheet-conn! schema (d/datoms cljs-db :eavt))]
                                       (impl-rust/set-named-db! "$ws" rdb @ds-conn))
-                                    ;; Fallback: CLJS storage-async for very old formats
-                                    (let [store (ds-sqlite/sqlite-store sql-conn {:db-name db-name :skip-ddl true})]
-                                      (-> (storage-async/restore-sync store)
-                                          (p/then (fn [[db _wrapper]]
-                                                    (let [ds-conn (setup-worksheet-conn! schema (d/datoms db :eavt))
-                                                          rdb (impl-rust/sync-to-rust! @ds-conn)]
-                                                      (impl-rust/set-named-db! "$ws" rdb @ds-conn))))))))
+                                    (js/console.error "Unsupported .bp7 format: restoreFromLegacy returned nil for" db-name)))
                                 (rf/dispatch-sync [:state/set :sync-loaded? true])
                                 (rf/dispatch-sync [:state/set :ws-version
                                                    @(rf/subscribe [:worksheet/version

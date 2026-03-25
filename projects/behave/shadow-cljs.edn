@@ -12,6 +12,9 @@
                           :js-options   {:resolve {"datascript-rs"
                                                    {:target :file
                                                     :file   "target/datascript-rs/datascript_rs.js"}}}
+                          :compiler-options {:closure-defines
+                                            {absurder-sql.datascript.persistent-sorted-set/WASM_URL
+                                             "/js/datascript_rs_bg.wasm"}}
                           :build-hooks  [(behave.test-build/wasm-prepare-hook)
                                         (behave.test-build/flush-hook)]
                           :devtools     {:http-port 1819

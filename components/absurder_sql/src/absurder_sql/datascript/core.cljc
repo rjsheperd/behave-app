@@ -3,7 +3,6 @@
   (:require
    [#?(:cljs cljs.reader :clj clojure.edn) :as edn]
    [absurder-sql.datascript.conn :as conn]
-   [absurder-sql.datascript.protocols :as proto :refer [IDatascriptStorageAdapter]]
    [absurder-sql.datascript.db :as db #?@(:cljs [:refer [Datom DB FilteredDB]])]
    #?(:clj [absurder-sql.datascript.pprint])
    [absurder-sql.datascript.pull-api :as dp]
@@ -11,8 +10,7 @@
    [absurder-sql.datascript.query :as dq]
    [absurder-sql.datascript.impl.entity :as de]
    [absurder-sql.datascript.util :as util]
-   [#?(:clj me.tonsky.persistent-sorted-set :cljs absurder-sql.datascript.persistent-sorted-set) :as set]
-   [#?(:clj datascript.storage :cljs absurder-sql.datascript.storage) :as storage])
+   [#?(:clj me.tonsky.persistent-sorted-set :cljs absurder-sql.datascript.persistent-sorted-set) :as set])
   #?(:clj
      (:import
       [absurder-sql.datascript.db Datom DB FilteredDB]
@@ -29,10 +27,10 @@
        :doc "Retrieves an entity by its id from database. Entities are lazy map-like structures to navigate Absurdersql.DataScript database content.
 
              For `eid` pass entity id or lookup attr:
-             
+
                  (entity db 1)
                  (entity db [:unique-attr :value])
-            
+
              If entity does not exist, `nil` is returned:
 
                  (entity db 100500) ; => nil
@@ -42,7 +40,7 @@
                  (entity db 1) ; => {:db/id 1}
 
              Entity attributes can be lazily accessed through key lookups:
-             
+
                  (:attr (entity db 1)) ; => :value
                  (get (entity db 1) :attr) ; => :value
 
@@ -59,17 +57,17 @@
 
                  (:_ref (entity db 2)) ; => [{:db/id 1}]
                  (:ns/_ref (entity db 2)) ; => [{:db/id 1}]
-             
+
              Reverse reference lookup returns sequence of entities unless attribute is marked as `:db/isComponent`:
 
                  (:_component-ref (entity db 2)) ; => {:db/id 1}
 
              Entity gotchas:
-               
+
              - Entities print as map, but are not exactly maps (they have compatible get interface though).
-             - Entities are effectively immutable “views” into a particular version of a database.
+             - Entities are effectively immutable \"views\" into a particular version of a database.
              - Entities retain reference to the whole database.
-             - You can’t change database through entities, only read.
+             - You can't change database through entities, only read.
              - Creating an entity by id is very cheap, almost no-op (attributes are looked up on demand).
              - Comparing entities just compares their ids. Be careful when comparing entities taken from different dbs or from different versions of the same db.
              - Accessed entity attributes are cached on entity itself (except backward references).
@@ -135,7 +133,7 @@
     :doc "Executes a datalog query. See [docs.datomic.com/on-prem/query.html](https://docs.datomic.com/on-prem/query.html).
 
           Usage:
-          
+
           ```
           (q '[:find ?value
                :where [_ :likes ?value]]
@@ -150,22 +148,14 @@
   "Creates an empty database with an optional schema.
 
    Usage:
-   
+
    ```
    (empty-db) ; => #absurder-sql.datascript/DB {:schema {}, :datoms []}
 
    (empty-db {:likes {:db/cardinality :db.cardinality/many}})
    ; => #absurder-sql.datascript/DB {:schema {:likes {:db/cardinality :db.cardinality/many}}
    ;                    :datoms []}
-   ```
-   
-   Options are:
-   
-   :branching-factor <int>, default 512. B-tree max node length
-   :ref-type         :strong | :soft | :weak, default :soft. How will nodes that are already
-                     stored on disk be referenced. Soft or weak means they might be unloaded
-                     from memory under memory pressure and later fetched from storage again.
-   :storage          <IDataScriptStorage>. Will be used to store this db later with `(d/store db)`"
+   ```"
   ([]
    (db/empty-db nil {}))
   ([schema]
@@ -202,31 +192,6 @@
   ([datoms schema opts]
    (db/init-db datoms schema opts)))
 
-#_(def ^{:arglists '([db] [db opts])
-         :doc "Converts db into a data structure (not string!) that can be fed to serializer
-             of your choice (e.g. `js/JSON.stringify` in CLJS, `cheshire.core/generate-string`
-             or `jsonista.core/write-value-as-string` in CLJ).
-
-             On JVM, `serializable` holds a global lock that prevents any two serializations
-             to run in parallel (an implementation constraint, be aware).
-
-             Options:
-
-             `:freeze-fn` Non-primitive values will be serialized using this. Optional.
-             `pr-str` by default."}
-    serializable ds/serializable)
-
-#_(def ^{:tag DB
-         :arglists '([serializable] [serializable opts])
-         :doc "Creates db from a data structure (not string!) produced by serializable.
-
-             Opts:
-
-             `:thaw-fn` Non-primitive values will be deserialized using this.
-             Must match :freeze-fn from serializable. Optional. `clojure.edn/read-string`
-             by default."}
-    from-serializable ds/from-serializable)
-
 ; Schema
 
 (def ^{:arglists '([db])
@@ -242,7 +207,7 @@
 
 (defn filter
   "Returns a view over database that has same interface but only includes datoms for which the `(pred db datom)` is true. Can be applied multiple times.
-   
+
    Filtered DB gotchas:
 
    - All operations on filtered database are proxied to original DB, then filter pred is applied.
@@ -289,17 +254,17 @@
        ;     #absurder-sql.datascript/Datom [1 :likes \"fries\"]
        ;     #absurder-sql.datascript/Datom [1 :likes \"pizza\"]
        ;     #absurder-sql.datascript/Datom [1 :name \"Ivan\"])
-  
+
        ; find all datoms for entity id == 1 and attribute == :likes (any values)
        ; sorted by value
        (datoms db :eavt 1 :likes)
        ; => (#absurder-sql.datascript/Datom [1 :likes \"fries\"]
        ;     #absurder-sql.datascript/Datom [1 :likes \"pizza\"])
-       
+
        ; find all datoms for entity id == 1, attribute == :likes and value == \"pizza\"
        (datoms db :eavt 1 :likes \"pizza\")
        ; => (#absurder-sql.datascript/Datom [1 :likes \"pizza\"])
-  
+
        ; find all datoms for attribute == :likes (any entity ids and values)
        ; sorted by entity id, then value
        (datoms db :aevt :likes)
@@ -308,13 +273,13 @@
        ;     #absurder-sql.datascript/Datom [2 :likes \"candy\"]
        ;     #absurder-sql.datascript/Datom [2 :likes \"pie\"]
        ;     #absurder-sql.datascript/Datom [2 :likes \"pizza\"])
-  
+
        ; find all datoms that have attribute == `:likes` and value == `\"pizza\"` (any entity id)
        ; `:likes` must be a unique attr, reference or marked as `:db/index true`
        (datoms db :avet :likes \"pizza\")
        ; => (#absurder-sql.datascript/Datom [1 :likes \"pizza\"]
        ;     #absurder-sql.datascript/Datom [2 :likes \"pizza\"])
-  
+
        ; find all datoms sorted by entity id, then attribute, then value
        (datoms db :eavt) ; => (...)
 
@@ -322,24 +287,24 @@
 
        ; get all values of :db.cardinality/many attribute
        (->> (datoms db :eavt eid attr) (map :v))
-  
+
        ; lookup entity ids by attribute value
        (->> (datoms db :avet attr value) (map :e))
-  
+
        ; find all entities with a specific attribute
        (->> (datoms db :aevt attr) (map :e))
-  
-       ; find “singleton” entity by its attr
+
+       ; find \"singleton\" entity by its attr
        (->> (datoms db :aevt attr) first :e)
-  
+
        ; find N entities with lowest attr value (e.g. 10 earliest posts)
        (->> (datoms db :avet attr) (take N))
-  
+
        ; find N entities with highest attr value (e.g. 10 latest posts)
        (->> (datoms db :avet attr) (reverse) (take N))
 
    Gotchas:
-   
+
    - Index lookup is usually more efficient than doing a query with a single clause.
    - Resulting iterator is calculated in constant time and small constant memory overhead.
    - Iterator supports efficient `first`, `next`, `reverse`, `seq` and is itself a sequence.
@@ -363,7 +328,7 @@
 (defn seek-datoms
   "Similar to [[datoms]], but will return datoms starting from specified components and including rest of the database until the end of the index.
 
-   If no datom matches passed arguments exactly, iterator will start from first datom that could be considered “greater” in index order.
+   If no datom matches passed arguments exactly, iterator will start from first datom that could be considered \"greater\" in index order.
 
    Usage:
 
@@ -381,12 +346,12 @@
        ;     #absurder-sql.datascript/Datom [2 :likes \"candy\"]
        ;     #absurder-sql.datascript/Datom [2 :likes \"pie\"]
        ;     #absurder-sql.datascript/Datom [2 :likes \"pizza\"])
-  
-       (seek-datoms db :eavt 2) 
+
+       (seek-datoms db :eavt 2)
        ; => (#absurder-sql.datascript/Datom [2 :likes \"candy\"]
        ;     #absurder-sql.datascript/Datom [2 :likes \"pie\"]
        ;     #absurder-sql.datascript/Datom [2 :likes \"pizza\"])
-  
+
        ; no datom [2 :likes \"fish\"], so starts with one immediately following such in index
        (seek-datoms db :eavt 2 :likes \"fish\")
        ; => (#absurder-sql.datascript/Datom [2 :likes \"pie\"]
@@ -407,11 +372,11 @@
 
 (defn index-range
   "Returns part of `:avet` index between `[_ attr start]` and `[_ attr end]` in AVET sort order.
-  
+
    Same properties as [[datoms]].
-   
+
    `attr` must be a reference, unique attribute or marked as `:db/index true`.
-   
+
    Usage:
 
        (index-range db :likes \"a\" \"zzzzzzzzz\")
@@ -420,13 +385,13 @@
        ;     #absurder-sql.datascript/Datom [2 :likes \"pie\"]
        ;     #absurder-sql.datascript/Datom [1 :likes \"pizza\"]
        ;     #absurder-sql.datascript/Datom [2 :likes \"pizza\"])
-        
+
        (index-range db :likes \"egg\" \"pineapple\")
        ; => (#absurder-sql.datascript/Datom [1 :likes \"fries\"]
        ;     #absurder-sql.datascript/Datom [2 :likes \"pie\"])
-           
+
    Useful patterns:
-     
+
        ; find all entities with age in a specific range (inclusive)
        (->> (index-range db :age 18 60) (map :e))"
   [db attr start end]
@@ -454,28 +419,14 @@
 
    Connections are lightweight in-memory structures (~atoms) with direct support of transaction listeners ([[listen!]], [[unlisten!]]) and other handy Absurdersql.DataScript APIs ([[transact!]], [[reset-conn!]], [[db]]).
 
-   To access underlying immutable DB value, deref: `@conn`.
-
-   For list of options, see [[empty-db]].
-
-   If you specify `:storage` option, conn will be stored automatically after each transaction"
+   To access underlying immutable DB value, deref: `@conn`."
   ([] (conn/create-conn))
   ([schema] (conn/create-conn schema))
   ([schema opts] (conn/create-conn schema opts)))
 
-(defn restore-conn
-  "Lazy-load database from storage and make conn out of it.
-   Returns nil if there's no database yet in storage"
-  ([storage] (restore-conn storage {}))
-  ([storage opts]
-   (when-some [result (if (satisfies? proto/IDatascriptStorageAdapter storage)
-                         (proto/-restore-impl storage opts)
-                         (storage/restore-impl storage opts))]
-     (conn/restore-conn result))))
-
 (def ^{:arglists '([conn tx-data] [conn tx-data tx-meta])} transact!
   "Applies transaction the underlying database value and atomically updates connection reference to point to the result of that transaction, new db value.
-  
+
    Returns transaction report, a map:
 
        {:db-before ...      ; db value before transaction
@@ -485,56 +436,56 @@
         :tx-meta   tx-meta} ; the exact value you passed as `tx-meta`
 
   Note! `conn` will be updated in-place and is not returned from [[transact!]].
-  
+
   Usage:
 
       ; add a single datom to an existing entity (1)
       (transact! conn [[:db/add 1 :name \"Ivan\"]])
-  
+
       ; retract a single datom
       (transact! conn [[:db/retract 1 :name \"Ivan\"]])
-  
+
       ; retract single entity attribute
       (transact! conn [[:db.fn/retractAttribute 1 :name]])
-  
+
       ; ... or equivalently (since Datomic changed its API to support this):
       (transact! conn [[:db/retract 1 :name]])
-      
+
       ; retract all entity attributes (effectively deletes entity)
       (transact! conn [[:db.fn/retractEntity 1]])
-  
+
       ; create a new entity (`-1`, as any other negative value, is a tempid
       ; that will be replaced with Absurdersql.DataScript to a next unused eid)
       (transact! conn [[:db/add -1 :name \"Ivan\"]])
-  
+
       ; check assigned id (here `*1` is a result returned from previous `transact!` call)
       (def report *1)
       (:tempids report) ; => {-1 296}
-  
+
       ; check actual datoms inserted
       (:tx-data report) ; => [#absurder-sql.datascript/Datom [296 :name \"Ivan\"]]
-  
+
       ; tempid can also be a string
       (transact! conn [[:db/add \"ivan\" :name \"Ivan\"]])
       (:tempids *1) ; => {\"ivan\" 297}
-  
+
       ; reference another entity (must exist)
       (transact! conn [[:db/add -1 :friend 296]])
-  
+
       ; create an entity and set multiple attributes (in a single transaction
       ; equal tempids will be replaced with the same yet unused entid)
       (transact! conn [[:db/add -1 :name \"Ivan\"]
                        [:db/add -1 :likes \"fries\"]
                        [:db/add -1 :likes \"pizza\"]
                        [:db/add -1 :friend 296]])
-  
+
       ; create an entity and set multiple attributes (alternative map form)
       (transact! conn [{:db/id  -1
                         :name   \"Ivan\"
                         :likes  [\"fries\" \"pizza\"]
                         :friend 296}])
-      
-      ; update an entity (alternative map form). Can’t retract attributes in
+
+      ; update an entity (alternative map form). Can't retract attributes in
       ; map form. For cardinality many attrs, value (fish in this example)
       ; will be added to the list of existing values
       (transact! conn [{:db/id  296
@@ -546,7 +497,7 @@
                         :name   \"Oleg\"
                         :friend {:db/id -2
                                  :name \"Sergey\"}}])
-                                 
+
       ; reverse attribute name can be used if you want created entity to become
       ; a value in another entity reference
       (transact! conn [{:db/id  -1
@@ -570,9 +521,9 @@
 (def ^{:arglists '([conn callback] [conn key callback])} listen!
   "Listen for changes on the given connection. Whenever a transaction is applied to the database via [[transact!]], the callback is called
    with the transaction report. `key` is any opaque unique value.
-   
+
    Idempotent. Calling [[listen!]] with the same key twice will override old callback with the new value.
-   
+
    Returns the key under which this listener is registered. See also [[unlisten!]]."
   conn/listen!)
 
@@ -582,7 +533,7 @@
 
 ; Data Readers
 
-(def ^{:doc "Data readers for EDN readers. In CLJS they’re registered automatically. In CLJ, if `data_readers.clj` do not work, you can always do
+(def ^{:doc "Data readers for EDN readers. In CLJS they're registered automatically. In CLJ, if `data_readers.clj` do not work, you can always do
 
              ```
              (clojure.edn/read-string {:readers data-readers} \"...\")
@@ -599,7 +550,7 @@
 
 (defn tempid
   "Allocates and returns an unique temporary id (a negative integer). Ignores `part`. Returns `x` if it is specified.
-  
+
    Exists for Datomic API compatibility. Prefer using negative integers directly if possible."
   ([part]
    (if (= part :db.part/tx)
@@ -612,14 +563,14 @@
 
 (defn resolve-tempid
   "Does a lookup in tempids map, returning an entity id that tempid was resolved to.
-   
+
    Exists for Datomic API compatibility. Prefer using map lookup directly if possible."
   [_db tempids tempid]
   (get tempids tempid))
 
 (defn ^DB db
   "Returns the underlying immutable database value from a connection.
-   
+
    Exists for Datomic API compatibility. Prefer using `@conn` directly if possible."
   [conn]
   {:pre [(conn? conn)]}
@@ -627,7 +578,7 @@
 
 (defn transact
   "Same as [[transact!]], but returns an immediately realized future.
-  
+
    Exists for Datomic API compatibility. Prefer using [[transact!]] if possible."
   ([conn tx-data] (transact conn tx-data nil))
   ([conn tx-data tx-meta]
@@ -666,7 +617,7 @@
 
 (defn transact-async
   "In CLJ, calls [[transact!]] on a future thread pool, returning immediately.
-  
+
    In CLJS, just calls [[transact!]] and returns a realized future."
   ([conn tx-data] (transact-async conn tx-data nil))
   ([conn tx-data tx-meta]
@@ -677,43 +628,13 @@
 
 (def ^{:arglists '([] [msec])} squuid
   "Generates a UUID that grow with time. Such UUIDs will always go to the end  of the index and that will minimize insertions in the middle.
-  
+
    Consist of 64 bits of current UNIX timestamp (in seconds) and 64 random bits (2^64 different unique values per second)."
   util/squuid)
 
 (def ^{:arglists '([uuid])} squuid-time-millis
   "Returns time that was used in [[squuid]] call, in milliseconds, rounded to the closest second."
   util/squuid-time-millis)
-
-;; Storage
-(defn store
-  "Stores databases to provided storage. If database was created
-      with :storage option or restored from storage, use single-argument version.
-      
-      Subsequent stores are incremental, i.e. only newly added nodes will be actually stored.
-      
-      Storing already stored dbs into another storage is not supported (may change)."
-  [storage db]
-  (proto/-store-db storage db))
-
-(defn restore
-  "Lazy-loads database from storage. Ultra-fast, fetches the rest as it’s needed"
-  ([^IDatascriptStorageAdapter storage]
-   (restore storage {}))
-  ([^IDatascriptStorageAdapter storage opts]
-   (proto/-restore-storage storage opts)))
-
-(defn addresses
-  "Returns all addresses in use by current db (as java.util.HashSet).
-      Anything that is not in the return set is safe to be deleted"
-  [^IDatascriptStorageAdapter storage & dbs]
-  (proto/-addresses storage dbs))
-
-(defn collect-garbage
-  "Deletes all keys from storage that are not referenced by any of the currently alive db refs.
-      Has a side-effect of fully loading databases fully into memory, so, can be slow"
-  [^IDatascriptStorageAdapter storage]
-  (proto/-collect-garbage storage))
 
 (defn settings [db]
   (set/settings (:eavt db)))

@@ -1,10 +1,8 @@
 (ns absurder-sql.datascript.conn
   (:require
    [absurder-sql.datascript.db :as db #?@(:cljs [:refer [DB FilteredDB]])]
-   [absurder-sql.datascript.protocols :as proto]
    [extend-clj.core :as extend]
-   [#?(:clj me.tonsky.persistent-sorted-set :cljs absurder-sql.datascript.persistent-sorted-set) :as set]
-   [#?(:clj datascript.storage :cljs absurder-sql.datascript.storage) :as storage])
+   [#?(:clj me.tonsky.persistent-sorted-set :cljs absurder-sql.datascript.persistent-sorted-set) :as set])
   #?(:clj
      (:import
       [absurder-sql.datascript.db DB FilteredDB])))
@@ -20,18 +18,6 @@
 
 (defn- make-conn [opts]
   (->Conn (atom opts)))
-
-(defn- storage-adapter [db]
-  (when db (.-_storage (:eavt db))))
-
-(defn- db-with-tail [db tail]
-  (reduce
-   (fn [db datoms]
-     (if (empty? datoms) db
-         (as-> db %
-           (reduce db/with-datom % datoms)
-           (assoc % :max-tx (:tx (first datoms))))))
-   db tail))
 
 (defn with
   ([db tx-data] (with db tx-data nil))
@@ -57,14 +43,7 @@
 
 (defn conn-from-db [db]
   {:pre [(db/db? db)]}
-  (if-some [adapter (storage-adapter db)]
-    (do
-      (proto/-ds-store! adapter db true)
-      (make-conn
-       {:db db
-        :tx-tail []
-        :db-last-stored db}))
-    (make-conn {:db db})))
+  (make-conn {:db db}))
 
 (defn conn-from-datoms
   ([datoms]
@@ -72,7 +51,7 @@
   ([datoms schema]
    (conn-from-db (db/init-db datoms schema {})))
   ([datoms schema opts]
-   (conn-from-db (db/init-db datoms schema (storage/maybe-adapt-storage opts)))))
+   (conn-from-db (db/init-db datoms schema opts))))
 
 (defn create-conn
   ([]
@@ -80,14 +59,7 @@
   ([schema]
    (conn-from-db (db/empty-db schema {})))
   ([schema opts]
-   (conn-from-db (db/empty-db schema (storage/maybe-adapt-storage opts)))))
-
-(defn restore-conn [result]
-  (when-some [[db tail] result]
-    (make-conn
-     {:db             (db-with-tail db tail)
-      :tx-tail        tail
-      :db-last-stored db})))
+   (conn-from-db (db/empty-db schema opts))))
 
 (defn ^:no-doc -transact! [conn tx-data tx-meta]
   {:pre [(conn? conn)]}
@@ -97,22 +69,6 @@
              (let [r (with db tx-data tx-meta)]
                (vreset! *report r)
                (:db-after r))))
-    (when (storage-adapter @conn)
-      (let [{db     :db-after
-             datoms :tx-data} @*report]
-        (when-not (empty? datoms)
-          (let [settings (set/settings (:eavt db))
-                *atom    (:atom conn)
-                tx-tail' (:tx-tail (swap! *atom update :tx-tail conj datoms))]
-            (if (> (transduce (map count) + 0 tx-tail') (:branching-factor settings))
-              ;; overflow tail
-              (do
-                (proto/-ds-store! (storage-adapter db) db false)
-                (swap! *atom assoc
-                       :tx-tail        []
-                       :db-last-stored db))
-              ;; just update tail
-              (proto/-ds-store-tail! (storage-adapter db) db tx-tail'))))))
     @*report))
 
 (defn transact!
@@ -141,27 +97,14 @@
                                    (map #(assoc % :added false) (db/-datoms db-before :eavt nil nil nil nil)))
                                  (db/-datoms db :eavt nil nil nil nil))
                      :tx-meta   tx-meta})]
-     (if (storage-adapter db-before)
-       (do
-         (proto/-ds-store! (storage-adapter db) db false)
-         (swap! (:atom conn) assoc
-                :db             db
-                :tx-tail        []
-                :db-last-stored db))
-       (reset! conn db))
+     (reset! conn db)
      (doseq [[_ callback] (:listeners @(:atom conn))]
        (callback report))
      db)))
 
 (defn reset-schema! [conn schema]
   {:pre [(conn? conn)]}
-  (let [db (swap! conn db/with-schema schema)]
-    (when-some [adapter (storage-adapter db)]
-      (proto/-ds-store! adapter db true)
-      (swap! (:atom conn) assoc
-             :tx-tail []
-             :db-last-stored db))
-    db))
+  (swap! conn db/with-schema schema))
 
 (defn listen!
   ([conn callback]

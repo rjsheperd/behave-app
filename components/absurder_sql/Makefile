@@ -98,12 +98,12 @@ watch-stop: ## Stop shadow-cljs watch
 	@if [ -f $(SHADOW_PID) ]; then \
 		kill $$(cat $(SHADOW_PID)) 2>/dev/null || true; \
 		rm -f $(SHADOW_PID); \
-# # 		echo "Shadow watch stopped"; \
-# # 	fi
+		echo "Shadow watch stopped"; \
+	fi
 
-# # # ==================================================================
-# # # Dev
-# # # ==================================================================
+# ==================================================================
+# Dev
+# ==================================================================
 
 repl: ## Start a shadow-cljs cljs-repl for :test-kaocha
 	bun shadow-cljs cljs-repl :test-kaocha

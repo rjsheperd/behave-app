@@ -10,6 +10,8 @@
 ;; Test utils and fixtures
 ;; =================================================================================================
 
+(use-fixtures :once {:before fx/with-wasm-init})
+
 (use-fixtures :each
   {:before (join-fixtures [fx/setup-vms! fx/setup-empty-db])
    :after  (join-fixtures [fx/teardown-db])})

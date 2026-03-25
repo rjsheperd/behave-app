@@ -1,16 +1,27 @@
 (ns behave.fixtures
   (:require
+   [absurder-sql.datascript.core :as d]
+   [absurder-sql.datascript.persistent-sorted-set :as pss]
+   [austinbirch.reactive-entity :as re]
    [behave.schema.core :refer [all-schemas]]
    [behave.store :as bs]
    [behave.vms.store :as vms]
-   [absurder-sql.datascript.core :as d]
+   [cljs.core.async :refer [go]]
+   [cljs.core.async.interop :refer-macros [<p!]]
+   [cljs.test :refer [async]]
    [datom-compressor.interface :as c]
    [datom-utils.interface :refer [db-attrs datoms->map]]
    [ds-schema-utils.interface :refer [->ds-schema]]
    [re-frame.core :as rf]
    [re-posh.core :as rp]
-   [re-posh.db :as rpdb]
-   [austinbirch.reactive-entity :as re]))
+   [re-posh.db :as rpdb]))
+
+;;; WASM Initialization
+
+(defn with-wasm-init
+  "use-fixtures :once helper — ensures WASM is initialized before any tests."
+  [& [_f]]
+  (async done (go (<p! (pss/ensure-initialized!)) (done))))
 
 ;;; Re-Frame Event Logging
 

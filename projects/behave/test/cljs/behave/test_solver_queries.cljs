@@ -8,6 +8,8 @@
             [behave.schema.core :refer [rules]]
             [re-frame.core :as rf]))
 
+(use-fixtures :once {:before fx/with-wasm-init})
+
 (use-fixtures :each {:before (join-fixtures [fx/setup-vms! fx/setup-empty-db fx/with-new-worksheet])
                      :after  fx/teardown-db})
 

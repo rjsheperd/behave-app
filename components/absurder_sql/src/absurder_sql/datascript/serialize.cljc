@@ -4,8 +4,6 @@
     [clojure.edn :as edn]
     [clojure.string :as str]
     [absurder-sql.datascript.db :as db #?@(:cljs [:refer [Datom]])]
-    [absurder-sql.datascript.protocols :as proto :refer [IStorage]]
-    [absurder-sql.datascript.storage :as storage]
     [absurder-sql.datascript.util :as util]
     [#?(:clj me.tonsky.persistent-sorted-set :cljs absurder-sql.datascript.persistent-sorted-set) :as set]
     [me.tonsky.persistent-sorted-set.arrays :as arrays])
@@ -120,8 +118,6 @@
   [db {:keys [freeze-fn freeze-kw]
        :or   {freeze-fn pr-str
               freeze-kw freeze-kw}}]
-  (when (storage/storage db)
-    (throw (ex-info "serializable doesn't work with databases that have :storage" {})))
   (let [attrs       (all-attrs db)
         attrs-map   (into {} (map vector attrs (range)))
         *kws        (volatile! (transient []))

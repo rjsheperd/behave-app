@@ -4,6 +4,8 @@
    [re-frame.core :as rf]
    [behave.fixtures :as fx]))
 
+(use-fixtures :once {:before fx/with-wasm-init})
+
 (use-fixtures :each
   {:before (join-fixtures [fx/setup-vms! fx/setup-empty-db fx/with-new-worksheet fx/with-dummy-results-table])
    :after  (join-fixtures [fx/teardown-db])})

@@ -1,12 +1,14 @@
 (ns behave.tests-used-in-fixtures
   (:require
+   [behave.fixtures :as fx :refer [setup-empty-db teardown-db]]
    [cljs.test :refer [use-fixtures deftest is join-fixtures] :include-macros true]
-   [re-frame.core :as rf]
-   [behave.fixtures :refer [setup-empty-db teardown-db]]))
+   [re-frame.core :as rf]))
 
 ;; =================================================================================================
 ;; Test utils and fixtures
 ;; =================================================================================================
+
+(use-fixtures :once {:before fx/with-wasm-init})
 
 (use-fixtures :each
   {:before (join-fixtures [setup-empty-db])
