@@ -52,6 +52,58 @@
     conn))
 
 ;;; ==========================================================================
+;;; Multi-Window Safety: persist timer cancellation on worksheet switch
+;;; ==========================================================================
+
+(deftest ^:integration load-store-local-cancels-stale-persist-timer-test
+  (testing "load-store-local! cancels any pending persist timer from a previous worksheet"
+    (async done
+           (let [fired? (atom false)
+                 fake-timer (js/setTimeout #(reset! fired? true) 50)]
+             (reset! s/persist-timer fake-timer)
+             (reset! s/sql-state {:db-name "worksheet-stale.db"})
+             ;; Switching worksheets must cancel the pending timer synchronously
+             (s/load-store-local! "fresh-uuid")
+             (is (nil? @s/persist-timer)
+                 "persist-timer atom should be cleared immediately")
+             ;; Wait well past the fake timer's firing window
+             (js/setTimeout
+              (fn []
+                (is (false? @fired?)
+                    "stale timer from previous worksheet must not fire after switch")
+                (done))
+              150)))))
+
+(deftest ^:integration load-store-minimal-cancels-stale-persist-timer-test
+  (testing "load-store-minimal! also cancels a pending persist timer"
+    (async done
+           (let [fired? (atom false)
+                 fake-timer (js/setTimeout #(reset! fired? true) 50)]
+             (reset! s/persist-timer fake-timer)
+             (reset! s/sql-state {:db-name "worksheet-stale.db"})
+             (s/load-store-minimal!)
+             (is (nil? @s/persist-timer)
+                 "persist-timer atom should be cleared by load-store-minimal!")
+             (js/setTimeout
+              (fn []
+                (is (false? @fired?)
+                    "stale timer must not fire after load-store-minimal!")
+                (done))
+              150)))))
+
+(deftest ^:integration switch-worksheet-updates-db-name-test
+  (testing "after switching worksheets the sql-state db-name reflects the new worksheet"
+    (async done
+           ;; Prime sql-state with a stale db-name as if a previous worksheet was active
+           (reset! s/sql-state {:db-name "worksheet-old.db"})
+           (s/load-store-local! "new-ws-uuid")
+           ;; db-name swap happens synchronously inside load-store-local!
+           (is (= "worksheet-new-ws-uuid.db" (:db-name @s/sql-state))
+               "sql-state should be updated to the new worksheet's db-name")
+           ;; Give the async restore a moment to settle before next test
+           (js/setTimeout (fn [] (done)) 50))))
+
+;;; ==========================================================================
 ;;; In-Memory Re-Frame / Re-Posh / DataScript Cycle
 ;;; ==========================================================================
 

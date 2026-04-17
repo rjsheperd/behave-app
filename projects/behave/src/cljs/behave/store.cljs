@@ -21,12 +21,12 @@
 (defonce conn (atom nil))
 (defonce ^:private worksheet-from-file? (atom false))
 
-(defonce ^:private sql-state
+(defonce sql-state
   (atom {:db-name nil}))
 
 ;;; Debounced persistence
 
-(defonce ^:private persist-timer (atom nil))
+(defonce persist-timer (atom nil))
 
 (defn- schedule-persist!
   "Debounced SQLite persist. Writes Rust DB to SQLite via storeToLegacy
