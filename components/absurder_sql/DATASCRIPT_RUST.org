@@ -903,7 +903,7 @@ and =d/entity= calls in the behave app have been routed through =impl-rust/*=
 with CLJS fallbacks. This phase tracks 8 remaining issues that must be resolved
 before the CLJS fallback paths can be safely removed.
 
-** TODO 6.1 Keyword Values Corrupted on Persistence Restore [HIGH]
+** DONE 6.1 Keyword Values Corrupted on Persistence Restore [HIGH]
 
 *** Problem
 
@@ -939,6 +939,21 @@ back into CLJS keywords, matching what =value_from_js= does on the Rust side.
 
 - =components/absurder_sql/src/absurder_sql/datascript/impl_rust.cljs= (~5 lines
   in =sync-from-rust=)
+
+*** Implementation
+
+- Added =js-datom-value->clj= helper: converts =:=-prefixed string values back
+  to keywords (mirrors the =value_from_js= heuristic in =wasm.rs=), passes
+  numbers/plain strings/booleans through unchanged.
+- Wired into =sync-from-rust=: value column now goes through =js-datom-value->clj=
+  instead of raw =(.-v d)=.
+- *Known limitation:* a genuine string value starting with =:= is coerced to a
+  keyword. Acceptable for behave data. The clean fix is to carry a value-type tag
+  on the *outbound* datom (=datom_to_js=/=value_to_js=), symmetric with the
+  inbound =value-type+str= tagging — filed as a follow-up (see below).
+- *Verified:* previously-red =worksheet-sync-to-cljs-test= and
+  =keyword-value-roundtrip-test= now pass; full store-integration + posh-rust
+  suites green (51 tests, 114 assertions, 0 failures).
 
 ** TODO 6.2 No Error Handling in Rust Sync Listener [HIGH]
 

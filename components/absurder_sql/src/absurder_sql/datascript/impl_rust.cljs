@@ -72,7 +72,7 @@
    from a previous page load before WASM memory is re-initialized."
   []
   (js/console.log "[impl-rust] clear-all-state! called"
-                   (js/Error. "stack trace"))
+                  (js/Error. "stack trace"))
   (.clear live-rdbs)
   (reset! state {:rust-db        nil
                  :cljs-db        nil
@@ -160,6 +160,21 @@
   [^string s]
   (keyword (subs s 1)))
 
+(defn- js-datom-value->clj
+  "Convert a JS datom value to CLJS.
+
+  Rust stringifies keyword values as ':name' / ':ns/name'; convert those
+  back to keywords. Numbers, plain strings, and booleans pass through
+  unchanged.
+
+  Note: a genuine string value starting with ':' is indistinguishable from
+  a keyword here and will be coerced. This mirrors the inverse heuristic in
+  `value_from_js` (wasm.rs) and is acceptable for behave data."
+  [v]
+  (if (and (string? v) (identical? ":" (.charAt ^string v 0)))
+    (keyword (subs v 1))
+    v))
+
 ;;; Sync
 
 (defn- escape-bulk-str
@@ -237,7 +252,7 @@
                          (map (fn [d]
                                 (db/datom (.-e d)
                                           (js-datom-attr->keyword (.-a d))
-                                          (.-v d)
+                                          (js-datom-value->clj (.-v d))
                                           (.-tx d))))
                          (array-seq datoms-arr))]
     (d/init-db datoms schema)))
@@ -598,9 +613,9 @@
         ;; queryEdnMulti consumes source_db (wasm-bindgen zeros __wbg_ptr)
         ;; but returns [result, source_db] so we can re-register it.
         js-result   (if (seq @source-name)
-                      (let [ret (.queryEdnMulti rdb query-edn rules-edn inputs-js
-                                               @source-name @source-db)
-                            result     (aget ret 0)
+                      (let [ret         (.queryEdnMulti rdb query-edn rules-edn inputs-js
+                                                        @source-name @source-db)
+                            result      (aget ret 0)
                             returned-db (aget ret 1)]
                         ;; Re-register the returned source DB (new JS wrapper, same Rust struct)
                         (when (and returned-db (not (nil? returned-db)))
@@ -729,15 +744,15 @@
   (let [rdb (when @rust-enabled? (resolve-rust-db-strict db))]
     (when js/goog.DEBUG
       (js/console.log "[pull-many]" "rust?" (some? rdb)
-                       "pattern:" (pr-str pattern)
-                       "eids:" (pr-str (take 3 eids))
-                       "db-type:" (type db)
-                       "db=conn?" (identical? db (:cljs-db @state))))
+                      "pattern:" (pr-str pattern)
+                      "eids:" (pr-str (take 3 eids))
+                      "db-type:" (type db)
+                      "db=conn?" (identical? db (:cljs-db @state))))
     (if (nil? rdb)
       (let [result (d/pull-many db pattern eids)]
         (when js/goog.DEBUG
           (js/console.log "[pull-many] CLJS result sample:"
-                           (pr-str (take 2 result))))
+                          (pr-str (take 2 result))))
         result)
       (let [pattern-edn (strip-edn-comments (pr-str pattern))
             eids-js     (apply array (map eid->js eids))
