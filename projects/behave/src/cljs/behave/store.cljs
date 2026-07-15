@@ -1,5 +1,9 @@
 (ns behave.store
   (:require ["datascript-rs" :refer [WasmDataScript]]
+            [absurder-sql.datascript.core           :as d]
+            [absurder-sql.datascript.impl-rust      :as impl-rust]
+            [absurder-sql.datascript.persistent-sorted-set :as pss]
+            [absurder-sql.interface                 :as sql]
             [ajax.core                              :refer [ajax-request]]
             [ajax.edn                                :refer [edn-request-format]]
             [ajax.protocols                         :as pr]
@@ -7,14 +11,10 @@
             [behave-routing.main                    :refer [current-route-order]]
             [behave.schema.core                     :refer [all-schemas]]
             [browser-utils.core                     :refer [download]]
-            [absurder-sql.datascript.core           :as d]
-            [absurder-sql.datascript.impl-rust      :as impl-rust]
-            [absurder-sql.datascript.persistent-sorted-set :as pss]
-            [absurder-sql.interface                 :as sql]
             [ds-schema-utils.interface              :refer [->ds-schema]]
+            [promesa.core                           :as p]
             [re-frame.core                          :as rf]
-            [re-posh.core                           :as rp]
-            [promesa.core                           :as p]))
+            [re-posh.core                           :as rp]))
 
 ;;; State
 
@@ -34,12 +34,18 @@
   []
   (when-let [t @persist-timer] (js/clearTimeout t))
   (reset! persist-timer
-    (js/setTimeout
-      (fn []
-        (when-let [rdb (impl-rust/named-db "$ws")]
-          (when-let [db-name (:db-name @sql-state)]
-            (.storeToLegacy rdb db-name))))
-      2000)))
+          (js/setTimeout
+           (fn []
+             (when-let [rdb (impl-rust/named-db "$ws")]
+               (when-let [db-name (:db-name @sql-state)]
+            ;; Fail loud: a background persist failure is reported via the
+            ;; global window.onerror handler (behave.telemetry), not swallowed.
+                 (try
+                   (.storeToLegacy rdb db-name)
+                   (catch :default e
+                     (js/console.error "[store] Rust persist failed for" db-name e)
+                     (throw e))))))
+           2000)))
 
 ;;; SQLite Helpers
 
@@ -104,7 +110,7 @@
     (-> (pss/ensure-initialized!)
         (p/then (fn [_]
                   (if-let [rdb (try (.restoreFromLegacy WasmDataScript db-name)
-                                 (catch :default _ nil))]
+                                    (catch :default _ nil))]
                     (let [cljs-db (impl-rust/sync-from-rust rdb)
                           ds-conn (setup-worksheet-conn! schema (d/datoms cljs-db :eavt))]
                       (impl-rust/set-named-db! "$ws" rdb @ds-conn)
@@ -186,7 +192,7 @@
                                 (swap! sql-state assoc :db-name db-name)
                                 (let [schema (->ds-schema all-schemas)
                                       rdb    (try (.restoreFromLegacy WasmDataScript db-name)
-                                               (catch :default _ nil))]
+                                                  (catch :default _ nil))]
                                   (if rdb
                                     (let [cljs-db (impl-rust/sync-from-rust rdb)
                                           ds-conn (setup-worksheet-conn! schema (d/datoms cljs-db :eavt))]
@@ -230,10 +236,10 @@
                 @(rf/subscribe [:wizard/route-order ws-uuid workflow]))
         ;; Defer dispatches — we're inside an event handler, can't dispatch-sync
         (js/setTimeout
-          (fn []
-            (rf/dispatch-sync [:state/set :sync-loaded? true])
-            (rf/dispatch [:navigate (first @current-route-order)]))
-          0)))))
+         (fn []
+           (rf/dispatch-sync [:state/set :sync-loaded? true])
+           (rf/dispatch [:navigate (first @current-route-order)]))
+         0)))))
 
 ;;; Public Fns
 
@@ -252,16 +258,25 @@
 ;; Transact through Rust first (fast, in-place), then update CLJS conn
 ;; for posh reactivity. No storage adapter — persistence is debounced.
 (rf/reg-fx :transact
-  (fn [tx-data]
-    (if-let [rdb (impl-rust/named-db "$ws")]
-      (do
-        (.transact rdb (pr-str (vec tx-data)))
-        (d/transact! @conn tx-data)
-        (impl-rust/set-named-db! "$ws" rdb (d/db @conn))
-        (schedule-persist!))
+           (fn [tx-data]
+             (if-let [rdb (impl-rust/named-db "$ws")]
+               (do
+        ;; Rust is the source of truth. Fail loud on a Rust write error rather
+        ;; than masking it — swallowing here would silently diverge the Rust DB
+        ;; from the CLJS reactivity mirror. The re-thrown error is reported by
+        ;; the global window.onerror handler (behave.telemetry); the CLJS mirror
+        ;; is intentionally left untouched so both stay at the pre-tx state.
+                 (try
+                   (.transact rdb (pr-str (vec tx-data)))
+                   (catch :default e
+                     (js/console.error "[store] Rust transact failed for" (vec tx-data) e)
+                     (throw e)))
+                 (d/transact! @conn tx-data)
+                 (impl-rust/set-named-db! "$ws" rdb (d/db @conn))
+                 (schedule-persist!))
       ;; No Rust DB — fall back to CLJS-only transact
-      (when @conn
-        (d/transact! @conn tx-data)))))
+               (when @conn
+                 (d/transact! @conn tx-data)))))
 
 ;;; Events
 

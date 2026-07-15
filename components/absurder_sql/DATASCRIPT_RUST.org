@@ -955,24 +955,45 @@ back into CLJS keywords, matching what =value_from_js= does on the Rust side.
   =keyword-value-roundtrip-test= now pass; full store-integration + posh-rust
   suites green (51 tests, 114 assertions, 0 failures).
 
-** TODO 6.2 No Error Handling in Rust Sync Listener [HIGH]
+** DONE 6.2 No Error Handling in Rust Writes [HIGH]
 
-*** Problem
+*** Problem (superseded architecture)
 
-The =:rust-sync= listener in =setup-conn!= calls =sync-to-rust!= with no
-try/catch. If it throws (WASM OOM, schema mismatch, etc.), the exception
-propagates into DataScript's =transact!= internals, potentially leaving the CLJS
-conn in an undefined state, and the Rust DB stale.
+The original problem described a =:rust-sync= listener in =setup-conn!= calling
+=sync-to-rust!=. That dual-state model no longer exists: =store.cljs= was
+refactored to *Rust-primary* (Rust is the source of truth; the CLJS conn is a
+reactivity mirror rebuilt via =sync-from-rust=). The unguarded-write concern
+moved to two spots:
 
-*** Fix
+- The overridden =:transact= re-frame effect — =(.transact rdb ...)= is the hot
+  write path.
+- =schedule-persist!= — the debounced =(.storeToLegacy rdb db-name)= runs
+  detached inside a =setTimeout=.
 
-Wrap the listener body in =try=/=catch=. On failure, log a warning and optionally
-set a flag (=rust-sync-failed?=) that =impl-rust/q= checks to force CLJS fallback
-until the next successful sync.
+A throw in either (WASM OOM, schema mismatch, unsupported tx form) would
+otherwise surface as a cryptic error deep in re-frame / an anonymous timer, with
+no indication Rust was the cause.
+
+*** Fix — option C (fail loud)
+
+Rather than masking the error (which would silently diverge the Rust DB from the
+CLJS mirror), both Rust writes are wrapped to log with context and *re-throw*.
+=behave.telemetry='s global =window.onerror= / =unhandledrejection= handlers then
+report it. The CLJS mirror is intentionally left untouched on failure so both
+stores stay at the pre-tx state.
 
 *** Files
 
-- =projects/behave/src/cljs/behave/store.cljs= (~8 lines in =setup-conn!=)
+- =projects/behave/src/cljs/behave/store.cljs= (=:transact= fx + =schedule-persist!=)
+
+*** Related follow-up (new)
+
+=open-worksheet!= keys its SQLite/IndexedDB name off the uploaded *file name*
+(=<file>.bp7=), while =new-worksheet!= / =load-store-local!= use
+=worksheet-<uuid>.db=. In-session open+edit+persist works, but a uuid-route
+reload can't find a file-opened worksheet, and file names can collide. Fix:
+after =restoreFromLegacy= in =open-worksheet!=, re-key persistence to
+=worksheet-<uuid>.db= using the restored worksheet's =:worksheet/uuid=.
 
 ** TODO 6.3 reactive-entity Bypasses Rust Entirely [MEDIUM]
 
