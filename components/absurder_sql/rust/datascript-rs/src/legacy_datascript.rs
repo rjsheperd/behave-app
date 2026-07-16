@@ -76,6 +76,22 @@ pub mod wasm {
         }
     }
 
+    /// Get the pooled AbsurderSQL connection for `db_name`, or error.
+    ///
+    /// Deliberately NO fallback open: a raw `sqlite3_open_v2` with a null VFS
+    /// would silently write to an in-memory database (the Phase-6 "worksheets
+    /// don't persist" bug). The connection must be opened first via
+    /// `persistence::ensure_open` (`WasmDataScript.open`) or `sql/connect!`.
+    pub fn require_connection(db_name: &str) -> Result<Rc<ConnectionState>, String> {
+        let pool_key = db_name.trim_end_matches(".db");
+        connection_pool::get_or_create_connection(pool_key, || {
+            Err(format!(
+                "No open AbsurderSQL connection for {} — call WasmDataScript.open() first",
+                db_name
+            ))
+        })
+    }
+
     /// LegacyStorage reads/writes PSS nodes as EDN text in the `datascript` table.
     pub struct LegacyStorage {
         conn: Rc<ConnectionState>,
@@ -88,31 +104,8 @@ pub mod wasm {
     }
 
     impl LegacyStorage {
-        pub fn new(db_name: &str, settings: Settings) -> Self {
-            let pool_key = db_name.trim_end_matches(".db");
-
-            let conn = connection_pool::get_or_create_connection(pool_key, {
-                let name = db_name.to_string();
-                move || {
-                    let c_path =
-                        CString::new(name.as_str()).map_err(|e| e.to_string())?;
-                    let mut db: *mut sqlite3 = ptr::null_mut();
-                    let ret = unsafe {
-                        sqlite_wasm_rs::sqlite3_open_v2(
-                            c_path.as_ptr(),
-                            &mut db,
-                            sqlite_wasm_rs::SQLITE_OPEN_READWRITE
-                                | sqlite_wasm_rs::SQLITE_OPEN_CREATE,
-                            ptr::null(),
-                        )
-                    };
-                    if ret != SQLITE_OK {
-                        return Err(format!("Failed to open SQLite: {}", name));
-                    }
-                    Ok(db)
-                }
-            })
-            .expect("Failed to get or create SQLite connection for legacy storage");
+        pub fn new(db_name: &str, settings: Settings) -> Result<Self, String> {
+            let conn = require_connection(db_name)?;
 
             let (schema, rschema, max_addr) =
                 if let Some(meta) = Self::read_metadata_raw(conn.db.get()) {
@@ -126,7 +119,7 @@ pub mod wasm {
                 };
 
             let cache_size = settings.cache_size();
-            LegacyStorage {
+            Ok(LegacyStorage {
                 conn,
                 db_name: db_name.to_string(),
                 schema,
@@ -137,7 +130,7 @@ pub mod wasm {
                     NonZeroUsize::new(cache_size)
                         .unwrap_or(NonZeroUsize::new(1024).unwrap()),
                 ),
-            }
+            })
         }
 
         fn read_metadata_raw(db: *mut sqlite3) -> Option<LegacyMetadata> {
@@ -173,7 +166,7 @@ pub mod wasm {
             Self::read_metadata_raw(self.conn.db.get())
         }
 
-        pub fn write_metadata(&mut self, meta: &LegacyMetadata) {
+        pub fn write_metadata(&mut self, meta: &LegacyMetadata) -> Result<(), String> {
             let content = metadata_to_edn(meta);
             let db = self.conn.db.get();
             unsafe {
@@ -190,9 +183,15 @@ pub mod wasm {
                     SQLITE_TRANSIENT(),
                 );
                 let ret = sqlite3_step(ps.stmt);
-                assert_eq!(ret, SQLITE_DONE, "failed to write metadata: {}", ret);
+                if ret != SQLITE_DONE {
+                    let msg = std::ffi::CStr::from_ptr(sqlite3_errmsg(db))
+                        .to_string_lossy()
+                        .into_owned();
+                    return Err(format!("failed to write metadata ({}): {}", ret, msg));
+                }
             }
             self.max_addr = meta.max_addr;
+            Ok(())
         }
 
         pub fn schema(&self) -> &Schema {
@@ -209,35 +208,20 @@ pub mod wasm {
 
         /// Create a LegacyStorage with an explicit max_addr (used when storing
         /// multiple indexes sequentially to avoid address collisions).
-        pub fn new_with_max_addr(db_name: &str, settings: Settings, max_addr: i64) -> Self {
-            let mut s = Self::new(db_name, settings);
+        pub fn new_with_max_addr(
+            db_name: &str,
+            settings: Settings,
+            max_addr: i64,
+        ) -> Result<Self, String> {
+            let mut s = Self::new(db_name, settings)?;
             s.max_addr = max_addr;
-            s
+            Ok(s)
         }
 
         /// Query the actual maximum address from the datascript table.
-        pub fn query_max_addr(db_name: &str) -> i64 {
+        pub fn query_max_addr(db_name: &str) -> Result<i64, String> {
             let pool_key = db_name.trim_end_matches(".db");
-            let conn = connection_pool::get_or_create_connection(pool_key, {
-                let name = db_name.to_string();
-                move || {
-                    let c_path = CString::new(name.as_str()).map_err(|e| e.to_string())?;
-                    let mut db: *mut sqlite3 = ptr::null_mut();
-                    let ret = unsafe {
-                        sqlite_wasm_rs::sqlite3_open_v2(
-                            c_path.as_ptr(),
-                            &mut db,
-                            sqlite_wasm_rs::SQLITE_OPEN_READWRITE
-                                | sqlite_wasm_rs::SQLITE_OPEN_CREATE,
-                            ptr::null(),
-                        )
-                    };
-                    if ret != SQLITE_OK {
-                        return Err(format!("Failed to open SQLite: {}", name));
-                    }
-                    Ok(db)
-                }
-            }).expect("Failed to get connection for query_max_addr");
+            let conn = require_connection(db_name)?;
             let db = conn.db.get();
             let result = unsafe {
                 let ps = PreparedStmt::new(db, "SELECT COALESCE(MAX(addr), 1) FROM datascript");
@@ -249,7 +233,7 @@ pub mod wasm {
                 }
             };
             connection_pool::release_connection(pool_key);
-            result
+            Ok(result)
         }
 
         /// Check if the `datascript` table exists in the database.

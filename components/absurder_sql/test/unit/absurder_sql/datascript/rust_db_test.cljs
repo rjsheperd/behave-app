@@ -3,12 +3,14 @@
    Exercises the Rust DB directly via WASM exports, including
    the legacy EDN storage format (restoreFromLegacy/storeToLegacy)."
   (:require
+   ["datascript-rs" :refer [WasmDataScript]]
+   [absurder-sql.datascript.core :as d]
+   [absurder-sql.datascript.impl-rust :as impl-rust]
    [absurder-sql.datascript.persistent-sorted-set :as pss]
    [absurder-sql.interface :as sql]
    [cljs.core.async :refer [go]]
    [cljs.core.async.interop :refer-macros [<p!]]
-   [cljs.test :refer [async deftest is testing use-fixtures]]
-   ["datascript-rs" :refer [WasmDataScript]]))
+   [cljs.test :refer [async deftest is testing use-fixtures]]))
 
 (defn- with-sqlite []
   (async done
@@ -24,11 +26,11 @@
   (clj->js m))
 
 (defn- test-schema []
-  (js-schema {":name" {":db/index" true}
-              ":age" {}
-              ":email" {":db/unique" ":db.unique/identity"}
+  (js-schema {":name"   {":db/index" true}
+              ":age"    {}
+              ":email"  {":db/unique" ":db.unique/identity"}
               ":parent" {":db/valueType" ":db.type/ref"}
-              ":aka" {":db/cardinality" ":db.cardinality/many"}}))
+              ":aka"    {":db/cardinality" ":db.cardinality/many"}}))
 
 ;; Helper: create a datom JS object
 (defn- js-datom [e a v tx]
@@ -59,10 +61,10 @@
 
 (deftest datoms-eavt-test
   (testing "datomsIndex returns sorted datoms for EAVT"
-    (let [db (-> (.emptyDb WasmDataScript (test-schema))
-                 (.withDatoms #js [#js {:e 2 :a ":name" :v "Bob" :tx 536870913}
-                                   #js {:e 1 :a ":name" :v "Alice" :tx 536870913}
-                                   #js {:e 1 :a ":age" :v 30 :tx 536870913}]))
+    (let [db  (-> (.emptyDb WasmDataScript (test-schema))
+                  (.withDatoms #js [#js {:e 2 :a ":name" :v "Bob" :tx 536870913}
+                                    #js {:e 1 :a ":name" :v "Alice" :tx 536870913}
+                                    #js {:e 1 :a ":age" :v 30 :tx 536870913}]))
           ;; Get all datoms from EAVT
           all (.datomsIndex db "eavt" nil nil nil nil nil nil nil nil)]
       (is (= 3 (.-length all)))
@@ -71,9 +73,9 @@
 
 (deftest datoms-aevt-test
   (testing "datomsIndex returns attr-sorted datoms for AEVT"
-    (let [db (-> (.emptyDb WasmDataScript (test-schema))
-                 (.withDatoms #js [#js {:e 1 :a ":name" :v "Alice" :tx 536870913}
-                                   #js {:e 1 :a ":age" :v 30 :tx 536870913}]))
+    (let [db  (-> (.emptyDb WasmDataScript (test-schema))
+                  (.withDatoms #js [#js {:e 1 :a ":name" :v "Alice" :tx 536870913}
+                                    #js {:e 1 :a ":age" :v 30 :tx 536870913}]))
           all (.datomsIndex db "aevt" nil nil nil nil nil nil nil nil)]
       (is (= 2 (.-length all)))
       ;; AEVT order: :age before :name (alphabetical)
@@ -82,10 +84,10 @@
 
 (deftest datoms-avet-indexed-test
   (testing "datomsIndex returns indexed attrs in AVET"
-    (let [db (-> (.emptyDb WasmDataScript (test-schema))
-                 (.withDatoms #js [#js {:e 1 :a ":name" :v "Alice" :tx 536870913}
-                                   #js {:e 1 :a ":age" :v 30 :tx 536870913}
-                                   #js {:e 2 :a ":name" :v "Bob" :tx 536870913}]))
+    (let [db  (-> (.emptyDb WasmDataScript (test-schema))
+                  (.withDatoms #js [#js {:e 1 :a ":name" :v "Alice" :tx 536870913}
+                                    #js {:e 1 :a ":age" :v 30 :tx 536870913}
+                                    #js {:e 2 :a ":name" :v "Bob" :tx 536870913}]))
           ;; AVET should have :name (indexed) but not :age (not indexed)
           all (.datomsIndex db "avet" nil nil nil nil nil nil nil nil)]
       ;; Only :name datoms (2) — :age is not indexed
@@ -93,11 +95,11 @@
 
 (deftest with-datom-indexing-test
   (testing "Indexed attrs go to AVET, non-indexed skip AVET"
-    (let [db (-> (.emptyDb WasmDataScript (test-schema))
-                 (.withDatoms #js [#js {:e 1 :a ":name" :v "Alice" :tx 536870913}
-                                   #js {:e 1 :a ":age" :v 30 :tx 536870913}
-                                   #js {:e 1 :a ":email" :v "a@b.com" :tx 536870913}
-                                   #js {:e 1 :a ":parent" :v 2 :tx 536870913}]))
+    (let [db   (-> (.emptyDb WasmDataScript (test-schema))
+                   (.withDatoms #js [#js {:e 1 :a ":name" :v "Alice" :tx 536870913}
+                                     #js {:e 1 :a ":age" :v 30 :tx 536870913}
+                                     #js {:e 1 :a ":email" :v "a@b.com" :tx 536870913}
+                                     #js {:e 1 :a ":parent" :v 2 :tx 536870913}]))
           avet (.datomsIndex db "avet" nil nil nil nil nil nil nil nil)]
       ;; :name (index), :email (unique→indexed), :parent (ref→indexed) = 3
       ;; :age not indexed
@@ -105,10 +107,10 @@
 
 (deftest retraction-test
   (testing "Retracted datoms are removed from all indexes"
-    (let [db (-> (.emptyDb WasmDataScript (test-schema))
-                 (.withDatoms #js [#js {:e 1 :a ":name" :v "Alice" :tx 536870913}
-                                   #js {:e 1 :a ":age" :v 30 :tx 536870913}]))
-          _ (is (= 2 (.count db)))
+    (let [db  (-> (.emptyDb WasmDataScript (test-schema))
+                  (.withDatoms #js [#js {:e 1 :a ":name" :v "Alice" :tx 536870913}
+                                    #js {:e 1 :a ":age" :v 30 :tx 536870913}]))
+          _   (is (= 2 (.count db)))
           ;; Retract :name (negative tx)
           db2 (.withDatoms db #js [#js {:e 1 :a ":name" :v "Alice" :tx -536870913}])]
       (is (= 1 (.count db2)))
@@ -118,18 +120,18 @@
 
 (deftest cardinality-many-test
   (testing "Multiple values per entity-attr with :db.cardinality/many"
-    (let [db (-> (.emptyDb WasmDataScript (test-schema))
-                 (.withDatoms #js [#js {:e 1 :a ":aka" :v "Al" :tx 536870913}
-                                   #js {:e 1 :a ":aka" :v "Ali" :tx 536870913}
-                                   #js {:e 1 :a ":aka" :v "Alice" :tx 536870913}]))
+    (let [db      (-> (.emptyDb WasmDataScript (test-schema))
+                      (.withDatoms #js [#js {:e 1 :a ":aka" :v "Al" :tx 536870913}
+                                        #js {:e 1 :a ":aka" :v "Ali" :tx 536870913}
+                                        #js {:e 1 :a ":aka" :v "Alice" :tx 536870913}]))
           results (.search db 1 ":aka" nil nil)]
       (is (= 3 (.-length results))))))
 
 (deftest ref-value-test
   (testing "Ref attrs are indexed in AVET"
-    (let [db (-> (.emptyDb WasmDataScript (test-schema))
-                 (.withDatoms #js [#js {:e 1 :a ":parent" :v 2 :tx 536870913}
-                                   #js {:e 3 :a ":parent" :v 2 :tx 536870913}]))
+    (let [db      (-> (.emptyDb WasmDataScript (test-schema))
+                      (.withDatoms #js [#js {:e 1 :a ":parent" :v 2 :tx 536870913}
+                                        #js {:e 3 :a ":parent" :v 2 :tx 536870913}]))
           ;; Search by ref value via AVET (refs are implicitly indexed)
           results (.search db nil ":parent" 2 nil)]
       (is (= 2 (.-length results))))))
@@ -151,13 +153,13 @@
     (async done
            (go
              (try
-               (let [db-name (str "rust-db-" (random-uuid) ".db")
+               (let [db-name  (str "rust-db-" (random-uuid) ".db")
                      sql-conn (<p! (sql/connect! db-name))
-                     db (-> (.emptyDb WasmDataScript (test-schema))
-                            (.withDatoms #js [#js {:e 1 :a ":name" :v "Alice" :tx 536870913}
-                                              #js {:e 1 :a ":age" :v 30 :tx 536870913}
-                                              #js {:e 2 :a ":name" :v "Bob" :tx 536870913}
-                                              #js {:e 2 :a ":email" :v "b@b.com" :tx 536870913}]))]
+                     db       (-> (.emptyDb WasmDataScript (test-schema))
+                                  (.withDatoms #js [#js {:e 1 :a ":name" :v "Alice" :tx 536870913}
+                                                    #js {:e 1 :a ":age" :v 30 :tx 536870913}
+                                                    #js {:e 2 :a ":name" :v "Bob" :tx 536870913}
+                                                    #js {:e 2 :a ":email" :v "b@b.com" :tx 536870913}]))]
                  ;; Store
                  (.storeDb db db-name)
                  ;; Restore
@@ -184,12 +186,12 @@
     (async done
            (go
              (try
-               (let [db-name (str "legacy-store-" (random-uuid) ".db")
+               (let [db-name  (str "legacy-store-" (random-uuid) ".db")
                      sql-conn (<p! (sql/connect! db-name))
-                     db (-> (.emptyDb WasmDataScript (test-schema))
-                            (.withDatoms #js [#js {:e 1 :a ":name" :v "Alice" :tx 536870913}
-                                              #js {:e 1 :a ":age" :v 30 :tx 536870913}
-                                              #js {:e 2 :a ":name" :v "Bob" :tx 536870913}]))]
+                     db       (-> (.emptyDb WasmDataScript (test-schema))
+                                  (.withDatoms #js [#js {:e 1 :a ":name" :v "Alice" :tx 536870913}
+                                                    #js {:e 1 :a ":age" :v 30 :tx 536870913}
+                                                    #js {:e 2 :a ":name" :v "Bob" :tx 536870913}]))]
                  (.storeToLegacy db db-name)
                  ;; Verify the datascript table was created
                  (let [rows (<p! (sql/select sql-conn "SELECT count(*) as cnt FROM datascript"))]
@@ -217,14 +219,14 @@
     (async done
            (go
              (try
-               (let [db-name (str "legacy-rt-" (random-uuid) ".db")
+               (let [db-name  (str "legacy-rt-" (random-uuid) ".db")
                      sql-conn (<p! (sql/connect! db-name))
-                     db (-> (.emptyDb WasmDataScript (test-schema))
-                            (.withDatoms #js [#js {:e 1 :a ":name" :v "Alice" :tx 536870913}
-                                              #js {:e 1 :a ":age" :v 30 :tx 536870913}
-                                              #js {:e 2 :a ":name" :v "Bob" :tx 536870913}
-                                              #js {:e 2 :a ":email" :v "b@b.com" :tx 536870913}
-                                              #js {:e 1 :a ":parent" :v 2 :tx 536870913}]))]
+                     db       (-> (.emptyDb WasmDataScript (test-schema))
+                                  (.withDatoms #js [#js {:e 1 :a ":name" :v "Alice" :tx 536870913}
+                                                    #js {:e 1 :a ":age" :v 30 :tx 536870913}
+                                                    #js {:e 2 :a ":name" :v "Bob" :tx 536870913}
+                                                    #js {:e 2 :a ":email" :v "b@b.com" :tx 536870913}
+                                                    #js {:e 1 :a ":parent" :v 2 :tx 536870913}]))]
                  (.storeToLegacy db db-name)
                  (let [restored (.restoreFromLegacy WasmDataScript db-name)]
                    (is (some? restored) "restoreFromLegacy should return a DB")
@@ -246,15 +248,218 @@
                (finally
                  (done)))))))
 
+(deftest legacy-re-store-after-restore-test
+  (testing "re-storing after a restore persists the edit without corrupting the db"
+    (async done
+           (go
+             (try
+               (let [db-name (str "legacy-restore-" (random-uuid) ".db")]
+                 ;; Session 1: create via transact + store + sync (mirrors new-worksheet!)
+                 (let [c1  (<p! (sql/connect! db-name))
+                       db1 (.emptyDb WasmDataScript (test-schema))]
+                   (.transact db1 "[[:db/add 1 :name \"Alice\"]]")
+                   (.storeToLegacy db1 db-name)
+                   (<p! (sql/sync! c1))
+                   (<p! (sql/close! c1)))
+                 ;; Session 2: reconnect + restore, then edit-then-re-store on the
+                 ;; SAME open connection (mirrors load-store-local! + schedule-persist!)
+                 (let [c2  (<p! (sql/connect! db-name))
+                       db2 (.restoreFromLegacy WasmDataScript db-name)]
+                   (is (some? db2) "first restore returns a DB")
+                   (is (= 1 (.count db2)) "restored db has Alice")
+                   ;; Edit in place via transact, then re-store (schedule-persist!)
+                   (.transact db2 "[[:db/add 2 :name \"Bob\"]]")
+                   ;; Currently panics: SQLITE_CORRUPT in write_metadata on re-store.
+                   (.storeToLegacy db2 db-name)
+                   (<p! (sql/sync! c2))
+                   (<p! (sql/close! c2)))
+                 ;; Session 3: reconnect + restore + verify BOTH datoms persisted
+                 (let [c3  (<p! (sql/connect! db-name))
+                       db4 (.restoreFromLegacy WasmDataScript db-name)]
+                   (is (some? db4) "second restore returns a DB")
+                   (is (= 2 (.count db4))
+                       "both Alice and Bob persist after re-store")
+                   (is (= 1 (.-length (.search db4 nil ":name" "Bob" nil)))
+                       "Bob is found after re-store")
+                   (<p! (sql/close! c3))))
+               (catch :default e
+                 (is (nil? e) (str "Unexpected error: " e)))
+               (finally
+                 (done)))))))
+
+;; ===================================================================
+;; Self-sufficient persistence lifecycle (Phase A)
+;;
+;; These tests use ONLY the WasmDataScript lifecycle API — no sql/connect!
+;; or sql/sync! — proving the connect-first contract is gone.
+;; ===================================================================
+
+(deftest self-sufficient-lifecycle-test
+  (testing "open → transact → persist → closeDb → open restores, no sql/* calls"
+    (async done
+           (go
+             (try
+               (let [db-name (str "lifecycle-" (random-uuid) ".db")
+                     ;; Session 1: open (fresh), transact, persist, close.
+                     rdb     (<p! (.open WasmDataScript db-name (test-schema)))]
+                 (is (some? rdb) "open returns a fresh db")
+                 (is (= 0 (.count rdb)) "fresh db is empty")
+                 (.transact rdb "[[:db/add 1 :name \"Alice\"]]")
+                 (<p! (.persist rdb db-name))
+                 (<p! (.closeDb WasmDataScript db-name))
+                 ;; Session 2: reopen restores; edit + re-persist (re-store path).
+                 (let [rdb2 (<p! (.open WasmDataScript db-name (test-schema)))]
+                   (is (= 1 (.count rdb2)) "reopened db has Alice")
+                   (is (= 1 (.-length (.search rdb2 nil ":name" "Alice" nil)))
+                       "Alice found after reopen")
+                   (.transact rdb2 "[[:db/add 2 :name \"Bob\"]]")
+                   (<p! (.persist rdb2 db-name))
+                   (<p! (.closeDb WasmDataScript db-name)))
+                 ;; Session 3: the edit survived the close/open cycle.
+                 (let [rdb3 (<p! (.open WasmDataScript db-name (test-schema)))]
+                   (is (= 2 (.count rdb3)) "edit persisted across close/open")
+                   (is (= 1 (.-length (.search rdb3 nil ":name" "Bob" nil)))
+                       "Bob found after re-store")
+                   (<p! (.closeDb WasmDataScript db-name))))
+               (catch :default e
+                 (is (nil? e) (str "Unexpected error: " e)))
+               (finally
+                 (done)))))))
+
+(deftest reverse-ref-lookup-ref-test
+  (testing "map tx with a reverse ref whose value is a lookup ref (upsert-output shape)"
+    ;; {:worksheet/_outputs [:worksheet/uuid ws-uuid]} — the referring entity
+    ;; is identified by lookup ref. Regression: the Rust EDN parser used to
+    ;; stringify the lookup-ref vector (reverse attrs aren't in the schema),
+    ;; then fail with "Reverse ref value must be an entity ref".
+    (let [db     (.emptyDb WasmDataScript (test-schema))
+          _      (.transact db "[[:db/add 1 :email \"a@b\"] [:db/add 1 :name \"Alice\"]]")
+          report (.transact db (pr-str [{:_parent [:email "a@b"]
+                                         :name    "Child"}]))]
+      (is (nil? (aget report "error"))
+          (str "reverse-ref lookup-ref tx should parse: " (aget report "error")))
+      ;; Alice's :parent now points at the new child entity.
+      (let [parent-datoms (.search db 1 ":parent" nil nil)]
+        (is (= 1 (.-length parent-datoms)) "Alice gained a :parent ref")
+        (let [child-eid (.-v (aget parent-datoms 0))]
+          (is (= 1 (.-length (.search db child-eid ":name" "Child" nil)))
+              "ref points at the Child entity"))))))
+
+(deftest persist-requires-open-test
+  (testing "persist without open fails loudly instead of writing to memory"
+    (let [db (.emptyDb WasmDataScript (test-schema))]
+      (is (thrown? js/Error (.persist db (str "not-open-" (random-uuid) ".db")))
+          "persist on an unopened db throws"))))
+
+(deftest store-to-legacy-requires-connection-test
+  (testing "storeToLegacy without a connection fails loudly (no in-memory fallback)"
+    (let [db (.emptyDb WasmDataScript (test-schema))]
+      (is (thrown? js/Error (.storeToLegacy db (str "no-conn-" (random-uuid) ".db")))
+          "storeToLegacy on an unopened db throws"))))
+
+(deftest export-import-round-trip-test
+  (testing "exportDb bytes can be imported into a new db and restored"
+    (async done
+           (go
+             (try
+               (let [db-name (str "export-" (random-uuid) ".db")
+                     rdb     (<p! (.open WasmDataScript db-name (test-schema)))]
+                 (.transact rdb "[[:db/add 1 :name \"Alice\"] [:db/add 1 :age 30]]")
+                 (let [db-bytes (<p! (.exportDb rdb db-name))]
+                   (is (pos? (.-length db-bytes)) "export produces bytes")
+                   (<p! (.closeDb WasmDataScript db-name))
+                   (let [import-name (str "import-" (random-uuid) ".db")]
+                     (<p! (.importDb WasmDataScript import-name db-bytes))
+                     (let [rdb2 (<p! (.open WasmDataScript import-name (test-schema)))]
+                       (is (= 2 (.count rdb2)) "imported db has both datoms")
+                       (is (= 1 (.-length (.search rdb2 nil ":name" "Alice" nil)))
+                           "Alice found in imported db")
+                       (<p! (.closeDb WasmDataScript import-name))))))
+               (catch :default e
+                 (is (nil? e) (str "Unexpected error: " e)))
+               (finally
+                 (done)))))))
+
+(deftest mirror-eid-divergence-after-restore-test
+  (testing "entities created after a restore get the same eid in Rust and the CLJS mirror"
+    ;; Mirrors the behave app's architecture: the Rust rdb is the source of
+    ;; truth, a CLJS conn mirrors it for reactivity, and the :transact fx
+    ;; replays the SAME tx-data into both engines independently.
+    ;;
+    ;; Rust persists its max-eid high-water mark in the legacy metadata and
+    ;; restores it verbatim; the CLJS mirror (conn-from-datoms) recomputes
+    ;; max-eid from the live datoms. After restoring a db that ever retracted
+    ;; its top entity, the two allocators diverge, so a new entity gets
+    ;; DIFFERENT eids in Rust vs the mirror — and every subsequent edit
+    ;; addressed by a mirror eid silently lands on the wrong Rust entity.
+    (async done
+           (go
+             (try
+               (let [db-name (str "legacy-eid-div-" (random-uuid) ".db")
+                     schema  {:name {:db/index true}
+                              :age  {}}]
+                 ;; Session 1: two entities, retract the top one, persist.
+                 ;; Rust max-eid stays 2 (high water); live max datom eid is 1.
+                 (let [c1  (<p! (sql/connect! db-name))
+                       db1 (.emptyDb WasmDataScript (test-schema))]
+                   (.transact db1 "[[:db/add 1 :name \"Alice\"] [:db/add 2 :name \"Bob\"]]")
+                   (is (= 2 (.maxEid db1)) "Bob advanced max-eid to 2")
+                   (.transact db1 "[[:db.fn/retractEntity 2]]")
+                   (is (zero? (.-length (.search db1 nil ":name" "Bob" nil)))
+                       "Bob is retracted before the store")
+                   (is (= 2 (.maxEid db1)) "max-eid high water survives the retract")
+                   (.storeToLegacy db1 db-name)
+                   (<p! (sql/sync! c1))
+                   (<p! (sql/close! c1)))
+                 ;; Session 2: restore + mirror (as load-store-local! does),
+                 ;; then create a new entity through BOTH engines (as the
+                 ;; :transact fx does).
+                 (let [c2      (<p! (sql/connect! db-name))
+                       rdb     (.restoreFromLegacy WasmDataScript db-name)
+                       _       (is (= 2 (.maxEid rdb))
+                                   "restored Rust db keeps the max-eid high water mark")
+                       cljs-db (impl-rust/sync-from-rust rdb)
+                       _       (is (= 2 (:max-eid cljs-db))
+                                   "sync-from-rust carries the Rust max-eid, not the datom-derived one")
+                       conn    (d/conn-from-datoms (d/datoms cljs-db :eavt) schema)
+                       ;; conn-from-datoms re-derives max-eid from datoms —
+                       ;; align it with the Rust allocator (as behave.store must).
+                       _       (swap! conn assoc :max-eid (:max-eid cljs-db))
+                       tx      [[:db/add -1 :name "Carol"]]]
+                   (.transact rdb (pr-str tx))
+                   (d/transact! conn tx)
+                   (let [rust-eid   (.-e (aget (.search rdb nil ":name" "Carol" nil) 0))
+                         mirror-eid (d/q '[:find ?e . :where [?e :name "Carol"]] @conn)]
+                     (is (= rust-eid mirror-eid)
+                         "Carol's eid must match between Rust and the CLJS mirror")
+                     ;; The app-visible symptom: an edit addressed by the
+                     ;; mirror's eid must land on Carol in the Rust db.
+                     (.transact rdb (pr-str [[:db/add mirror-eid :age 30]]))
+                     (.storeToLegacy rdb db-name)
+                     (<p! (sql/sync! c2)))
+                   (<p! (sql/close! c2)))
+                 ;; Session 3: restore and verify Carol's edit persisted.
+                 (let [c3        (<p! (sql/connect! db-name))
+                       db3       (.restoreFromLegacy WasmDataScript db-name)
+                       carol-eid (.-e (aget (.search db3 nil ":name" "Carol" nil) 0))
+                       ages      (.search db3 carol-eid ":age" nil nil)]
+                   (is (= 1 (.-length ages))
+                       "Carol's :age edit persists across restore")
+                   (<p! (sql/close! c3))))
+               (catch :default e
+                 (is (nil? e) (str "Unexpected error: " e)))
+               (finally
+                 (done)))))))
+
 (deftest has-legacy-db-test
   (testing "hasLegacyDb returns true after storeToLegacy"
     (async done
            (go
              (try
-               (let [db-name (str "has-legacy-" (random-uuid) ".db")
+               (let [db-name  (str "has-legacy-" (random-uuid) ".db")
                      sql-conn (<p! (sql/connect! db-name))
-                     db (-> (.emptyDb WasmDataScript (test-schema))
-                            (.withDatoms #js [#js {:e 1 :a ":name" :v "Test" :tx 536870913}]))]
+                     db       (-> (.emptyDb WasmDataScript (test-schema))
+                                  (.withDatoms #js [#js {:e 1 :a ":name" :v "Test" :tx 536870913}]))]
                  (.storeToLegacy db db-name)
                  (is (true? (.hasLegacyDb WasmDataScript db-name))
                      "hasLegacyDb should return true after storeToLegacy")
@@ -269,17 +474,17 @@
     (async done
            (go
              (try
-               (let [db-name (str "legacy-schema-" (random-uuid) ".db")
+               (let [db-name  (str "legacy-schema-" (random-uuid) ".db")
                      sql-conn (<p! (sql/connect! db-name))
-                     db (-> (.emptyDb WasmDataScript (test-schema))
-                            (.withDatoms #js [#js {:e 1 :a ":name" :v "Alice" :tx 536870913}
-                                              #js {:e 1 :a ":email" :v "a@b" :tx 536870913}
-                                              #js {:e 1 :a ":parent" :v 2 :tx 536870913}
-                                              #js {:e 1 :a ":aka" :v "Al" :tx 536870913}]))]
+                     db       (-> (.emptyDb WasmDataScript (test-schema))
+                                  (.withDatoms #js [#js {:e 1 :a ":name" :v "Alice" :tx 536870913}
+                                                    #js {:e 1 :a ":email" :v "a@b" :tx 536870913}
+                                                    #js {:e 1 :a ":parent" :v 2 :tx 536870913}
+                                                    #js {:e 1 :a ":aka" :v "Al" :tx 536870913}]))]
                  (.storeToLegacy db db-name)
-                 (let [restored (.restoreFromLegacy WasmDataScript db-name)
+                 (let [restored  (.restoreFromLegacy WasmDataScript db-name)
                        schema-js (.schema restored)
-                       entries (js/Object.entries schema-js)]
+                       entries   (js/Object.entries schema-js)]
                    ;; Verify schema attrs survived
                    (is (pos? (.-length entries))
                        "restored schema should have attributes")
@@ -309,13 +514,13 @@
     (async done
            (go
              (try
-               (let [db-name (str "legacy-gc-" (random-uuid) ".db")
+               (let [db-name  (str "legacy-gc-" (random-uuid) ".db")
                      sql-conn (<p! (sql/connect! db-name))
-                     db1 (-> (.emptyDb WasmDataScript (js-schema {":val" {}}))
-                             (.withDatoms (let [arr (js/Array.)]
-                                           (dotimes [i 50]
-                                             (.push arr (js-datom (inc i) ":val" (str i) 536870913)))
-                                           arr)))]
+                     db1      (-> (.emptyDb WasmDataScript (js-schema {":val" {}}))
+                                  (.withDatoms (let [arr (js/Array.)]
+                                                 (dotimes [i 50]
+                                                   (.push arr (js-datom (inc i) ":val" (str i) 536870913)))
+                                                 arr)))]
                  ;; Store first version
                  (.storeToLegacy db1 db-name)
                  (let [rows-before (<p! (sql/select sql-conn "SELECT count(*) as cnt FROM datascript"))]
@@ -347,24 +552,24 @@
     (async done
            (go
              (try
-               (let [db-name (str "legacy-export-" (random-uuid) ".db")
+               (let [db-name  (str "legacy-export-" (random-uuid) ".db")
                      sql-conn (<p! (sql/connect! db-name))
-                     db (-> (.emptyDb WasmDataScript (test-schema))
-                            (.withDatoms #js [#js {:e 1 :a ":name" :v "Alice" :tx 536870913}
-                                              #js {:e 1 :a ":age" :v 30 :tx 536870913}
-                                              #js {:e 2 :a ":name" :v "Bob" :tx 536870913}]))]
+                     db       (-> (.emptyDb WasmDataScript (test-schema))
+                                  (.withDatoms #js [#js {:e 1 :a ":name" :v "Alice" :tx 536870913}
+                                                    #js {:e 1 :a ":age" :v 30 :tx 536870913}
+                                                    #js {:e 2 :a ":name" :v "Bob" :tx 536870913}]))]
                  (.storeToLegacy db db-name)
                  ;; Export
                  (let [db-bytes (<p! (sql/export! sql-conn))]
                    (<p! (sql/close! sql-conn))
                    ;; Import into fresh connection
                    (let [import-name (str "legacy-import-" (random-uuid) ".db")
-                         tmp-conn (<p! (sql/connect! import-name))]
+                         tmp-conn    (<p! (sql/connect! import-name))]
                      (<p! (sql/import! tmp-conn db-bytes))
                      (<p! (sql/close! tmp-conn))
                      ;; Reconnect and restore
                      (let [fresh-conn (<p! (sql/connect! import-name))
-                           restored (.restoreFromLegacy WasmDataScript import-name)]
+                           restored   (.restoreFromLegacy WasmDataScript import-name)]
                        (is (some? restored) "should restore after import")
                        (is (= (.count db) (.count restored))
                            "imported DB should have same datom count")
@@ -382,16 +587,16 @@
     (async done
            (go
              (try
-               (let [db-name (str "legacy-ns-" (random-uuid) ".db")
+               (let [db-name  (str "legacy-ns-" (random-uuid) ".db")
                      sql-conn (<p! (sql/connect! db-name))
-                     schema (js-schema {":person/name" {":db/index" true}
-                                        ":person/age" {}
-                                        ":person/parent" {":db/valueType" ":db.type/ref"}})
-                     db (-> (.emptyDb WasmDataScript schema)
-                            (.withDatoms #js [#js {:e 1 :a ":person/name" :v "Alice" :tx 536870913}
-                                              #js {:e 1 :a ":person/age" :v 30 :tx 536870913}
-                                              #js {:e 1 :a ":person/parent" :v 2 :tx 536870913}
-                                              #js {:e 2 :a ":person/name" :v "Bob" :tx 536870913}]))]
+                     schema   (js-schema {":person/name"   {":db/index" true}
+                                          ":person/age"    {}
+                                          ":person/parent" {":db/valueType" ":db.type/ref"}})
+                     db       (-> (.emptyDb WasmDataScript schema)
+                                  (.withDatoms #js [#js {:e 1 :a ":person/name" :v "Alice" :tx 536870913}
+                                                    #js {:e 1 :a ":person/age" :v 30 :tx 536870913}
+                                                    #js {:e 1 :a ":person/parent" :v 2 :tx 536870913}
+                                                    #js {:e 2 :a ":person/name" :v "Bob" :tx 536870913}]))]
                  (.storeToLegacy db db-name)
                  (let [restored (.restoreFromLegacy WasmDataScript db-name)]
                    (is (= (.count db) (.count restored))

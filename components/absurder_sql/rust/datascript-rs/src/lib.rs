@@ -20,6 +20,7 @@ pub fn set_panic_hook() {
 // Re-export PSS types so their wasm-bindgen exports are linked.
 pub use persistent_sorted_set::wasm::{WasmPSS, WasmSeq};
 
+pub mod persistence;
 pub mod unified_storage;
 pub mod wasm_datascript;
 pub mod legacy_datascript;
@@ -58,33 +59,36 @@ fn parse_settings(settings: &JsValue) -> Settings {
 // ---------------------------------------------------------------------------
 
 /// Create an empty PSS with IndexType comparator and unified SQLite storage.
-/// The `db_name` should match an AbsurderSQL database for IndexedDB persistence.
+/// The `db_name` must match an OPEN AbsurderSQL database (throws otherwise).
 #[wasm_bindgen(js_name = "withUnifiedSqlite")]
 pub fn with_unified_sqlite(
     index_type: String,
     db_name: String,
     settings: JsValue,
-) -> WasmPSS {
+) -> Result<WasmPSS, JsValue> {
     let idx = parse_index_type(&index_type);
     let rust_settings = parse_settings(&settings);
-    let storage = UnifiedSQLiteStorage::new(&db_name, rust_settings.clone());
+    let storage = UnifiedSQLiteStorage::new(&db_name, rust_settings.clone())
+        .map_err(|e| JsValue::from_str(&e))?;
 
-    WasmPSS::new_with_storage(idx, Box::new(storage), rust_settings)
+    Ok(WasmPSS::new_with_storage(idx, Box::new(storage), rust_settings))
 }
 
 /// Restore a PSS from unified SQLite storage by root address.
+/// The `db_name` must match an OPEN AbsurderSQL database (throws otherwise).
 #[wasm_bindgen(js_name = "restoreFromUnifiedSqlite")]
 pub fn restore_from_unified_sqlite(
     index_type: String,
     address: f64,
     db_name: String,
     settings: JsValue,
-) -> WasmPSS {
+) -> Result<WasmPSS, JsValue> {
     let idx = parse_index_type(&index_type);
     let rust_settings = parse_settings(&settings);
-    let storage = UnifiedSQLiteStorage::new(&db_name, rust_settings.clone());
+    let storage = UnifiedSQLiteStorage::new(&db_name, rust_settings.clone())
+        .map_err(|e| JsValue::from_str(&e))?;
 
-    WasmPSS::new_restored(idx, address as i64, Box::new(storage), rust_settings)
+    Ok(WasmPSS::new_restored(idx, address as i64, Box::new(storage), rust_settings))
 }
 
 /// Close all unified SQLite connections managed by PSS. Call during teardown.

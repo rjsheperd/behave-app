@@ -71,8 +71,7 @@
   "Reset all WASM state. Call on page reload to clear stale references
    from a previous page load before WASM memory is re-initialized."
   []
-  (js/console.log "[impl-rust] clear-all-state! called"
-                  (js/Error. "stack trace"))
+  (js/console.log "[impl-rust] clear-all-state! called")
   (.clear live-rdbs)
   (reset! state {:rust-db        nil
                  :cljs-db        nil
@@ -241,7 +240,14 @@
 
 (defn sync-from-rust
   "Create a CLJS DataScript DB from a WasmDataScript instance.
-   Extracts all datoms from the Rust DB and creates a CLJS DB via init-db."
+   Extracts all datoms from the Rust DB and creates a CLJS DB via init-db.
+
+   The mirror's `:max-eid` is taken from the Rust DB rather than recomputed
+   from the datoms: Rust persists its max-eid high-water mark across
+   store/restore, while `init-db` derives it from live datoms only. If an
+   entity above the live maximum was ever retracted, the two allocators
+   diverge and the same tempid resolves to DIFFERENT eids in each engine —
+   after which edits addressed by mirror eids land on the wrong Rust entity."
   [rust-db]
   (let [js-schema  (.schema rust-db)
         schema     (js->schema js-schema)
@@ -255,7 +261,7 @@
                                           (js-datom-value->clj (.-v d))
                                           (.-tx d))))
                          (array-seq datoms-arr))]
-    (d/init-db datoms schema)))
+    (assoc (d/init-db datoms schema) :max-eid (.maxEid rust-db))))
 
 ;;; Query helpers
 
@@ -402,13 +408,18 @@
    {} schema))
 
 (defn- js-datoms->clj-datoms
-  "Convert a JS array of datom objects to a seq of CLJS Datom records."
+  "Convert a JS array of datom objects to a seq of CLJS Datom records.
+   Values go through [[js-datom-value->clj]] so keyword values stringified
+   by Rust (\":name\") come back as keywords — the same conversion
+   [[sync-from-rust]] applies. Without it, entity/touch/search returned
+   keyword-valued attrs as colon-prefixed strings (e.g. VMS
+   :conditional/operator \":equal\"), breaking case dispatches downstream."
   [js-arr]
   (when js-arr
     (map (fn [d]
            (db/datom (.-e d)
                      (js-datom-attr->keyword (.-a d))
-                     (.-v d)
+                     (js-datom-value->clj (.-v d))
                      (.-tx d)))
          (array-seq js-arr))))
 

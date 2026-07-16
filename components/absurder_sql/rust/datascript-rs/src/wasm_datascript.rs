@@ -465,9 +465,26 @@ impl persistent_sorted_set::transact::TransactableDB for WasmDataScript {
             }
             self.advance_max_eid(datom.e);
         } else {
-            // Retracting — construct positive version to find and remove
-            let pos_datom = Datom::new(datom.e, datom.a.clone(), datom.v.clone(), -datom.tx);
-            if self.eavt.contains(&pos_datom) {
+            // Retracting. The report datom carries the CURRENT tx (negated,
+            // DataScript convention), but the stored datom keeps the tx it was
+            // ADDED under — and the index comparators include tx, so a datom
+            // rebuilt from `-datom.tx` only matches when the retract happens in
+            // the same tx generation as the add. Look up the stored datom by
+            // (e, a, v) across any tx and remove exactly that datom.
+            let pos_datom = match crate::query::search_internal(
+                self,
+                Some(datom.e),
+                Some(attr),
+                Some(&datom.v),
+                None,
+            )
+            .into_iter()
+            .next()
+            {
+                Some(stored) => stored,
+                None => return, // nothing stored at (e, a, v) — no-op
+            };
+            {
                 let eavt = std::mem::replace(
                     &mut self.eavt,
                     PersistentSortedSet::empty(comparator_for_index(IndexType::EAVT)),
@@ -1446,25 +1463,23 @@ impl WasmDataScript {
     }
 
     /// Store the database to unified SQLite storage.
+    /// Throws if the database connection is not open (see [`crate::persistence`]).
     #[wasm_bindgen(js_name = "storeDb")]
-    pub fn store_db(&mut self, db_name: String) {
+    pub fn store_db(&mut self, db_name: String) -> Result<(), JsValue> {
         // Store each index
-        self.eavt.set_storage(Box::new(UnifiedSQLiteStorage::new(
-            &db_name,
-            self.settings.clone(),
-        )));
+        self.eavt.set_storage(Box::new(
+            UnifiedSQLiteStorage::new(&db_name, self.settings.clone()).map_err(js_error)?,
+        ));
         let eavt_root = self.eavt.store();
 
-        self.aevt.set_storage(Box::new(UnifiedSQLiteStorage::new(
-            &db_name,
-            self.settings.clone(),
-        )));
+        self.aevt.set_storage(Box::new(
+            UnifiedSQLiteStorage::new(&db_name, self.settings.clone()).map_err(js_error)?,
+        ));
         let aevt_root = self.aevt.store();
 
-        self.avet.set_storage(Box::new(UnifiedSQLiteStorage::new(
-            &db_name,
-            self.settings.clone(),
-        )));
+        self.avet.set_storage(Box::new(
+            UnifiedSQLiteStorage::new(&db_name, self.settings.clone()).map_err(js_error)?,
+        ));
         let avet_root = self.avet.store();
 
         // Store metadata at addr=0
@@ -1479,28 +1494,34 @@ impl WasmDataScript {
         };
         let meta_blob = serialize_metadata(&meta);
 
-        let mut meta_storage = UnifiedSQLiteStorage::new(&db_name, self.settings.clone());
+        let mut meta_storage =
+            UnifiedSQLiteStorage::new(&db_name, self.settings.clone()).map_err(js_error)?;
         meta_storage.store_metadata(METADATA_ADDR, &meta_blob);
+        Ok(())
     }
 
     /// Check whether a stored database exists at the given db_name.
+    /// Returns false when the connection is not open.
     #[wasm_bindgen(js_name = "hasStoredDb")]
     pub fn has_stored_db(db_name: String) -> bool {
         let settings = Settings::new(512);
-        let storage = UnifiedSQLiteStorage::new(&db_name, settings);
-        storage.restore_metadata(METADATA_ADDR).is_some()
+        match UnifiedSQLiteStorage::new(&db_name, settings) {
+            Ok(storage) => storage.restore_metadata(METADATA_ADDR).is_some(),
+            Err(_) => false,
+        }
     }
 
     /// Restore a database from unified SQLite storage.
-    /// Returns null if no stored database exists.
+    /// Returns null if no stored database exists; throws if the database
+    /// connection is not open (see [`crate::persistence`]).
     #[wasm_bindgen(js_name = "restoreDb")]
-    pub fn restore_db(db_name: String) -> Option<WasmDataScript> {
+    pub fn restore_db(db_name: String) -> Result<Option<WasmDataScript>, JsValue> {
         let settings = Settings::new(512);
-        let storage = UnifiedSQLiteStorage::new(&db_name, settings.clone());
+        let storage = UnifiedSQLiteStorage::new(&db_name, settings.clone()).map_err(js_error)?;
 
         let meta_blob = match storage.restore_metadata(METADATA_ADDR) {
             Some(blob) => blob,
-            None => return None,
+            None => return Ok(None),
         };
         let meta = deserialize_metadata(&meta_blob);
         let schema = deserialize_schema(&meta.schema_blob);
@@ -1509,23 +1530,23 @@ impl WasmDataScript {
         let eavt = PersistentSortedSet::restore(
             comparator_for_index(IndexType::EAVT),
             meta.eavt_root,
-            Box::new(UnifiedSQLiteStorage::new(&db_name, settings.clone())),
+            Box::new(UnifiedSQLiteStorage::new(&db_name, settings.clone()).map_err(js_error)?),
             settings.clone(),
         );
         let aevt = PersistentSortedSet::restore(
             comparator_for_index(IndexType::AEVT),
             meta.aevt_root,
-            Box::new(UnifiedSQLiteStorage::new(&db_name, settings.clone())),
+            Box::new(UnifiedSQLiteStorage::new(&db_name, settings.clone()).map_err(js_error)?),
             settings.clone(),
         );
         let avet = PersistentSortedSet::restore(
             comparator_for_index(IndexType::AVET),
             meta.avet_root,
-            Box::new(UnifiedSQLiteStorage::new(&db_name, settings.clone())),
+            Box::new(UnifiedSQLiteStorage::new(&db_name, settings.clone()).map_err(js_error)?),
             settings.clone(),
         );
 
-        Some(WasmDataScript {
+        Ok(Some(WasmDataScript {
             schema,
             rschema,
             eavt,
@@ -1534,22 +1555,24 @@ impl WasmDataScript {
             max_eid: meta.max_eid,
             max_tx: meta.max_tx,
             settings,
-        })
+        }))
     }
 
     /// Restore a DataScript database from legacy EDN format (`.bp7` files).
     /// The `datascript` table must exist with EDN metadata at addr=0.
-    /// Returns null if no legacy data found.
+    /// Returns null if no legacy data found; throws if the database
+    /// connection is not open (see [`crate::persistence`]).
     #[wasm_bindgen(js_name = "restoreFromLegacy")]
-    pub fn restore_from_legacy(db_name: String) -> Option<WasmDataScript> {
+    pub fn restore_from_legacy(db_name: String) -> Result<Option<WasmDataScript>, JsValue> {
         use crate::legacy_datascript::wasm::LegacyStorage;
 
         let settings_base = Settings::new(512);
         let meta = {
-            let storage = LegacyStorage::new(&db_name, settings_base.clone());
+            let storage =
+                LegacyStorage::new(&db_name, settings_base.clone()).map_err(js_error)?;
             match storage.read_metadata() {
                 Some(m) => m,
-                None => return None, // No legacy metadata — not a legacy DB
+                None => return Ok(None), // No legacy metadata — not a legacy DB
             }
         };
 
@@ -1559,23 +1582,23 @@ impl WasmDataScript {
         let eavt = PersistentSortedSet::restore(
             comparator_for_index(IndexType::EAVT),
             meta.eavt_root,
-            Box::new(LegacyStorage::new(&db_name, settings.clone())),
+            Box::new(LegacyStorage::new(&db_name, settings.clone()).map_err(js_error)?),
             settings.clone(),
         );
         let aevt = PersistentSortedSet::restore(
             comparator_for_index(IndexType::AEVT),
             meta.aevt_root,
-            Box::new(LegacyStorage::new(&db_name, settings.clone())),
+            Box::new(LegacyStorage::new(&db_name, settings.clone()).map_err(js_error)?),
             settings.clone(),
         );
         let avet = PersistentSortedSet::restore(
             comparator_for_index(IndexType::AVET),
             meta.avet_root,
-            Box::new(LegacyStorage::new(&db_name, settings.clone())),
+            Box::new(LegacyStorage::new(&db_name, settings.clone()).map_err(js_error)?),
             settings.clone(),
         );
 
-        Some(WasmDataScript {
+        Ok(Some(WasmDataScript {
             schema: meta.schema,
             rschema,
             eavt,
@@ -1584,7 +1607,7 @@ impl WasmDataScript {
             max_eid: meta.max_eid,
             max_tx: meta.max_tx,
             settings,
-        })
+        }))
     }
 
     /// Check if a legacy (EDN) DataScript database exists at the given db_name.
@@ -1595,38 +1618,24 @@ impl WasmDataScript {
 
     /// Store the database to the legacy EDN format in the `datascript` table.
     /// Creates the table if it doesn't exist. Writes nodes as EDN text.
+    /// Throws if the database connection is not open (see [`crate::persistence`]).
     #[wasm_bindgen(js_name = "storeToLegacy")]
-    pub fn store_to_legacy(&mut self, db_name: String) {
-        use crate::legacy_datascript::wasm::LegacyStorage;
+    pub fn store_to_legacy(&mut self, db_name: String) -> Result<(), JsValue> {
+        self.store_to_legacy_impl(&db_name).map_err(js_error)
+    }
+
+    fn store_to_legacy_impl(&mut self, db_name: &str) -> Result<(), String> {
+        use crate::legacy_datascript::wasm::{require_connection, LegacyStorage};
         use crate::legacy_datascript::LegacyMetadata;
+        use absurder_sql::connection_pool;
 
         let settings = self.settings.clone();
 
-        // Ensure the datascript table exists
+        // Ensure the datascript table exists (through the pooled connection).
         {
             use std::ffi::CString;
             use std::ptr;
-            use absurder_sql::connection_pool;
-            let pool_key = db_name.trim_end_matches(".db");
-            let conn = connection_pool::get_or_create_connection(pool_key, {
-                let name = db_name.clone();
-                move || {
-                    let c_path = CString::new(name.as_str()).map_err(|e| e.to_string())?;
-                    let mut db: *mut sqlite_wasm_rs::sqlite3 = ptr::null_mut();
-                    let ret = unsafe {
-                        sqlite_wasm_rs::sqlite3_open_v2(
-                            c_path.as_ptr(),
-                            &mut db,
-                            sqlite_wasm_rs::SQLITE_OPEN_READWRITE | sqlite_wasm_rs::SQLITE_OPEN_CREATE,
-                            ptr::null(),
-                        )
-                    };
-                    if ret != sqlite_wasm_rs::SQLITE_OK {
-                        return Err(format!("Failed to open SQLite: {}", name));
-                    }
-                    Ok(db)
-                }
-            }).expect("Failed to get connection for legacy store");
+            let conn = require_connection(db_name)?;
             let db = conn.db.get();
             unsafe {
                 let c_sql = CString::new(
@@ -1636,25 +1645,32 @@ impl WasmDataScript {
                     db, c_sql.as_ptr(), None, ptr::null_mut(), ptr::null_mut()
                 );
             }
-            connection_pool::release_connection(pool_key);
+            connection_pool::release_connection(db_name.trim_end_matches(".db"));
         }
 
         // Store each index tree. Use query_max_addr to read the actual max
         // address from the datascript table after each store, so subsequent
         // LegacyStorage instances don't reuse addresses (new() reads max_addr
         // from metadata at addr=0, which hasn't been updated yet).
-        self.eavt.set_storage(Box::new(LegacyStorage::new(&db_name, settings.clone())));
+        self.eavt
+            .set_storage(Box::new(LegacyStorage::new(db_name, settings.clone())?));
         let eavt_root = self.eavt.store();
 
         self.aevt.set_storage(Box::new(LegacyStorage::new_with_max_addr(
-            &db_name, settings.clone(), LegacyStorage::query_max_addr(&db_name))));
+            db_name,
+            settings.clone(),
+            LegacyStorage::query_max_addr(db_name)?,
+        )?));
         let aevt_root = self.aevt.store();
 
         self.avet.set_storage(Box::new(LegacyStorage::new_with_max_addr(
-            &db_name, settings.clone(), LegacyStorage::query_max_addr(&db_name))));
+            db_name,
+            settings.clone(),
+            LegacyStorage::query_max_addr(db_name)?,
+        )?));
         let avet_root = self.avet.store();
 
-        let max_addr = LegacyStorage::query_max_addr(&db_name);
+        let max_addr = LegacyStorage::query_max_addr(db_name)?;
 
         let meta = LegacyMetadata {
             schema: self.schema.clone(),
@@ -1668,8 +1684,103 @@ impl WasmDataScript {
             branching_factor: settings.branching_factor(),
         };
 
-        let mut meta_storage = LegacyStorage::new_with_max_addr(&db_name, settings, max_addr);
-        meta_storage.write_metadata(&meta);
+        let mut meta_storage = LegacyStorage::new_with_max_addr(db_name, settings, max_addr)?;
+        meta_storage.write_metadata(&meta)
+    }
+
+    // -----------------------------------------------------------------------
+    // Self-sufficient persistence lifecycle (see crate::persistence)
+    //
+    // These own the AbsurderSQL database internally — callers never touch
+    // sql/init!, sql/connect!, or sql/sync!. The on-disk format is the legacy
+    // `datascript` EDN table (the .bp7 contract), so existing stored
+    // worksheets and exported files remain compatible.
+    // -----------------------------------------------------------------------
+
+    /// Open the AbsurderSQL database for `db_name` (IndexedDB VFS, pooled)
+    /// and restore the DataScript database stored in it. Returns a fresh
+    /// empty database with `schema_js` when nothing is stored yet.
+    #[wasm_bindgen(js_name = "open")]
+    pub async fn open(db_name: String, schema_js: JsValue) -> Result<WasmDataScript, JsValue> {
+        crate::persistence::ensure_open(&db_name)
+            .await
+            .map_err(js_error)?;
+        // Legacy (.bp7 contract) is the current on-disk format; unified is
+        // checked second for forward compatibility.
+        if let Some(db) = Self::restore_from_legacy(db_name.clone())? {
+            return Ok(db);
+        }
+        if let Some(db) = Self::restore_db(db_name)? {
+            return Ok(db);
+        }
+        Ok(Self::empty_db(schema_js))
+    }
+
+    /// Open (or reuse) the AbsurderSQL database for `db_name` WITHOUT
+    /// restoring anything — for persisting an existing WasmDataScript under
+    /// a new name (e.g. re-keying an imported worksheet to its canonical
+    /// name). Idempotent.
+    #[wasm_bindgen(js_name = "ensureDb")]
+    pub async fn ensure_db(db_name: String) -> Result<(), JsValue> {
+        crate::persistence::ensure_open(&db_name)
+            .await
+            .map_err(js_error)
+    }
+
+    /// Persist this database: store to SQLite through the pooled connection,
+    /// then flush the write-back VFS cache to IndexedDB. Returns a Promise.
+    /// Requires a prior `WasmDataScript.open()` (throws otherwise).
+    #[wasm_bindgen(js_name = "persist")]
+    pub fn persist(&mut self, db_name: String) -> Result<js_sys::Promise, JsValue> {
+        if !crate::persistence::is_open(&db_name) {
+            return Err(js_error(format!(
+                "Database {} is not open — call WasmDataScript.open() first",
+                db_name
+            )));
+        }
+        self.store_to_legacy_impl(&db_name).map_err(js_error)?;
+        Ok(wasm_bindgen_futures::future_to_promise(async move {
+            crate::persistence::sync(&db_name).await.map_err(js_error)?;
+            Ok(JsValue::UNDEFINED)
+        }))
+    }
+
+    /// Persist, then export the database as SQLite file bytes (.bp7).
+    /// Returns a Promise of Uint8Array.
+    #[wasm_bindgen(js_name = "exportDb")]
+    pub fn export_db(&mut self, db_name: String) -> Result<js_sys::Promise, JsValue> {
+        if !crate::persistence::is_open(&db_name) {
+            return Err(js_error(format!(
+                "Database {} is not open — call WasmDataScript.open() first",
+                db_name
+            )));
+        }
+        self.store_to_legacy_impl(&db_name).map_err(js_error)?;
+        Ok(wasm_bindgen_futures::future_to_promise(async move {
+            let bytes = crate::persistence::export(&db_name)
+                .await
+                .map_err(js_error)?;
+            Ok(bytes.into())
+        }))
+    }
+
+    /// Import SQLite file bytes (.bp7) into the database for `db_name`,
+    /// opening it first if needed. Follow with `open()` to restore.
+    #[wasm_bindgen(js_name = "importDb")]
+    pub async fn import_db(db_name: String, bytes: js_sys::Uint8Array) -> Result<(), JsValue> {
+        crate::persistence::ensure_open(&db_name)
+            .await
+            .map_err(js_error)?;
+        crate::persistence::import(&db_name, bytes)
+            .await
+            .map_err(js_error)
+    }
+
+    /// Sync and close the AbsurderSQL database for `db_name`, releasing its
+    /// pooled connection reference.
+    #[wasm_bindgen(js_name = "closeDb")]
+    pub async fn close_db(db_name: String) -> Result<(), JsValue> {
+        crate::persistence::close(&db_name).await.map_err(js_error)
     }
 
     /// Transact tx-data (EDN string) against this database.
@@ -1727,9 +1838,11 @@ impl WasmDataScript {
     }
 
     /// Collect garbage: walk all 3 indexes, delete orphan addresses.
+    /// Throws if the database connection is not open (see [`crate::persistence`]).
     #[wasm_bindgen(js_name = "collectGarbage")]
-    pub fn collect_garbage(&self, db_name: String) {
-        let storage = UnifiedSQLiteStorage::new(&db_name, self.settings.clone());
+    pub fn collect_garbage(&self, db_name: String) -> Result<(), JsValue> {
+        let storage =
+            UnifiedSQLiteStorage::new(&db_name, self.settings.clone()).map_err(js_error)?;
 
         let mut live_addrs = HashSet::new();
         live_addrs.insert(METADATA_ADDR);
@@ -1748,10 +1861,17 @@ impl WasmDataScript {
             .collect();
 
         if !orphans.is_empty() {
-            let mut storage_mut = UnifiedSQLiteStorage::new(&db_name, self.settings.clone());
+            let mut storage_mut =
+                UnifiedSQLiteStorage::new(&db_name, self.settings.clone()).map_err(js_error)?;
             storage_mut.delete(&orphans);
         }
+        Ok(())
     }
+}
+
+/// Convert an internal error string to a JS `Error` exception value.
+fn js_error(e: String) -> JsValue {
+    js_sys::Error::new(&e).into()
 }
 
 // ---------------------------------------------------------------------------

@@ -14,13 +14,11 @@ use lru::LruCache;
 
 use sqlite_wasm_rs::{
     sqlite3, sqlite3_stmt,
-    sqlite3_open_v2,
     sqlite3_prepare_v2, sqlite3_step, sqlite3_finalize,
     sqlite3_bind_int64, sqlite3_bind_blob, sqlite3_bind_null,
     sqlite3_column_int64, sqlite3_column_blob, sqlite3_column_bytes, sqlite3_column_type,
     sqlite3_exec, sqlite3_errmsg, sqlite3_last_insert_rowid,
     SQLITE_OK, SQLITE_ROW, SQLITE_DONE,
-    SQLITE_OPEN_READWRITE, SQLITE_OPEN_CREATE,
     SQLITE_NULL, SQLITE_TRANSIENT,
 };
 
@@ -92,34 +90,23 @@ pub struct UnifiedSQLiteStorage {
 }
 
 impl UnifiedSQLiteStorage {
-    pub fn new(db_name: &str, settings: Settings) -> Self {
+    pub fn new(db_name: &str, settings: Settings) -> Result<Self, String> {
         let db_name_owned = db_name.to_string();
-        // AbsurderSQL strips ".db" for the pool key — match that convention
-        let pool_key = db_name.trim_end_matches(".db");
 
-        // Get or create a connection via AbsurderSQL's pool.
-        // If AbsurderSQL has already opened this database (with IndexedDB VFS),
-        // we reuse that connection. Otherwise, fall back to a basic open.
+        // Require the pooled AbsurderSQL connection (IndexedDB VFS).
+        // Deliberately NO fallback open: a raw sqlite3_open_v2 with a null
+        // VFS would silently write to an in-memory database. Open first via
+        // persistence::ensure_open (WasmDataScript.open) or sql/connect!.
+        let pool_key = db_name.trim_end_matches(".db");
         let conn = connection_pool::get_or_create_connection(pool_key, {
             let name = db_name_owned.clone();
             move || {
-                let c_path = CString::new(name.as_str())
-                    .map_err(|e| e.to_string())?;
-                let mut db: *mut sqlite3 = ptr::null_mut();
-                let ret = unsafe {
-                    sqlite3_open_v2(
-                        c_path.as_ptr(),
-                        &mut db,
-                        SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
-                        ptr::null(),
-                    )
-                };
-                if ret != SQLITE_OK {
-                    return Err(format!("Failed to open SQLite: {}", db_name));
-                }
-                Ok(db)
+                Err(format!(
+                    "No open AbsurderSQL connection for {} — call WasmDataScript.open() first",
+                    name
+                ))
             }
-        }).expect("Failed to get or create SQLite connection");
+        })?;
 
         let db = conn.db.get();
 
@@ -136,14 +123,14 @@ impl UnifiedSQLiteStorage {
         }
 
         let cache_size = settings.cache_size();
-        UnifiedSQLiteStorage {
+        Ok(UnifiedSQLiteStorage {
             conn,
             db_name: db_name_owned,
             cache: LruCache::new(
                 NonZeroUsize::new(cache_size).unwrap_or(NonZeroUsize::new(1024).unwrap()),
             ),
             settings,
-        }
+        })
     }
 }
 
@@ -194,7 +181,9 @@ impl UnifiedSQLiteStorage {
 
 impl Drop for UnifiedSQLiteStorage {
     fn drop(&mut self) {
-        connection_pool::release_connection(&self.db_name);
+        // Release under the SAME key `new()` acquired with (".db" stripped) —
+        // releasing under the raw name would leak the reference forever.
+        connection_pool::release_connection(self.db_name.trim_end_matches(".db"));
     }
 }
 

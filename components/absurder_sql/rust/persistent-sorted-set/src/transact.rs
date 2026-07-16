@@ -250,6 +250,29 @@ fn parse_map_entity(
             id = Some(parse_entity_ref(v)?);
         } else {
             let a = attr_from_edn_keyword(&key_str);
+            let (is_reverse, _) = check_reverse_ref(&a);
+
+            // Reverse refs (:ns/_attr): the value is an ENTITY REF — an eid,
+            // tempid, or lookup ref like [:worksheet/uuid "..."]. The reverse
+            // attr itself is not in the schema, so parse_tx_value would
+            // stringify a lookup-ref vector; parse as entity ref(s) instead.
+            if is_reverse {
+                match parse_entity_ref(v) {
+                    Ok(eref) => attrs.push((a, entity_ref_to_tx_value(eref))),
+                    Err(err) => match v {
+                        // Multiple referring entities: {:a/_b [ref1 ref2]}
+                        EdnValue::Vector(items) | EdnValue::List(items) => {
+                            for item in items {
+                                let eref = parse_entity_ref(item)?;
+                                attrs.push((a.clone(), entity_ref_to_tx_value(eref)));
+                            }
+                        }
+                        _ => return Err(err),
+                    },
+                }
+                continue;
+            }
+
             let is_ref = rschema.is_ref(&a);
             let is_many = rschema.is_multival(&a);
 
@@ -282,6 +305,17 @@ fn parse_map_entity(
     }
 
     Ok(TxEntity::MapEntity { id, attrs })
+}
+
+/// Encode an entity ref as a TxValue (for reverse-ref attr values, where the
+/// "value" is really the referring entity).
+fn entity_ref_to_tx_value(eref: EntityRef) -> TxValue {
+    match eref {
+        EntityRef::Eid(n) => TxValue::Val(Value::Ref(n)),
+        EntityRef::TempId(tid) => TxValue::TempId(tid),
+        EntityRef::LookupRef(a, v) => TxValue::LookupRef(a, v),
+        EntityRef::CurrentTx => TxValue::CurrentTx,
+    }
 }
 
 fn parse_entity_ref(edn: &EdnValue) -> Result<EntityRef, TransactError> {
@@ -785,6 +819,10 @@ fn explode_map<DB: TransactableDB>(
                     TxValue::Val(Value::Long(n)) => EntityRef::Eid(*n),
                     TxValue::Val(Value::Ref(n)) => EntityRef::Eid(*n),
                     TxValue::TempId(tid) => EntityRef::TempId(tid.clone()),
+                    TxValue::LookupRef(la, lv) => {
+                        EntityRef::LookupRef(la.clone(), lv.clone())
+                    }
+                    TxValue::CurrentTx => EntityRef::CurrentTx,
                     _ => return Err(TransactError::ParseError {
                         message: format!("Reverse ref value must be an entity ref, got {:?}", v),
                     }),
