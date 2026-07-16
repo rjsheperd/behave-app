@@ -2,3 +2,11 @@
 members = ["persistent-sorted-set", "datascript-rs"]
 default-members = ["persistent-sorted-set"]
 resolver = "2"
+
+# Vendored absurder-sql (AGPL-3.0) with a critical fix: the VFS write path
+# had a "richer data" heuristic that silently dropped page writes whose
+# content had fewer non-zero bytes than the existing block (freed pages,
+# freelist updates), producing torn/corrupt SQLite images after a
+# restore + re-store cycle. See vendor/absurder-sql/src/storage/io_operations.rs.
+[patch."https://github.com/npiesco/absurder-sql"]
+absurder-sql = { path = "vendor/absurder-sql" }

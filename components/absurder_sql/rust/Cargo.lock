@@ -5,7 +5,6 @@ version = 4
 [[package]]
 name = "absurder-sql"
 version = "0.1.26"
-source = "git+https://github.com/npiesco/absurder-sql?tag=v0.1.26#7bf7e223de36455419062dfafd69963e9b1e7f3b"
 dependencies = [
  "console_error_panic_hook",
  "console_log",
@@ -160,6 +159,7 @@ dependencies = [
  "serde",
  "sqlite-wasm-rs",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
  "wasm-bindgen-test",
  "web-sys",
 ]
