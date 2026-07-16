@@ -1,22 +1,22 @@
 (ns behave.store-integration-test
   "Integration tests for the full re-frame/re-posh/absurder-sql storage cycle.
    Tests worksheet create, transact, query, save, and restore round-trips."
-  (:require [cljs.test :refer [deftest is async testing use-fixtures] :include-macros true]
-            ["datascript-rs" :refer [WasmDataScript]]
+  (:require ["datascript-rs" :refer [WasmDataScript]]
             [absurder-sql.datascript.core :as d]
             [absurder-sql.datascript.impl-rust :as impl-rust]
             [absurder-sql.datascript.persistent-sorted-set :as pss]
             [absurder-sql.interface :as sql]
+            [austinbirch.reactive-entity :as re]
             [behave.schema.core :refer [all-schemas]]
             [behave.store :as s]
             [cljs.core.async :refer [go]]
             [cljs.core.async.interop :refer-macros [<p!]]
+            [cljs.test :refer [deftest is async testing use-fixtures] :include-macros true]
             [ds-schema-utils.interface :refer [->ds-schema]]
             [promesa.core :as p]
             [re-frame.core :as rf]
             [re-posh.core :as rp]
-            [re-posh.db :as rpdb]
-            [austinbirch.reactive-entity :as re]))
+            [re-posh.db :as rpdb]))
 
 ;;; Fixtures
 
@@ -58,10 +58,10 @@
 (deftest ^:integration load-store-local-cancels-stale-persist-timer-test
   (testing "load-store-local! cancels any pending persist timer from a previous worksheet"
     (async done
-           (let [fired? (atom false)
+           (let [fired?     (atom false)
                  fake-timer (js/setTimeout #(reset! fired? true) 50)]
              (reset! s/persist-timer fake-timer)
-             (reset! s/sql-state {:db-name "worksheet-stale.db"})
+             (reset! s/active-db-name "worksheet-stale.db")
              ;; Switching worksheets must cancel the pending timer synchronously
              (s/load-store-local! "fresh-uuid")
              (is (nil? @s/persist-timer)
@@ -77,10 +77,10 @@
 (deftest ^:integration load-store-minimal-cancels-stale-persist-timer-test
   (testing "load-store-minimal! also cancels a pending persist timer"
     (async done
-           (let [fired? (atom false)
+           (let [fired?     (atom false)
                  fake-timer (js/setTimeout #(reset! fired? true) 50)]
              (reset! s/persist-timer fake-timer)
-             (reset! s/sql-state {:db-name "worksheet-stale.db"})
+             (reset! s/active-db-name "worksheet-stale.db")
              (s/load-store-minimal!)
              (is (nil? @s/persist-timer)
                  "persist-timer atom should be cleared by load-store-minimal!")
@@ -92,14 +92,14 @@
               150)))))
 
 (deftest ^:integration switch-worksheet-updates-db-name-test
-  (testing "after switching worksheets the sql-state db-name reflects the new worksheet"
+  (testing "after switching worksheets active-db-name reflects the new worksheet"
     (async done
-           ;; Prime sql-state with a stale db-name as if a previous worksheet was active
-           (reset! s/sql-state {:db-name "worksheet-old.db"})
+           ;; Prime active-db-name as if a previous worksheet was active
+           (reset! s/active-db-name "worksheet-old.db")
            (s/load-store-local! "new-ws-uuid")
            ;; db-name swap happens synchronously inside load-store-local!
-           (is (= "worksheet-new-ws-uuid.db" (:db-name @s/sql-state))
-               "sql-state should be updated to the new worksheet's db-name")
+           (is (= "worksheet-new-ws-uuid.db" @s/active-db-name)
+               "active-db-name should be updated to the new worksheet's db-name")
            ;; Give the async restore a moment to settle before next test
            (js/setTimeout (fn [] (done)) 50))))
 
@@ -229,7 +229,7 @@
                (p/then (fn [_sql-conn]
                          ;; Create Rust DB, transact, store via storeToLegacy
                          (let [js-schema (impl-rust/schema->js test-schema)
-                               rdb      (.emptyDb WasmDataScript js-schema)]
+                               rdb       (.emptyDb WasmDataScript js-schema)]
                            (.transact rdb (pr-str [{:worksheet/uuid "ws-sqlite"
                                                     :worksheet/name "SQLite Test"}]))
                            (.storeToLegacy rdb db-name)
@@ -258,7 +258,7 @@
                (p/then (fn [sql-conn]
                          ;; Create Rust DB, transact, store
                          (let [js-schema (impl-rust/schema->js test-schema)
-                               rdb      (.emptyDb WasmDataScript js-schema)]
+                               rdb       (.emptyDb WasmDataScript js-schema)]
                            (.transact rdb (pr-str [{:worksheet/uuid "ws-export"
                                                     :worksheet/name "Export Test"}
                                                    {:worksheet/uuid "ws-export-2"
@@ -302,7 +302,7 @@
                (p/then (fn [_sql-conn]
                          ;; Create Rust DB, transact, store
                          (let [js-schema (impl-rust/schema->js test-schema)
-                               rdb      (.emptyDb WasmDataScript js-schema)]
+                               rdb       (.emptyDb WasmDataScript js-schema)]
                            (.transact rdb (pr-str [{:worksheet/uuid "ws-reposh"
                                                     :worksheet/name "RePosh SQLite"}]))
                            (.storeToLegacy rdb db-name)
@@ -326,7 +326,7 @@
                              ;; Restore from storage and verify data survived
                              (let [restored (.restoreFromLegacy WasmDataScript db-name)]
                                (is (some? restored) "restoreFromLegacy should return a DB")
-                               (let [restored-db (impl-rust/sync-from-rust restored)
+                               (let [restored-db   (impl-rust/sync-from-rust restored)
                                      restored-conn (d/conn-from-datoms (d/datoms restored-db :eavt) test-schema)]
                                  ;; Teardown old, set up restored
                                  (reset! rpdb/store nil)

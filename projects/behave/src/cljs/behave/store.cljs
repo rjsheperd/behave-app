@@ -26,8 +26,8 @@
 (defonce ^:private worksheet-from-file? (atom false))
 
 ;; AbsurderSQL db name for the active worksheet (used by the debounced
-;; persist and by export).
-(defonce ^:private active-db-name (atom nil))
+;; persist and by export). Non-private so integration tests can assert on it.
+(defonce active-db-name (atom nil))
 
 ;;; Persistence
 
@@ -144,10 +144,14 @@
   (reset-persist-state!)
   (let [schema  (->ds-schema all-schemas)
         db-name (str "worksheet-" ws-uuid ".db")]
+    ;; Track the target worksheet synchronously so active-db-name always
+    ;; reflects the current worksheet even while the async open is in flight.
+    ;; Safe: the persist timer was just cancelled and $ws is nil until the
+    ;; open completes, so no persist can fire against a wrong/incomplete db.
+    (reset! active-db-name db-name)
     (-> (pss/ensure-initialized!)
         (p/then (fn [_] (.open WasmDataScript db-name (impl-rust/schema->js schema))))
         (p/then (fn [rdb]
-                  (reset! active-db-name db-name)
                   (mirror-rust-db! schema rdb)
                   (rf/dispatch-sync [:state/set :sync-loaded? true])))
         (p/catch (fn [e]
