@@ -124,18 +124,24 @@
 
 (defn init!
   "VMS as a plain in-memory CLJS conn (no WasmDataScript — worksheet store is
-   the only Rust-backed DB). Bulk-loads via `conn-from-datoms` (~0.5s vs ~4s
-   per-datom transact); the sentinel transact wakes posh, which bulk init-db
-   bypasses."
+   the only Rust-backed DB). A Datom snapshot (the app's msgpack path) is
+   bulk-loaded via `conn-from-datoms` (~0.5s vs ~4s per-datom transact), with
+   a sentinel transact to wake posh, which bulk init-db bypasses. Entity maps
+   (test fixtures) take the plain create-conn + transact path."
   [{:keys [datoms schema]}]
   (if @vms-conn
     @vms-conn
-    (let [conn (d/conn-from-datoms datoms schema)]
+    (let [bulk? (and (seq datoms) (d/datom? (first datoms)))
+          conn  (if bulk?
+                  (d/conn-from-datoms datoms schema)
+                  (doto (d/create-conn schema)
+                    (d/transact datoms)))]
       (reset! vms-conn conn)
       (posh! conn)
-      (let [sentinel (inc (:max-eid @conn))]
-        (d/transact conn [[:db/add sentinel :posh/init true]])
-        (d/transact conn [[:db/retract sentinel :posh/init true]]))
+      (when bulk?
+        (let [sentinel (inc (:max-eid @conn))]
+          (d/transact conn [[:db/add sentinel :posh/init true]])
+          (d/transact conn [[:db/retract sentinel :posh/init true]])))
       conn)))
 
 ;;; Effects
