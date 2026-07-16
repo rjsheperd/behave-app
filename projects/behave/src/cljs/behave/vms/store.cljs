@@ -72,30 +72,19 @@
     (or (str/starts-with? s ":db")
         (str/starts-with? s ":fressian"))))
 
-(defn- raw-datoms->map
-  "Single-pass reduce: filters out :db/* / :fressian* attrs and nil values,
-   and accumulates into an entity map keyed by entity id."
+(defn- raw-datoms->datoms
+  "Raw `[e a v]` triples -> Datom records for bulk `init-db`, dropping
+   :db/* / :fressian* attrs and nil values. Snapshot data, so all share tx0."
   [raw-datoms]
-  (let [entities (persistent!
-                  (reduce (fn [acc [e a v]]
-                            (if (or (db-attr? a) (nil? v))
-                              acc
-                              (if-let [entity (get acc e)]
-                                (let [cur (get entity a)
-                                      val (cond
-                                            (coll? cur) (conj cur v)
-                                            (some? cur) (vector cur v)
-                                            :else       v)]
-                                  (assoc! acc e (assoc entity a val)))
-                                (assoc! acc e {a v}))))
-                          (transient {})
-                          raw-datoms))]
-    (sort-by :db/id
-             (map (fn [[idx m]] (assoc m :db/id idx)) entities))))
+  (into []
+        (keep (fn [[e a v]]
+                (when-not (or (db-attr? a) (nil? v))
+                  (d/datom e a v d/tx0))))
+        raw-datoms))
 
 (defn- process-and-init! [body version]
-  (let [datoms-map (raw-datoms->map (c/unpack body))]
-    (rf/dispatch-sync [:vms/initialize (->ds-schema all-schemas) datoms-map])
+  (let [datoms (raw-datoms->datoms (c/unpack body))]
+    (rf/dispatch-sync [:vms/initialize (->ds-schema all-schemas) datoms])
     (rf/dispatch-sync [:state/set :vms-loaded? true])
     (load-translations!)
     (when version
@@ -134,19 +123,19 @@
 ;;; Public Fns
 
 (defn init!
-  "Initialize the VMS as a plain in-memory CLJS DataScript conn.
-
-   The VMS is read-only reference data; it deliberately does NOT get a
-   WasmDataScript instance (the worksheet store is the only Rust-backed
-   DB). `impl-rust/q`/`entity` callers fall back to CLJS automatically
-   when no default rust-db is registered."
+  "VMS as a plain in-memory CLJS conn (no WasmDataScript — worksheet store is
+   the only Rust-backed DB). Bulk-loads via `conn-from-datoms` (~0.5s vs ~4s
+   per-datom transact); the sentinel transact wakes posh, which bulk init-db
+   bypasses."
   [{:keys [datoms schema]}]
   (if @vms-conn
     @vms-conn
-    (let [conn (d/create-conn schema)]
-      (d/transact conn datoms)
+    (let [conn (d/conn-from-datoms datoms schema)]
       (reset! vms-conn conn)
       (posh! conn)
+      (let [sentinel (inc (:max-eid @conn))]
+        (d/transact conn [[:db/add sentinel :posh/init true]])
+        (d/transact conn [[:db/retract sentinel :posh/init true]]))
       conn)))
 
 ;;; Effects
