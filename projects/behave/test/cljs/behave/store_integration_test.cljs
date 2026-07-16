@@ -157,8 +157,8 @@
   (testing ":worksheet/new creates a worksheet entity with correct attributes"
     (make-conn!)
     (let [ws-uuid "test-new-ws"]
-      (rf/dispatch-sync [:worksheet/new {:ws-uuid ws-uuid
-                                         :ws-name "New Worksheet"
+      (rf/dispatch-sync [:worksheet/new {:uuid    ws-uuid
+                                         :name    "New Worksheet"
                                          :modules [:surface]
                                          :version "1.0.0"}])
       (let [*ws (rf/subscribe [:worksheet ws-uuid])]
@@ -193,8 +193,8 @@
   (testing "add input group, upsert variable, query back via subs"
     (make-conn!)
     (let [ws-uuid "ws-input-rt"]
-      (rf/dispatch-sync [:worksheet/new {:ws-uuid ws-uuid
-                                         :ws-name "Input RT"
+      (rf/dispatch-sync [:worksheet/new {:uuid    ws-uuid
+                                         :name    "Input RT"
                                          :modules [:surface]}])
       (rf/dispatch-sync [:worksheet/add-input-group ws-uuid "group-1" 0])
 
