@@ -426,13 +426,19 @@ pub fn transact<DB: TransactableDB>(
     let mut state = TransactState::new(db.max_tx(), db.max_eid());
     let mut queue: VecDeque<TxEntity> = tx_data.into();
 
-    // Assign auto-tempids to map entities without :db/id
+    // Assign a synthetic tempid to each map entity without an explicit :db/id.
+    // `auto_seq` makes them DISTINCT: without it every bare map entity got the
+    // same tempid (the old code's `+= 0` was a no-op), so transacting multiple
+    // new entities in one tx merged them into one. The real eid is allocated
+    // later when the tempid is resolved, so upsert-by-:db.unique/identity still
+    // applies. The 1_000_000 offset keeps these clear of user tempids.
     let mut queue2 = VecDeque::new();
+    let mut auto_seq: i64 = 0;
     while let Some(entity) = queue.pop_front() {
         match entity {
             TxEntity::MapEntity { id: None, attrs } => {
-                let tempid = TempId::Neg(-(state.next_auto_eid as i64 + 1000000));
-                state.next_auto_eid += 0; // don't alloc yet, just use unique neg number
+                let tempid = TempId::Neg(-(state.next_auto_eid + 1_000_000 + auto_seq));
+                auto_seq += 1;
                 queue2.push_back(TxEntity::MapEntity {
                     id: Some(EntityRef::TempId(tempid)),
                     attrs,

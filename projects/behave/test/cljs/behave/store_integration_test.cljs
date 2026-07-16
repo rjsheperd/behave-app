@@ -21,6 +21,11 @@
 ;;; Fixtures
 
 (defn ^:private setup-rf! []
+  ;; Clear Rust-side state at the START of each test too, not only in
+  ;; teardown: the async sqlite tests can set "$ws" in a promise continuation
+  ;; that runs AFTER their `done`/teardown, so a teardown-only reset misses it
+  ;; and the next test's :transact misroutes away from its fresh CLJS conn.
+  (impl-rust/clear-all-state!)
   (rf/dispatch-sync [:initialize]))
 
 (defn ^:private teardown! []
@@ -29,7 +34,8 @@
   ;; Reset re-posh store *after* clearing sub cache to avoid
   ;; stale subscriptions evaluating against nil conn
   (reset! rpdb/store nil)
-  (reset! s/conn nil))
+  (reset! s/conn nil)
+  (impl-rust/clear-all-state!))
 
 (use-fixtures :once
   {:before (fn [] (async done (go (<p! (pss/ensure-initialized!)) (done))))})

@@ -326,6 +326,33 @@
                (finally
                  (done)))))))
 
+(deftest multiple-new-map-entities-distinct-test
+  (testing "transacting several :db/id-less map entities creates distinct entities"
+    ;; Regression: the synthetic auto-tempid was the same for every bare map
+    ;; entity in a tx, so multiple new entities merged into one (e.g. an
+    ;; export round-trip losing all but the last worksheet).
+    (let [db     (.emptyDb WasmDataScript (test-schema))
+          report (.transact db (pr-str [{:name "Alice"}
+                                        {:name "Bob"}
+                                        {:name "Carol"}]))]
+      (is (nil? (aget report "error")))
+      (is (= 3 (.count db)) "three distinct entities, not merged into one")
+      (let [names (into #{}
+                        (map #(.-v %))
+                        (array-seq (.datomsIndex db "aevt" nil ":name"
+                                                 nil nil nil nil nil nil)))]
+        (is (= #{"Alice" "Bob" "Carol"} names) "all three names present"))))
+  (testing "upsert still applies: a unique-identity match reuses the entity"
+    (let [db (.emptyDb WasmDataScript (test-schema))]
+      (.transact db (pr-str [{:email "a@b" :name "Alice"}]))
+      ;; Second tx: one new entity + one upsert on the existing :email.
+      (.transact db (pr-str [{:email "a@b" :name "Alice2"}
+                             {:email "c@d" :name "Carol"}]))
+      (is (= 2 (.-length (.search db nil ":email" nil nil)))
+          "two distinct entities by unique :email (upsert, not duplicate)")
+      (is (= 1 (.-length (.search db nil ":name" "Alice2" nil)))
+          "existing entity was updated via upsert"))))
+
 (deftest reverse-ref-lookup-ref-test
   (testing "map tx with a reverse ref whose value is a lookup ref (upsert-output shape)"
     ;; {:worksheet/_outputs [:worksheet/uuid ws-uuid]} — the referring entity
