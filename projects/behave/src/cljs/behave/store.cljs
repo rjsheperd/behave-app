@@ -1,12 +1,16 @@
 (ns behave.store
+  "Worksheet store. The Rust `WasmDataScript` instance is the source of truth;
+   a lightweight CLJS conn mirrors it for posh/reactive-entity reactivity.
+
+   Persistence is owned by the Rust engine (see SIMPLIFY_RUST_DS.org Phase A):
+   `WasmDataScript.open` opens the AbsurderSQL database (IndexedDB VFS) and
+   restores any stored worksheet; `.persist` stores and flushes to IndexedDB
+   in one call. There is no connect-first contract — a missing connection is
+   a loud error, never a silent in-memory write."
   (:require ["datascript-rs" :refer [WasmDataScript]]
             [absurder-sql.datascript.core           :as d]
             [absurder-sql.datascript.impl-rust      :as impl-rust]
             [absurder-sql.datascript.persistent-sorted-set :as pss]
-            [absurder-sql.interface                 :as sql]
-            [ajax.core                              :refer [ajax-request]]
-            [ajax.edn                                :refer [edn-request-format]]
-            [ajax.protocols                         :as pr]
             [austinbirch.reactive-entity            :as re]
             [behave-routing.main                    :refer [current-route-order]]
             [behave.schema.core                     :refer [all-schemas]]
@@ -21,38 +25,43 @@
 (defonce conn (atom nil))
 (defonce ^:private worksheet-from-file? (atom false))
 
-(defonce sql-state
-  (atom {:db-name nil}))
+;; AbsurderSQL db name for the active worksheet (used by the debounced
+;; persist and by export).
+(defonce ^:private active-db-name (atom nil))
 
-;;; Debounced persistence
+;;; Persistence
+
+(defn- persist!
+  "Store the Rust DB to its AbsurderSQL SQLite and flush to IndexedDB.
+   Returns a Promise. Fails loud — errors are logged and re-thrown to the
+   global window.onerror handler (behave.telemetry) rather than swallowed."
+  [rdb db-name]
+  (-> (p/do (.persist rdb db-name))
+      (p/catch (fn [e]
+                 (js/console.error "[store] Rust persist failed for" db-name e)
+                 (throw e)))))
 
 (defonce persist-timer (atom nil))
 
 (defn- schedule-persist!
-  "Debounced SQLite persist. Writes Rust DB to SQLite via storeToLegacy
-   after 2s of inactivity."
+  "Debounced persist: flush the Rust DB to IndexedDB 2s after the last edit."
   []
   (when-let [t @persist-timer] (js/clearTimeout t))
   (reset! persist-timer
           (js/setTimeout
            (fn []
-             (when-let [rdb (impl-rust/named-db "$ws")]
-               (when-let [db-name (:db-name @sql-state)]
-            ;; Fail loud: a background persist failure is reported via the
-            ;; global window.onerror handler (behave.telemetry), not swallowed.
-                 (try
-                   (.storeToLegacy rdb db-name)
-                   (catch :default e
-                     (js/console.error "[store] Rust persist failed for" db-name e)
-                     (throw e))))))
+             (let [db-name @active-db-name
+                   rdb     (impl-rust/named-db "$ws")]
+               (when (and rdb db-name)
+                 (persist! rdb db-name))))
            2000)))
 
-;;; SQLite Helpers
+;;; Helpers
 
-(defn- reset-sql-state! []
+(defn- reset-persist-state! []
   (when-let [t @persist-timer] (js/clearTimeout t))
   (reset! persist-timer nil)
-  (reset! sql-state {:db-name nil}))
+  (reset! active-db-name nil))
 
 (defn- read-file-bytes
   "Read a File object as Uint8Array. Returns a Promise."
@@ -62,6 +71,11 @@
      (let [rdr (js/FileReader.)]
        (set! (.-onload rdr) (fn [_] (res (js/Uint8Array. (.-result rdr)))))
        (.readAsArrayBuffer rdr file)))))
+
+(defn- worksheet-uuid
+  "The `:worksheet/uuid` in a CLJS db value, or nil."
+  [cljs-db]
+  (d/q '[:find ?uuid . :where [_ :worksheet/uuid ?uuid]] cljs-db))
 
 ;;; Conn Initialization (Rust-primary, CLJS for reactivity only)
 
@@ -77,47 +91,65 @@
     (re/init! ds-conn)
     ds-conn))
 
+(defn- mirror-rust-db!
+  "Mirror the Rust db into a fresh CLJS conn and register it as `$ws`.
+   Aligns the mirror's max-eid with the Rust allocator — conn-from-datoms
+   recomputes max-eid from live datoms, which diverges from Rust's persisted
+   high-water mark after any retraction (see impl-rust/sync-from-rust)."
+  [schema rdb]
+  (let [cljs-db (impl-rust/sync-from-rust rdb)
+        ds-conn (setup-worksheet-conn! schema (d/datoms cljs-db :eavt))]
+    (swap! ds-conn assoc :max-eid (:max-eid cljs-db))
+    (impl-rust/set-named-db! "$ws" rdb @ds-conn)
+    ds-conn))
+
 (defn- reset-conn-state! []
   (impl-rust/remove-named-db! "$ws")
   (reset! conn nil)
   (reset! worksheet-from-file? false))
 
-;;; SQLite Sync (load initial state from AbsurderSQL/IndexedDB)
+(defn- rekey-to-canonical!
+  "A worksheet opened from a file is imported under its file name. Re-key
+   persistence to the canonical `worksheet-<uuid>.db` so uuid-based reload
+   (`load-store-local!`) finds it and user file names can't collide.
+   Returns a Promise. No-op when the worksheet has no uuid."
+  [rdb cljs-db]
+  (if-let [ws-uuid (worksheet-uuid cljs-db)]
+    (let [canonical (str "worksheet-" ws-uuid ".db")]
+      (-> (p/do (.ensureDb WasmDataScript canonical))
+          (p/then (fn [_] (persist! rdb canonical)))
+          (p/then (fn [_] (reset! active-db-name canonical)))))
+    (p/resolved nil)))
+
+;;; Store Initialization
 
 (defn load-store-minimal!
   "Set up an in-memory DataScript conn without SQLite backing.
-   Used on initial load when no worksheet is active.
-   Awaits WASM init but does not return a Promise to the caller."
+   Used on initial load when no worksheet is active."
   []
   (reset-conn-state!)
-  (reset-sql-state!)
+  (reset-persist-state!)
   (-> (pss/ensure-initialized!)
       (p/then (fn [_]
-                (let [schema (->ds-schema all-schemas)]
-                  (setup-worksheet-conn! schema nil)
-                  (rf/dispatch-sync [:state/set :sync-loaded? true])))))
+                (setup-worksheet-conn! (->ds-schema all-schemas) nil)
+                (rf/dispatch-sync [:state/set :sync-loaded? true]))))
   nil)
 
 (defn load-store-local!
-  "Initialize a local DataScript connection backed by Rust DB.
-   Attempts to restore an existing DB named `worksheet-<ws-uuid>.db`."
+  "Open the worksheet's AbsurderSQL database (`worksheet-<ws-uuid>.db`) and
+   restore whatever is stored in it — a fresh empty db when nothing is —
+   then mirror it into a CLJS conn for reactivity."
   [ws-uuid]
   (reset-conn-state!)
-  (reset-sql-state!)
+  (reset-persist-state!)
   (let [schema  (->ds-schema all-schemas)
         db-name (str "worksheet-" ws-uuid ".db")]
-    (swap! sql-state assoc :db-name db-name)
     (-> (pss/ensure-initialized!)
-        (p/then (fn [_]
-                  (if-let [rdb (try (.restoreFromLegacy WasmDataScript db-name)
-                                    (catch :default _ nil))]
-                    (let [cljs-db (impl-rust/sync-from-rust rdb)
-                          ds-conn (setup-worksheet-conn! schema (d/datoms cljs-db :eavt))]
-                      (impl-rust/set-named-db! "$ws" rdb @ds-conn)
-                      (rf/dispatch-sync [:state/set :sync-loaded? true]))
-                    ;; No existing DB — empty worksheet
-                    (do (setup-worksheet-conn! schema nil)
-                        (rf/dispatch-sync [:state/set :sync-loaded? true])))))
+        (p/then (fn [_] (.open WasmDataScript db-name (impl-rust/schema->js schema))))
+        (p/then (fn [rdb]
+                  (reset! active-db-name db-name)
+                  (mirror-rust-db! schema rdb)
+                  (rf/dispatch-sync [:state/set :sync-loaded? true])))
         (p/catch (fn [e]
                    (js/console.error "Failed to initialize local store:" e)
                    (setup-worksheet-conn! schema nil)
@@ -139,15 +171,12 @@
     (js/btoa (.join chunks ""))))
 
 (defn- export-db-bytes!
-  "Persist Rust DB to SQLite and export as bytes. Returns a Promise of Uint8Array.
-   Uses sql/init! + sql/connect! here since this is user-initiated (app fully loaded)."
+  "Persist the Rust DB then export it as SQLite bytes (.bp7).
+   Returns a Promise of Uint8Array."
   []
-  (when-let [db-name (:db-name @sql-state)]
+  (when-let [db-name @active-db-name]
     (when-let [rdb (impl-rust/named-db "$ws")]
-      (.storeToLegacy rdb db-name)
-      (-> (sql/init!)
-          (p/then (fn [_] (sql/connect! db-name)))
-          (p/then (fn [sql-conn] (sql/export! sql-conn)))))))
+      (p/do (.exportDb rdb db-name)))))
 
 (defn- save-worksheet-browser!
   "Save worksheet via browser blob download."
@@ -176,70 +205,66 @@
 ;;; Open Worksheet (import .bp7)
 
 (defn open-worksheet! [{:keys [file]}]
-  (let [db-name (.-name file)]
+  (let [db-name (.-name file)
+        schema  (->ds-schema all-schemas)]
     (reset-conn-state!)
-    (reset-sql-state!)
+    (reset-persist-state!)
     (reset! worksheet-from-file? true)
-    (-> (sql/init!)
+    (-> (pss/ensure-initialized!)
         (p/then (fn [_] (read-file-bytes file)))
-        (p/then (fn [db-bytes]
-                  (-> (sql/connect! db-name)
-                      (p/then (fn [tmp-conn]
-                                (-> (sql/import! tmp-conn db-bytes)
-                                    (p/then (fn [_] (sql/close! tmp-conn))))))
-                      (p/then (fn [_] (sql/connect! db-name)))
-                      (p/then (fn [sql-conn]
-                                (swap! sql-state assoc :db-name db-name)
-                                (let [schema (->ds-schema all-schemas)
-                                      rdb    (try (.restoreFromLegacy WasmDataScript db-name)
-                                                  (catch :default _ nil))]
-                                  (if rdb
-                                    (let [cljs-db (impl-rust/sync-from-rust rdb)
-                                          ds-conn (setup-worksheet-conn! schema (d/datoms cljs-db :eavt))]
-                                      (impl-rust/set-named-db! "$ws" rdb @ds-conn))
-                                    (js/console.error "Unsupported .bp7 format: restoreFromLegacy returned nil for" db-name)))
-                                (rf/dispatch-sync [:state/set :sync-loaded? true])
-                                (rf/dispatch-sync [:state/set :ws-version
-                                                   @(rf/subscribe [:worksheet/version
-                                                                   @(rf/subscribe [:worksheet/latest])])]))))))
+        (p/then (fn [db-bytes] (.importDb WasmDataScript db-name db-bytes)))
+        (p/then (fn [_] (.open WasmDataScript db-name (impl-rust/schema->js schema))))
+        (p/then (fn [rdb]
+                  (if (pos? (.count rdb))
+                    (let [ds-conn (mirror-rust-db! schema rdb)]
+                      (reset! active-db-name db-name)
+                      (rekey-to-canonical! rdb (d/db ds-conn)))
+                    (js/console.error "Unsupported .bp7 format: no worksheet data in" db-name))))
+        (p/then (fn [_]
+                  (rf/dispatch-sync [:state/set :sync-loaded? true])
+                  (rf/dispatch-sync [:state/set :ws-version
+                                     @(rf/subscribe [:worksheet/version
+                                                     @(rf/subscribe [:worksheet/latest])])])))
         (p/catch (fn [e]
                    (js/console.error "Open worksheet failed:" e))))))
 
 ;;; New Worksheet
 
 (defn new-worksheet! [ws-name modules _submodule workflow]
-  (let [schema    (->ds-schema all-schemas)
-        ws-uuid   (str (d/squuid))
-        db-name   (str "worksheet-" ws-uuid ".db")
-        js-schema (impl-rust/schema->js schema)]
-    ;; These mutations are safe inside an event handler (they don't dispatch)
+  (let [schema  (->ds-schema all-schemas)
+        ws-uuid (str (d/squuid))
+        db-name (str "worksheet-" ws-uuid ".db")]
+    ;; Safe inside an event handler (these mutations don't dispatch).
     (reset-conn-state!)
-    (reset-sql-state!)
-    (reset! worksheet-from-file? false)
-    ;; 1. Create Rust DB and transact worksheet entity synchronously
-    (let [rdb     (.emptyDb WasmDataScript js-schema)
-          version @(rf/subscribe [:state :app-version])
-          tx      (cond-> {:worksheet/uuid    ws-uuid
-                           :worksheet/modules modules
-                           :worksheet/created (.now js/Date)}
-                    version  (assoc :worksheet/version version)
-                    ws-name  (assoc :worksheet/name ws-name))]
-      (.transact rdb (pr-str [tx]))
-      ;; 2. Sync Rust→CLJS for posh reactivity (no storage adapter)
-      (let [cljs-db (impl-rust/sync-from-rust rdb)
-            ds-conn (setup-worksheet-conn! schema (d/datoms cljs-db :eavt))]
-        (impl-rust/set-named-db! "$ws" rdb @ds-conn)
-        ;; 3. Persist to SQLite via storeToLegacy (no separate sql/init! needed)
-        (swap! sql-state assoc :db-name db-name)
-        (.storeToLegacy rdb db-name)
-        (reset! current-route-order
-                @(rf/subscribe [:wizard/route-order ws-uuid workflow]))
-        ;; Defer dispatches — we're inside an event handler, can't dispatch-sync
-        (js/setTimeout
-         (fn []
-           (rf/dispatch-sync [:state/set :sync-loaded? true])
-           (rf/dispatch [:navigate (first @current-route-order)]))
-         0)))))
+    (reset-persist-state!)
+    (-> (pss/ensure-initialized!)
+        ;; Fresh uuid — open returns an empty Rust db bound to its SQLite.
+        (p/then (fn [_] (.open WasmDataScript db-name (impl-rust/schema->js schema))))
+        (p/then (fn [rdb]
+                  (let [version @(rf/subscribe [:state :app-version])
+                        tx      (cond-> {:worksheet/uuid    ws-uuid
+                                         :worksheet/modules modules
+                                         :worksheet/created (.now js/Date)}
+                                  version (assoc :worksheet/version version)
+                                  ws-name (assoc :worksheet/name ws-name))
+                        reveal! (fn []
+                                  (rf/dispatch-sync [:state/set :sync-loaded? true])
+                                  (rf/dispatch [:navigate (first @current-route-order)]))]
+                    (.transact rdb (pr-str [tx]))
+                    (mirror-rust-db! schema rdb)
+                    (reset! active-db-name db-name)
+                    (reset! current-route-order
+                            @(rf/subscribe [:wizard/route-order ws-uuid workflow]))
+                    ;; Persist, THEN reveal + navigate — so a refresh can
+                    ;; restore it. On persist failure, still reveal the
+                    ;; in-memory worksheet.
+                    (-> (persist! rdb db-name)
+                        (p/then (fn [_] (reveal!)))
+                        (p/catch (fn [e]
+                                   (js/console.error "[store] new-worksheet persist failed:" e)
+                                   (reveal!)))))))
+        (p/catch (fn [e]
+                   (js/console.error "[store] new-worksheet failed:" e))))))
 
 ;;; Public Fns
 
@@ -254,27 +279,32 @@
 
 (rf/reg-fx :ds/init init!)
 
-;; Override re-posh's :transact effect to use Rust as primary engine.
-;; Transact through Rust first (fast, in-place), then update CLJS conn
-;; for posh reactivity. No storage adapter — persistence is debounced.
+;; Override re-posh's :transact effect to use Rust as the primary engine:
+;; transact through Rust first (fast, in-place), then update the CLJS conn for
+;; posh reactivity, then schedule a debounced persist to IndexedDB.
 (rf/reg-fx :transact
            (fn [tx-data]
              (if-let [rdb (impl-rust/named-db "$ws")]
                (do
-        ;; Rust is the source of truth. Fail loud on a Rust write error rather
-        ;; than masking it — swallowing here would silently diverge the Rust DB
-        ;; from the CLJS reactivity mirror. The re-thrown error is reported by
-        ;; the global window.onerror handler (behave.telemetry); the CLJS mirror
-        ;; is intentionally left untouched so both stay at the pre-tx state.
-                 (try
-                   (.transact rdb (pr-str (vec tx-data)))
-                   (catch :default e
-                     (js/console.error "[store] Rust transact failed for" (vec tx-data) e)
-                     (throw e)))
+                 ;; Rust is the source of truth. Fail loud on a Rust write
+                 ;; error rather than masking it — swallowing here would
+                 ;; silently diverge the Rust DB from the CLJS reactivity
+                 ;; mirror. NOTE: .transact reports failures via an `error`
+                 ;; key on the returned object, not by throwing.
+                 (let [report (try
+                                (.transact rdb (pr-str (vec tx-data)))
+                                (catch :default e
+                                  (js/console.error "[store] Rust transact failed for"
+                                                    (vec tx-data) e)
+                                  (throw e)))]
+                   (when-let [err (some-> report (aget "error"))]
+                     (js/console.error "[store] Rust transact error for"
+                                       (vec tx-data) err)
+                     (throw (js/Error. (str "Rust transact error: " err)))))
                  (d/transact! @conn tx-data)
                  (impl-rust/set-named-db! "$ws" rdb (d/db @conn))
                  (schedule-persist!))
-      ;; No Rust DB — fall back to CLJS-only transact
+               ;; No Rust DB — fall back to CLJS-only transact.
                (when @conn
                  (d/transact! @conn tx-data)))))
 

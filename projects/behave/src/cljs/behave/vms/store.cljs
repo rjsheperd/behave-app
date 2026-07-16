@@ -1,19 +1,18 @@
 (ns behave.vms.store
-  (:require [ajax.core                  :refer [ajax-request]]
-            [ajax.protocols             :as pr]
-            ["datascript-rs" :refer [WasmDataScript]]
-            [absurder-sql.datascript.core :as d]
+  (:require [absurder-sql.datascript.core :as d]
             [absurder-sql.datascript.impl-rust :as impl-rust]
             [absurder-sql.datascript.persistent-sorted-set :as pss]
+            [ajax.core                  :refer [ajax-request]]
+            [ajax.protocols             :as pr]
+            [behave.schema.core         :refer [all-schemas]]
+            [behave.translate           :refer [load-translations!]]
             [clojure.string             :as str]
+            [datom-compressor.interface :as c]
+            [ds-schema-utils.interface  :refer [->ds-schema]]
             [posh.reagent               :refer [pull pull-many q posh!]
              :rename {q posh-query pull posh-pull pull-many posh-pull-many}]
             [promesa.core               :as p]
-            [re-frame.core              :as rf]
-            [datom-compressor.interface :as c]
-            [ds-schema-utils.interface  :refer [->ds-schema]]
-            [behave.schema.core         :refer [all-schemas]]
-            [behave.translate           :refer [load-translations!]]))
+            [re-frame.core              :as rf]))
 
 ;;; State
 
@@ -105,8 +104,8 @@
 (defn- fetch-vms! [version]
   (ajax-request {:uri             (str "/layout.msgpack?v=" version)
                  :handler         (fn [[ok body]]
-                                   (when ok
-                                     (process-and-init! body version)))
+                                    (when ok
+                                      (process-and-init! body version)))
                  :format          {:content-type "application/text" :write str}
                  :response-format {:description  "ArrayBuffer"
                                    :type         :arraybuffer
@@ -134,45 +133,21 @@
 
 ;;; Public Fns
 
-(defn- build-rust-db-from-entities!
-  "Build a WasmDataScript directly from entity maps.
-   Single WASM call via transactBulkString — no CLJS DataScript intermediary."
-  [entities js-schema]
-  (let [rdb (.emptyDb WasmDataScript js-schema)
-        sb  (js/Array.)]
-    (doseq [entity entities
-            :let [eid (:db/id entity)]
-            [k v] (dissoc entity :db/id)
-            :let [a-str (if (namespace k)
-                          (str (namespace k) "/" (name k))
-                          (name k))]
-            val (if (and (or (vector? v) (set? v)) (not (string? v)))
-                  v [v])]
-      (.push sb (str eid "\t" a-str "\t"
-                     (impl-rust/value-type+str val) "\t"
-                     536870913)))
-    (.transactBulkString rdb (.join sb "\n"))
-    rdb))
+(defn init!
+  "Initialize the VMS as a plain in-memory CLJS DataScript conn.
 
-(defn init! [{:keys [datoms schema]}]
-  (let [js-schema (impl-rust/schema->js schema)
-        rdb       (build-rust-db-from-entities! datoms js-schema)
-        cljs-db   (impl-rust/sync-from-rust rdb)
-        conn      (d/conn-from-db cljs-db)]
-    (reset! vms-conn conn)
-    ;; Register rust-db BEFORE posh so that queries during the sentinel
-    ;; transacts route through Rust instead of falling back to CLJS d/q.
-    (impl-rust/set-rust-db! rdb @conn)
-    (posh! conn)
-    ;; Force posh to evaluate queries against the pre-loaded DB.
-    ;; Without this, posh's lazy reactions see an empty result because
-    ;; init-db bypassed d/transact (no after-transact event fired).
-    (let [sentinel (inc (:max-eid @conn))]
-      (d/transact conn [[:db/add sentinel :posh/init true]])
-      (d/transact conn [[:db/retract sentinel :posh/init true]]))
-    ;; Update cljs-db identity to match the post-transact DB value.
-    (impl-rust/set-rust-db! rdb @conn)
-    conn))
+   The VMS is read-only reference data; it deliberately does NOT get a
+   WasmDataScript instance (the worksheet store is the only Rust-backed
+   DB). `impl-rust/q`/`entity` callers fall back to CLJS automatically
+   when no default rust-db is registered."
+  [{:keys [datoms schema]}]
+  (if @vms-conn
+    @vms-conn
+    (let [conn (d/create-conn schema)]
+      (d/transact conn datoms)
+      (reset! vms-conn conn)
+      (posh! conn)
+      conn)))
 
 ;;; Effects
 
