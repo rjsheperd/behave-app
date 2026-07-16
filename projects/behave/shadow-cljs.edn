@@ -2,7 +2,12 @@
 ;; Uses deps.edn :shadow alias for classpath resolution
 {:deps     {:aliases [:shadow]}
  :dev-http {8030 ["target/kaocha-test" "resources/public"]
-            8040 ["target/browser" "resources/public"]}
+            ;; SPA fallback: serve index.html for deep worksheet routes
+            ;; (e.g. /worksheets/<uuid>/...) so a hard refresh boots the app
+            ;; instead of 404ing. The behave clj backend (figwheel's old
+            ;; :ring-handler) is not in play under `shadow-cljs server`.
+            8040 {:roots            ["target/browser" "resources/public"]
+                  :push-state/index "index.html"}}
  :nrepl    {:port       9001
             :middleware [cider.nrepl/cider-middleware]}
  :builds   {:test-kaocha {:target       :browser-test
@@ -35,7 +40,12 @@
                          :modules         {:app {:entries [behave.client]}}
                          :build-hooks     [(behave.test-build/wasm-prepare-hook)
                                           (behave.test-build/browser-flush-hook)]
-                         :devtools        {:preloads [day8.re-frame-10x.preload devtools.preload]}
+                         ;; re-frame-10x preload removed: 1.9.9 patches reagent's
+                         ;; do-render with an arity incompatible with reagent
+                         ;; 0.10.0 under React 18, blanking components on a fresh
+                         ;; deep-route mount. (figwheel's compile-dev never loaded
+                         ;; it.) Re-add once a compatible 10x/reagent combo is set.
+                         :devtools        {:preloads [devtools.preload]}
                          :dev             {:compiler-options
                                            {:closure-defines
                                             {re-frame.trace.trace-enabled?        true

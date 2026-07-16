@@ -236,7 +236,10 @@
                    (include-js "/js/behave-min.js")
                    (cljs-init init-params figwheel?)
                    ;; Defer non-critical libraries (Step 3)
-                   (include-js "/js/behave-min.js" "js/sqlite.js")
+                   ;; NOTE: `sqlite.js` removed — dead since the old SQLite impl
+                   ;; was dropped (Rust datascript-rs bundles sqlite-wasm-rs). It
+                   ;; also used a relative path that 404'd on deep-route refresh.
+                   (include-js "/js/behave-min.js")
                    [:script {:src (first (add-v-query ["/js/katex.min.js"])) :defer true}]
                    [:script {:src (first (add-v-query ["/js/bodymovin.js"])) :defer true}]
                    (when figwheel? (include-js (find-app-js)))])})))

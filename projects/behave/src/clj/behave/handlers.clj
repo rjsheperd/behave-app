@@ -9,8 +9,8 @@
             [config.interface                  :refer [get-config]]
             [logging.interface                 :as l :refer [log-str]]
             [ring.middleware.content-type      :refer [wrap-content-type]]
-            [ring.middleware.multipart-params  :refer [wrap-multipart-params]]
             [ring.middleware.keyword-params    :refer [wrap-keyword-params]]
+            [ring.middleware.multipart-params  :refer [wrap-multipart-params]]
             [ring.middleware.reload            :refer [wrap-reload]]
             [ring.middleware.resource          :refer [wrap-resource]]
             [ring.util.codec                   :refer [url-decode]]
@@ -108,6 +108,15 @@
                        :else                                 (not-found "404 Not Found"))]
     (next-handler request)))
 
+(defn- read-param-value
+  "EDN-parse a query-param value, falling back to the raw string when it is
+   not valid EDN. Without this, a value like a 32-char hex hash (which the
+   reader rejects as an invalid number) would 500 the whole request."
+  [v]
+  (try
+    (edn/read-string v)
+    (catch Exception _ v)))
+
 (defn- wrap-query-params [handler]
   (fn [{:keys [params query-string] :or {params {}} :as req}]
     (if (empty? query-string)
@@ -116,7 +125,7 @@
                         (str/split #"&"))
             params  (reduce (fn [params keyval]
                               (let [[k v] (str/split keyval #"=")]
-                                (assoc params (keyword k) (edn/read-string v))))
+                                (assoc params (keyword k) (read-param-value v))))
                             params keyvals)]
         (handler (assoc req :params params))))))
 
