@@ -108,6 +108,27 @@
   (reset! conn nil)
   (reset! worksheet-from-file? false))
 
+(defn- close-previous-worksheet!
+  "Flush and close the active worksheet's AbsurderSQL database, unless it is
+   `keep-db-name` (the worksheet being switched to). Frees the Rust
+   WasmDataScript so its index storages release their pooled-connection refs,
+   and closes the database (releasing the leader-election heartbeat). Without
+   this, every worksheet switch leaks a Database, a SQLite connection, and a
+   heartbeat interval. Must run before `reset-conn-state!` (which drops the
+   `$ws` handle); async, and runs concurrently with opening the next
+   worksheet (a different db, so no contention)."
+  [keep-db-name]
+  (let [db-name @active-db-name
+        rdb     (impl-rust/named-db "$ws")]
+    (when (and db-name (not= db-name keep-db-name))
+      (-> (if rdb (persist! rdb db-name) (p/resolved nil))
+          (p/then (fn [_] (.closeDb WasmDataScript db-name)))
+          (p/then (fn [_] (when rdb (.free rdb))))
+          (p/catch (fn [e]
+                     (js/console.error "[store] failed closing previous worksheet"
+                                       db-name e)))))
+    nil))
+
 (defn- rekey-to-canonical!
   "A worksheet opened from a file is imported under its file name. Re-key
    persistence to the canonical `worksheet-<uuid>.db` so uuid-based reload
@@ -127,6 +148,7 @@
   "Set up an in-memory DataScript conn without SQLite backing.
    Used on initial load when no worksheet is active."
   []
+  (close-previous-worksheet! nil)
   (reset-conn-state!)
   (reset-persist-state!)
   (-> (pss/ensure-initialized!)
@@ -140,10 +162,11 @@
    restore whatever is stored in it — a fresh empty db when nothing is —
    then mirror it into a CLJS conn for reactivity."
   [ws-uuid]
-  (reset-conn-state!)
-  (reset-persist-state!)
   (let [schema  (->ds-schema all-schemas)
         db-name (str "worksheet-" ws-uuid ".db")]
+    (close-previous-worksheet! db-name)
+    (reset-conn-state!)
+    (reset-persist-state!)
     ;; Track the target worksheet synchronously so active-db-name always
     ;; reflects the current worksheet even while the async open is in flight.
     ;; Safe: the persist timer was just cancelled and $ws is nil until the
@@ -211,6 +234,7 @@
 (defn open-worksheet! [{:keys [file]}]
   (let [db-name (.-name file)
         schema  (->ds-schema all-schemas)]
+    (close-previous-worksheet! db-name)
     (reset-conn-state!)
     (reset-persist-state!)
     (reset! worksheet-from-file? true)
@@ -239,6 +263,7 @@
         ws-uuid (str (d/squuid))
         db-name (str "worksheet-" ws-uuid ".db")]
     ;; Safe inside an event handler (these mutations don't dispatch).
+    (close-previous-worksheet! db-name)
     (reset-conn-state!)
     (reset-persist-state!)
     (-> (pss/ensure-initialized!)
