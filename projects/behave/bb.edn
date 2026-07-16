@@ -9,7 +9,9 @@
                :task (shell (format "systemctl --user start %s" -project))}
   stop        {:depends [-project]
                :task (shell (format "systemctl --user stop %s" -project))}
-  build-js    (shell "bun shadow-cljs compile :app");; (clojure "-M:compile-cljs")
+  ;; :app is the production build (resources/public/cljs, :advanced optimizations,
+  ;; :release tracing stubs) — use `release`, not `compile` (which is dev/:none).
+  build-js    (shell "bun shadow-cljs release :app")
   uber        (clojure "-X:build-uberjar")
   server-uber (clojure "-X:build-server-uberjar")
   pull        (do
