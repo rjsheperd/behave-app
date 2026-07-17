@@ -65,7 +65,28 @@
                          :build-hooks [(behave.test-build/wasm-prepare-hook)
                                        (behave.test-build/app-configure-hook)
                                        (behave.test-build/app-flush-hook)]
-                         :compiler-options {:optimizations :advanced
+                         ;; :simple, not :advanced. Advanced renames JS
+                         ;; properties/methods, which munges the un-externed
+                         ;; datascript-rs (WasmPSS/WasmSeq/WasmDataScript) and
+                         ;; behave.lib.* C++ WASM interop that dev :none never
+                         ;; touched. That broke the VMS sorted-set backend
+                         ;; ("7251 is not ISeqable"). :simple minifies without
+                         ;; property renaming, so all WASM interop keeps working
+                         ;; (~7.8 MB vs ~3 MB — immaterial for a local desktop
+                         ;; bundle). Advanced would need hand-written externs
+                         ;; across two WASM libs — error-prone, so not worth it.
+                         ;;
+                         ;; WASM_URL must match where app-flush-hook copies the
+                         ;; datascript-rs wasm (the output dir, served at /cljs/).
+                         ;; Without this the packaged build loads the wasm from
+                         ;; the defaults (/ds/ for pss, /js/ for core), both 404,
+                         ;; so pss/ensure-initialized! fails and VMS never loads.
+                         :compiler-options {:optimizations :simple
+                                            :closure-defines
+                                            {absurder-sql.datascript.persistent-sorted-set/WASM_URL
+                                             "/cljs/datascript_rs_bg.wasm"
+                                             absurder-sql.core/WASM_URL
+                                             "/cljs/datascript_rs_bg.wasm"}
                                             :externs ["resources/behave_externs.js"
                                                       "../../components/absurder_sql/resources/externs.js"]}
                          :release     {:build-options
