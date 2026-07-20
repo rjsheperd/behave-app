@@ -986,14 +986,19 @@ stores stay at the pre-tx state.
 
 - =projects/behave/src/cljs/behave/store.cljs= (=:transact= fx + =schedule-persist!=)
 
-*** Related follow-up (new)
+*** DONE Related: canonical DB name for opened worksheets
 
-=open-worksheet!= keys its SQLite/IndexedDB name off the uploaded *file name*
+=open-worksheet!= keyed its SQLite/IndexedDB name off the uploaded *file name*
 (=<file>.bp7=), while =new-worksheet!= / =load-store-local!= use
-=worksheet-<uuid>.db=. In-session open+edit+persist works, but a uuid-route
-reload can't find a file-opened worksheet, and file names can collide. Fix:
-after =restoreFromLegacy= in =open-worksheet!=, re-key persistence to
-=worksheet-<uuid>.db= using the restored worksheet's =:worksheet/uuid=.
+=worksheet-<uuid>.db=. In-session open+edit+persist worked, but a uuid-route
+reload couldn't find a file-opened worksheet, and user file names could collide.
+
+*Fixed:* after =restoreFromLegacy=, =rekey-to-canonical!= reads the restored
+=:worksheet/uuid=, persists the Rust DB under =worksheet-<uuid>.db= via
+=storeToLegacy=, and repoints =sql-state=. All three entry points now share one
+naming scheme. The file-named import artifact is left orphaned in IndexedDB (the
+=sql= interface has no delete API); it is superseded and unreferenced. No-op when
+the restored data has no worksheet uuid (falls back to the file name).
 
 ** TODO 6.3 reactive-entity Bypasses Rust Entirely [MEDIUM]
 
