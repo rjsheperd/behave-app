@@ -4,3 +4,13 @@
 [submodule "bases/behave-docs"]
 	path = bases/behave-docs
 	url = git@github.com:firelab/behave-docs.git
+[submodule "SpatialFOFEM"]
+	path = SpatialFOFEM
+	url = https://github.com/firelab/SpatialFOFEM.git
+[submodule "firemodels"]
+	path = firemodels
+	url = https://github.com/firelab/firemodels.git
+[submodule "windninja"]
+	path = windninja
+	url = https://github.com/firelab/windninja.git
+	branch = FireBehaviorModels

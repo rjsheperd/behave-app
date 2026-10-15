@@ -1,0 +1,1095 @@
+#+TITLE: Behave 7 Architecture Review — Statements to Confirm & Questions to Clarify
+#+DATE: 2026-10-15
+#+AUTHOR: RJ Sheperd
+
+Framing: each item is either a *statement* (something we assert and want
+confirmed/corrected) or a *question* (a decision or unknown we need answered
+before we can scope). Items marked *[BLOCKER]* change the plan materially
+depending on the answer, and should be resolved in next week's in-person
+discussion. Items marked *[ANSWERED]* were resolved by source review and are
+retained because the answer changes the proposal.
+
+* Source review: three upstream repos resolve the biggest unknowns
+
+Added as submodules for inspection:
+
+- =SpatialFOFEM/= — https://github.com/firelab/SpatialFOFEM
+- =firemodels/= — https://github.com/firelab/firemodels
+- =windninja/= — https://github.com/firelab/windninja (pinned to the
+  =FireBehaviorModels= branch — see S4.6c)
+
+Headline: *both "does an extractable library exist?" blockers are already
+answered yes, and =firemodels= ships working JNI bindings today.* The
+proposal below shifts accordingly — the open risks move from "can this be
+extracted?" to "can it be built for macOS, and how do we ship GDAL."
+
+* 0. Cross-cutting statements (apply to all four feature sets)
+
+- *S0.1 — The current architecture's defining property is that all computation
+  happens client-side in WASM.* Behave 7 ships identical behavior in the
+  browser and in the JCEF desktop app because there is no server-side compute
+  path: the C++ equations are compiled to =behave-min.wasm= and called from
+  CLJS. Any feature that requires JNI/JNA native libraries or server-side
+  execution *breaks this symmetry* and creates a two-tier product (desktop-only
+  capability vs. web). This is the single biggest architectural fork in the
+  proposal.
+
+- *S0.2 — VMS is the real cost center, not the math.* Importing equations is
+  mechanical; what takes time is modeling every input/output in VMS
+  (Application → Module → Submodule → Group → GroupVariable), with units,
+  domains, conditionals, translations, and DITA help pages. Any estimate that
+  counts only C++/WASM work will be wrong by a large factor.
+
+- *S0.3 — VMS already supports multiple Applications as a first-class
+  concept.* The schema root is =Application=, so FOFEM (and FlamMap Basic)
+  can be modeled as sibling Applications sharing the same wizard engine,
+  worksheet model, and results pipeline. This makes "separate app" and "same
+  engine" less of a binary than it appears.
+
+- *S0.4 — Splitting the routing table by application context is cheap.*
+  =bases/behave_routing/src/behave_routing/main.cljc= is 113 lines with a
+  single =routes= def; adding =/fofem/...= and =/flammap/...= subtrees plus a
+  landing page is a small change. The expensive part is not routing — it is
+  per-app state, schema, and UI components.
+
+- *Q0.5 — What is the actual offline requirement?* "Works with no network
+  after install" vs. "works with intermittent network" vs. "online only for
+  data download" lead to very different map/basemap/landscape-caching designs.
+  *[BLOCKER for the map work]*
+
+- *Q0.6 — Who owns the C++ libraries long-term?* Behave's model is that the
+  Fire Lab owns the equations (=behave-mirror=) and SIG owns the bindings and
+  UI. Does that same ownership split hold for =fofemlib= and a
+  FlamMap/FARSITE core library? If the Fire Lab cannot commit to maintaining
+  those extracted libraries, the whole "extract to library" strategy is at
+  risk regardless of which integration path we pick.
+
+- *Q0.7 — What is the acceptance criterion for "correct"?* We need a
+  regression corpus (inputs → expected outputs) exported from the current
+  desktop FOFEM / FlamMap / FARSITE for every module we port, or we have no
+  way to prove equivalence. Who produces it?
+
+* 1. FOFEM mortality and consumption equations
+
+** Statements
+
+- *S1.1 — Agreed that these are 1D calculations and fit Behave's existing
+  shape.* Nothing here needs GPU, parallelism, or spatial data.
+
+- *S1.2 — Mortality is already done, and it is already FOFEM's mortality.*
+  Behave 7 ships a Mortality module end-to-end: C++ in
+  =behave-lib/behave-mirror/src= (with a =testMortality= harness and
+  =resultsProbMort.csv= baselines), a CLJS wrapper at
+  =projects/behave/src/cljs/behave/lib/mortality.cljs=, and ~15+ CMS
+  migrations covering tree species, GACC regions, equation types, bole char,
+  and scorch-height conditionals. So the mortality half of this request is
+  substantially *already satisfied*, and the real new work is *consumption*
+  (plus whatever FOFEM outputs depend on it).
+
+- *S1.3 — Therefore the live question is overlap, not integration.* If FOFEM
+  also ships mortality equations, we will have two implementations. One must
+  be declared authoritative and the other dropped; maintaining both guarantees
+  divergence.
+
+- *S1.4 — Our recommendation is your option 2, with a caveat.* Consumption as
+  its own module (dependent on fuel inputs, feeding mortality/soil-heating
+  outputs) fits the existing Module/Submodule model cleanly and reuses the
+  wizard, worksheet, results tables, and export machinery. Option 3 (separate
+  front-end) should be the fallback, not the default — it duplicates the
+  worksheet engine, results model, and help system for no modeling benefit.
+  The caveat is Q1.7 below.
+
+- *S1.5 — "Pipe it through the same Emscripten + Hatchet pipeline" is right in
+  spirit but not automatic.* The pipeline consumes a *mirror* layer
+  (=behave-mirror=) whose classes are deliberately shaped for WebIDL:
+  getter/setter-style APIs, no STL or templates in the public interface,
+  flat scalar/enum arguments. A =fofemlib= that is merely "math extracted from
+  the UI" will still need a hand-written =fofem-mirror= plus =behave.idl=
+  additions and =enums.cpp= entries. Budget that explicitly; it is the same
+  work that made =behave-mirror= its own repo.
+
+** Questions
+
+- *Q1.6 — Does =fofemlib= exist, in any form?* *[ANSWERED — yes, and better
+  than hoped.]* =SpatialFOFEM/FOF_DLL/= is exactly the =fofemlib= we wanted:
+  the equations are already separated from the desktop UI into a single
+  exported =FOFEM= class, covering consumption (=FOF_CM=, =FOF_CO=, =FOF_DUF=,
+  =BUR_BRN=/Burnup), mortality (=Fof_Mrt_Cls=), soil heating (=FOF_HSF=), and
+  emissions (=FOF_SGV=, =FOF_CO2=). Two findings make this unusually
+  favorable:
+
+  1. *The API shape is already what WebIDL/Hatchet wants.* The public
+     interface is flat scalar setters and getters — =CI_f_Duff(float)=,
+     =CI_f_MoistDuf(float)=, =CI_cr_DuffType(char[])= — with no STL or
+     templates crossing the boundary. This is the same mirror-layer shape we
+     hand-wrote for =behave-mirror=, meaning much less adaptation work than
+     S1.5 assumed.
+  2. *The Windows coupling is in the packaging, not the math.* There is no
+     CMake anywhere in the repo — it is a VS2022 =.sln=/=.vcxproj= build, and
+     =__declspec(dllexport)=, =dllmain.cpp=, =stdafx.h=, and =targetver.h=
+     appear throughout. Making this build under Emscripten (or any non-MSVC
+     toolchain) means authoring a CMake build and neutralizing the
+     =FOF_EXPORT= macro and precompiled-header scaffolding. Mechanical, but
+     real, and someone has to own it upstream.
+
+  Note also that =SpatialFOFEM/= proper is a *separate, spatial* product
+  (GDAL-based, raster in/raster out, per its Readme "used by FlamMap6 desktop
+  and the Fire Modeling Services Framework for inclusion in IFTDSS"). So
+  there are two distinct FOFEM targets: the 1D =FOF_DLL= that fits Behave's
+  wizard, and a spatial variant that belongs with the section 4 work.
+
+- *Q1.7 — Does FOFEM produce output shapes Behave's worksheet model cannot
+  represent?* Behave's results model is tabular
+  (ResultTable/ResultHeader/ResultRow/ResultCell) over scalar cells. FOFEM
+  emits things like emissions time series (flaming vs. smoldering over hours)
+  and soil-temperature-vs-depth profiles. If those are required outputs, we
+  need either (a) a schema extension for curve/series results, or (b)
+  acceptance of summary scalars only. *This, not UI preference, is the real
+  argument for or against option 3.* *[BLOCKER]*
+
+- *Q1.8 — Does FOFEM's input workflow fit the Behave wizard?* FOFEM's
+  stand-level fuel inventory (loadings by size class, duff depth, moisture
+  regimes) may not decompose into Behave's module→submodule→group
+  wizard steps. Can the Fire Lab walk us through one complete FOFEM run so we
+  can map it onto the wizard concretely?
+
+- *Q1.9 — Which FOFEM outputs are actually in scope?* Consumption only? Or
+  also smoke/emissions and soil heating? Scope here drives everything
+  downstream, including Q1.7.
+
+- *Q1.10 — Who authors the VMS content?* Hundreds of new variables need units,
+  domains, defaults, conditionals, and help pages. Is the Fire Lab staffing
+  CMS authoring, or is that in SIG's scope?
+
+* 2. Integrated map
+
+** Statements
+
+- *S2.1 — Agreed on WebGL + a mature web mapping library, and agreed on
+  avoiding API-keyed basemaps.* Per-user Mapbox keys and a shared embedded key
+  are both non-starters for the reasons you give.
+
+- *S2.2 — We'd recommend OpenLayers specifically, not just "one of the
+  three."* OpenLayers has first-class GeoTIFF support built in
+  (=ol/source/GeoTIFF= on top of geotiff.js, rendered through a WebGL tile
+  layer) with a declarative style expression language for color ramps and
+  band math. That means *plotty is unnecessary* — the color-styling problem
+  you flagged as unmaintained is already solved inside the mapping library.
+  This is the strongest single argument among the three options.
+
+- *S2.3 — For offline basemaps, we'd recommend PMTiles over scraping/caching
+  raw OSM tiles.* A single =.pmtiles= archive (Protomaps' OSM basemap) is one
+  file, requires no tile server, no API key, and no per-tile caching logic; it
+  can be bundled in the installer or downloaded once and read via range
+  requests locally. It is directly supported by both MapLibre and OpenLayers.
+  The =osm-offline-downloader= / local-tile-server approaches in your links
+  work but leave us maintaining a tile cache and its eviction policy.
+
+- *S2.4 — Browser memory is a hard constraint on raster display.* WASM32 is
+  capped at 4 GB and practical browser budgets are far lower, so any
+  landscape-scale raster must be tiled/windowed for both compute and display.
+  This constraint recurs in sections 3 and 4.
+
+** Questions
+
+- *Q2.5 — Is a basemap required at all for the point-based (FlamMap Basic)
+  case, or only for spatial?* If point-based just needs a location picker, the
+  map scope shrinks a lot.
+
+- *Q2.6 — Must the installer ship with basemap data (large download), or may
+  the app fetch it on first run?* Determines PMTiles-bundled vs.
+  PMTiles-on-demand.
+
+- *Q2.7 — What coordinate systems and projections must we accept?* LANDFIRE
+  ships in Albers (EPSG:5070); web maps are Web Mercator. Do we reproject for
+  display only, or is reprojection of user-supplied layers in scope?
+
+- *Q2.8 — Do users need to supply their own vector layers* (ownership
+  boundaries, roads, ignition points) *or only rasters?*
+
+* 3. Point-based fire behavior (FlamMap Basic)
+
+** Statements
+
+- *S3.1 — Agreed this is embarrassingly parallel.* Per-cell head-fire outputs
+  (fire type, spread rate, fireline intensity, flame length) have no
+  inter-cell dependency.
+
+- *S3.2 — Because there's no shared state, this does NOT require WASM threads
+  or SharedArrayBuffer.* The straightforward solution is N Web Workers, each
+  with its *own* WASM module instance, each handed a tile of the landscape.
+  That avoids cross-origin-isolation headers (COOP/COEP), avoids an
+  Emscripten pthreads build, and works identically in the browser and in
+  JCEF. We consider this the lowest-risk path and believe it removes the
+  "WASM parallelization problem" as a blocker.
+
+- *S3.3 — We'd argue against WebGPU here.* Running these equations on the GPU
+  means reimplementing them in WGSL, which forks the source of truth away from
+  the Fire Lab's C++ and doubles the validation burden forever. The expected
+  speedup does not justify losing single-source equations. (Happy to be
+  overruled if there's a performance target we can't otherwise hit — see Q3.5.)
+
+- *S3.4 — Agreed that reusing GridFire/Pyretechnics implementations is a
+  political non-starter even where it's technically sound*, for exactly the
+  reason you name: the Fire Lab would no longer own the authoritative
+  equations.
+
+** Questions
+
+- *Q3.5 — What's the performance target?* "Landscape of N cells in under T
+  seconds" — we need actual numbers (typical and worst-case landscape extent,
+  cell size, acceptable wait) before choosing workers vs. GPU vs. native.
+  *[BLOCKER for this section]*
+
+- *Q3.6 — Are FlamMap Basic's equations the same as Behave's SURFACE/CROWN
+  equations, or a separate FlamMap-specific implementation?* If they're the
+  same math, we may already have them in =behave-mirror= and the work is
+  purely the raster harness. If FlamMap's C++ differs, we need to know whether
+  outputs must match FlamMap bit-for-bit or merely agree scientifically.
+  *[BLOCKER]*
+
+- *Q3.7 — Which FlamMap Basic outputs are in scope,* beyond the four you
+  listed (e.g., crown fire activity, midflame wind, SDI, crowning/torching
+  index)?
+
+* 3b. FlamMap in the browser: WASM/WebGPU feasibility
+
+Verdict up front: *WASM is clearly feasible and the library is unusually
+well-shaped for it — the per-cell loop already accepts a tile range, so the
+Web Worker plan in S3.2 is supported by FlamMap's own design. WebGPU is not
+feasible without a full rewrite.* The real cost is not the fire equations;
+it is GDAL and the WindNinja link dependency.
+
+** What the code looks like
+
+=lib/flammap= is *only ~24,000 LOC* across 14 =.cpp= files — small enough
+to port deliberately rather than wholesale. The compute path is:
+
+- =CFlamMap::LaunchFlamMap()= (=flammap.cpp:931=) → =FlamMap::RunFlamMap()=
+  (=flammap3.cpp:56=).
+- =RunFlamMap()= optionally runs fuel-moisture conditioning
+  (=RunConditioning()=), then calls =SetLandscapeRange(0, GetNumEast(), 0,
+  GetNumNorth())= and =BurnTheLandscape()= *directly, in-process*
+  (=flammap3.cpp:72-73=).
+- =BurnThread::BurnTheLandscape()= (=flmburn4.cpp:245=) is a plain
+  doubly-nested row/column loop. Per cell: =GetLandscapeData()= →
+  =GetFireEnvironment()= → =EmberCoords()= → =SurfaceFire()= → (if canopy)
+  =CrownFire()= → =embers.Flight()= / =GetMaxSpotDist()= →
+  =WriteOutputLayers(k, j)=. Progress is reported per row via
+  =SetThreadProgress()=.
+
+** Why WASM is a good fit
+
+- *S3b.1 — S3.1 is confirmed in source: the per-cell work is independent.*
+  Each iteration writes only its own output cell. Nothing in the inner loop
+  reads a neighbor's result.
+
+- *S3b.2 — The tiling API already exists and is live.*
+  =BurnThread::SetLandscapeRange(colstart, colend, rowstart, rowend)=
+  (=flm4.hpp:291=, =flmburn4.cpp:99=) takes an arbitrary sub-band;
+  =RunFlamMap()= merely passes the full extent. Better, the commented-out
+  =Burn::StartLandscapeThreads()= (=flmburn4.cpp:~1008-1045=) still contains
+  the complete 2D band-decomposition arithmetic —
+  =Factor(NumPerimThreads, &NumX, &NumY)=, =XRange=/=YRange= computation, and
+  the loop that hands each worker its =(ColStart, ColEnd, RowStart, RowEnd)=.
+  *We can reuse that logic directly for Web Worker tiling.* This is a
+  strong signal: the library was designed for exactly the decomposition we
+  want.
+
+- *S3b.3 — There is no live Win32 threading to port.* All the
+  =_beginthreadex=, =HANDLE=, =ResumeThread=, =SetThreadAffinityMask=, and
+  =SYSTEM_INFO= code in =flmburn4.cpp= is *commented out*. The library runs
+  single-threaded today. The live OpenMP in =firemodels= sits at the
+  *application* layer — =app/runflammap/runflammap.cpp:121= is a
+  =#pragma omp parallel for= over *runs*, not over cells. So parallelism is
+  already understood upstream as a run-level concern, which is exactly how
+  workers would do it.
+
+- *S3b.4 — FlamMap's own internal dependencies are dependency-free.*
+  =lib/fuelcondition= and =lib/icf= declare no =find_package= and no
+  =target_link_libraries= — pure C++ with no GDAL and no SQLite. Those
+  compile to WASM as-is.
+
+- *S3b.5 — Emscripten's virtual filesystem avoids an I/O refactor.* Unlike
+  WindNinja (S4b.2), =CFlamMap= has no in-memory seam — it is file-path
+  based (=SetLandscapeFile(char*)=, =SetFuelMoistureFile=,
+  =SetCustomFuelsFile=). But MEMFS/WORKERFS lets us mount a user-selected
+  =File= into the virtual FS so the existing =fopen=/GDAL paths work
+  *unmodified*. No C++ changes needed to get the first run working.
+
+** What it actually costs
+
+- *S3b.6 — GDAL is load-bearing, and that is the main weight.*
+  =flammap3.cpp= has ~125 GDAL/CPL references. Landscape input goes through
+  =ReadGdalLCP()= for =.lcp= and =ReadGeoTiff()= for GeoTIFF
+  (=flammap3.cpp:813=), and outputs go out through the GTiff driver. So a
+  browser build needs GDAL compiled to WASM. This is *proven* (gdal3.js
+  exists) but it adds meaningful payload — on the order of 10–20 MB of
+  =.wasm= — plus real build complexity. Trimming GDAL to just the GTiff and
+  LCP drivers is the obvious mitigation and worth scoping early.
+
+- *S3b.7 — WindNinja is a hard link dependency of =lib/flammap=.*
+  =target_link_libraries(flammap fuelcondition icf ${GDAL_LIBRARY}
+  ${WINDNINJA_LIB})=, consumed by
+  =FlamMap::RunAndLoadWindNinjaGrids()= (=flammap4.cpp:503=). For a browser
+  build we want that path compiled out unless gridded winds are requested —
+  otherwise the WASM bundle drags in WindNinja plus boost and netCDF on top
+  of GDAL. *Scoping decision: is non-gridded (domain-average) wind enough
+  for FlamMap Basic in the browser?* If yes, this dependency can be stubbed
+  and the port gets dramatically smaller.
+
+- *S3b.8 — Upstream bug worth reporting: a hardcoded Windows path.*
+  =flammap4.cpp:568= calls =NinjaSetOutputPath(ninja, 0, "D:\\Data")=. That
+  will fail on any non-Windows build that exercises the gridded-wind path —
+  relevant to the macOS/Linux question in Q4.6a as well as to WASM.
+
+- *S3b.9 — Minor global state constrains the instance model.*
+  =GFlamMapInstance= (=flammap.cpp:16=) and =static long WindLoc=
+  (=flmfms3.cpp:17=) are file-scope mutable globals. Harmless under
+  *one WASM instance per Worker* (each gets its own linear memory), but they
+  would bite if we tried several concurrent =CFlamMap= objects inside a
+  single instance. This reinforces the one-instance-per-worker design from
+  S3.2.
+
+- *S3b.10 — Tiling may perturb spotting determinism.* The ember path
+  (=fsxwspot.cpp=, =embers.Flight()=, =GetSpottingSeed()=) is
+  RNG-driven. If the seed is consumed sequentially per cell rather than
+  derived per cell, splitting the landscape across workers changes the draw
+  sequence and results won't reproduce the desktop run bit-for-bit. Needs
+  checking before we promise equivalence (cf. Q0.7).
+
+** Why WebGPU is the wrong target here — more so than for WindNinja
+
+- *S3b.11 — The per-cell work is not a kernel; it is 24k lines of branchy,
+  table-driven C++.* =GetFireEnvironment()= does fuel-moisture conditioning
+  with lookup tables, =SurfaceFire()= / =CrownFire()= (=flmburn4.cpp:450=,
+  =:485=) chain into =flmmech.cpp= and =flmcrwn.cpp=, and the ember model
+  does geometric flight calculations — all double-precision, with heavy
+  pointer-chasing into landscape structs and data-dependent branching. WGSL
+  has no =f64= (S4b.7), no pointers-to-struct-graphs, and punishes divergent
+  branches. This is a rewrite, not a port.
+
+- *S3b.12 — And the speedup wouldn't be where the time goes.* Per-cell fire
+  behavior is cheap; the landscape is large. Realistically this workload is
+  bound by memory traffic and by GDAL raster I/O, not by arithmetic. N
+  workers × WASM captures nearly all the available parallelism with *zero*
+  numerical risk and zero divergence from the Fire Lab's source.
+
+- *S3b.13 — The S3.3 strategic objection applies in full.* A WGSL
+  reimplementation forks FlamMap's equations away from upstream permanently.
+  WASM keeps the Fire Lab's exact code as the single source of truth, which
+  is the whole reason =behave-mirror= works as an arrangement.
+
+** Partial answer to Q3.6
+
+FlamMap's surface/crown/spotting equations are a *separate implementation*
+from Behave's: =flmburn4.cpp= / =flmmech.cpp= / =flmcrwn.cpp= /
+=fsxwspot.cpp= in =firemodels=, versus =behave-mirror='s own =surface=,
+=crown=, and =spotDistance*= modules. Same physics lineage, different code.
+So Q3.6 stands as a real question — but it now has a sharper form: *do we
+run FlamMap's own compiled equations (consistent with FlamMap desktop, two
+WASM modules to ship), or reuse =behave-mirror='s (one module, but outputs
+that may not match FlamMap exactly)?* The answer determines whether
+sections 3 and 3b are the same project or two.
+
+** Recommendation
+
+1. *Spike it: Emscripten-build =lib/flammap= + =fuelcondition= + =icf= with
+   WindNinja stubbed out and a GDAL trimmed to GTiff/LCP, driving
+   =SetLandscapeRange= over a tile.* This is a bounded experiment with a
+   clear success criterion — one landscape, one tile, outputs matching
+   =runflammap= on the same inputs.
+2. *Parallelize with Web Workers at the tile level*, reusing the
+   decomposition math already in =StartLandscapeThreads()= (S3b.2), one WASM
+   instance per worker (S3b.9).
+3. *Do not pursue WebGPU for FlamMap.* If a performance target emerges that
+   WASM + workers cannot meet (Q3.5), revisit — but the honest fallback is
+   the native JNI path from section 4, not WGSL.
+4. *Decide S3b.7 early* — whether browser FlamMap Basic needs gridded winds.
+   It is the single largest swing factor in the bundle size and build
+   complexity.
+
+* 4. Spatial fire behavior (FlamMap / FARSITE)
+
+** Statements
+
+- *S4.1 — Agreed that fire spread is not a good GPU candidate*, and agreed
+  with your characterization: an iterative, front-propagating
+  continuous-time process where each step touches a thin expanding shell of a
+  large array, with topology changes (spotting spawning child fronts, merges).
+  Lots of FLOPs on a small active set is the worst case for GPU
+  parallelization.
+
+- *S4.2 — Agreed that native (JNI/JNA) execution is the most plausible path
+  for true spatial simulation*, and agreed on the cost: per-platform builds
+  for Windows/macOS(x64+arm64)/Linux shipped inside the existing Conveyor
+  packages.
+
+- *S4.3 — But see S0.1: this makes spatial a desktop-only feature.* The
+  browser deployment cannot load a native library. We should propose this
+  explicitly as a product decision — "FlamMap Spatial requires the desktop
+  install" — rather than discovering it late. The alternative (server-side
+  compute) contradicts the offline, no-backend model Behave 7 currently has,
+  and introduces hosting, queueing, and data-upload concerns that are a
+  different project.
+
+- *S4.4 — Agreed on the overall UX shape you describe*, and we like it: web
+  map with OSM/PMTiles basemap, form-driven inputs, user-supplied or
+  LANDFIRE-downloaded rasters, a "Your Data Library" page for the local
+  catalog, write config → invoke native entrypoint → load output GeoTIFFs
+  back onto the map → offer an input+output ZIP for archiving. The data
+  library concept is worth elevating: it's reusable by FlamMap Basic and by
+  any future spatial module.
+
+- *S4.5 — Revised after source review: the extraction risk is gone; the
+  risk is now macOS support and dependency shipping.* We expected the
+  dominant cost to be disentangling the spread core from MFC/Win32. In fact
+  =firemodels= has already done that work, builds under CMake on Linux, and
+  exposes JNI bindings. The cost has moved downstream to (a) a macOS build
+  and (b) packaging GDAL/WindNinja/Spatialite per platform — see Q4.6a and
+  Q4.6b.
+
+** Questions
+
+- *Q4.6 — Is there already a headless or command-line FlamMap/FARSITE build,
+  and a cross-platform build of the spread core?* *[ANSWERED — yes to both,
+  plus JNI bindings already exist.]* =firemodels/= is described upstream as
+  "Multiplatform versions of FireBehavior fire models including FlamMap, MTT,
+  and FSim," builds with CMake for *Windows and Linux*, and contains:
+
+  - *Libraries* (=lib/=): =flammap=, =farsite=, =mtt=, =fspro=,
+    =fireburner=, =fuelcondition=, =crasterlayer=, =icf=.
+  - *Headless CLIs* (=app/=): =runflammap=, =runfarsite=, =runmtt=,
+    =runfspro=, =fsim=.
+  - *JNI bindings* (=jni/=): =jflammaplib= (=JFlamMap.java=), =jfspro=,
+    =jmintraveltime= — i.e. the exact integration surface S4.2 proposed,
+    already written.
+
+  =JFlamMap= is notably well-suited to our UI needs: =setlandscapefile=,
+  =loadflammaptextsettingsfile=, =launchflammap=, =cancelflammap=,
+  =getflammapprogress=, =setnumprocessors=, =getlayervaluebycoords=, and
+  =writeoutputlayergeotiff= / =writealloutputlayersgeotiff=. That means
+  *cancellable, progress-reporting, multi-core, GeoTIFF-emitting* runs are
+  available without us writing any binding layer — and it answers Q4.9
+  affirmatively (progress polling is already exposed).
+
+  This substantially de-risks section 4 and makes JNI clearly preferable to
+  shelling out to a CLI, since the JNI path gives us progress and
+  cancellation that a subprocess would not.
+
+- *Q4.6a — Can =firemodels= be built for macOS?* *[NEW BLOCKER, replacing
+  Q4.6]* The upstream README documents Windows and Linux only. Behave ships
+  macOS packages (Intel + ARM) via Conveyor, so either someone ports the
+  build to macOS or FlamMap Spatial is Windows/Linux-only — a narrower
+  product than S4.3 already implies. Who owns that port?
+
+- *S4.6c — WindNinja's C API exists, but which ref we build matters.* The
+  =firemodels= README requires WindNinja's C API ("all that is required is
+  for =C_API= to be built"). Three findings:
+
+  1. *The C API is real and lives in the main library*, as
+     =src/ninja/windninja.h= / =windninja.cpp= with =extern "C"= linkage —
+     not a separate optional target.
+  2. *The =C_API= CMake option is commented out on =master=* (root
+     =CMakeLists.txt= lines 218–221). Per the commit that introduced it, that
+     option only controlled exception-handling mode, and =#ifdef C_API= /
+     =#ifndef C_API= guards remain live in =ninjaArmy.h=, =ninja.cpp=, and
+     =ninjafoam.cpp=. So following the =firemodels= README literally — "build
+     with =C_API= enabled" — will not do what it says on current =master=,
+     and the exception-handling behavior across the boundary needs to be
+     settled deliberately. *Worth raising with upstream.*
+  3. *There is a dedicated =FireBehaviorModels= branch, and it is the right
+     ref.* It is =master= plus exactly one commit, which adds the two C API
+     entry points =firemodels= needs
+     (=NinjaSetOutputSpeedGridResolution=, =NinjaSetOutputDirectionGridResolution=)
+     and a =USE_VCPKG_MANIFEST= option for prebuilt vcpkg trees. Our
+     submodule is pinned there via =submodule.windninja.branch=. Anyone
+     building from =master= will be missing those symbols.
+
+- *S4.6d — WindNinja is a heavier dependency than "a wind model."* It pulls
+  GDAL (with poppler, netcdf, and openssl features), boost, and shapelib via
+  =vcpkg.json=, optionally builds an OpenFOAM solver (=NINJAFOAM=, on by
+  default) and a Qt GUI (=NINJA_GUI=, on by default), and has
+  network-dependent features on by default — =WITH_NOMADS_SUPPORT=,
+  =PHONE_HOME_QUERIES=, =DISABLE_THREDDS_UPDATE=, =WITH_LCP_CLIENT=. For a
+  Behave integration we want a *minimal* build: GUI off, and the phone-home
+  and forecast-download features explicitly disabled. =PHONE_HOME_QUERIES=
+  in particular is a privacy question to raise with the Fire Lab before we
+  bundle it in a shipped installer. *[NEW — needs a decision]*
+
+- *Q4.6b — How do we ship the native dependency stack?* =firemodels=
+  requires *GDAL 3.x, WindNinja's C API, SQLite + Spatialite*, and (on
+  Windows) a boost version matched to GDAL's. That is a heavy transitive
+  payload to bundle per-platform inside the Conveyor packages, and the
+  =JFlamMap= source carries commented-out =System.loadLibrary= calls for
+  =gdal=, =WindNinja=, =FuelCondition=, and the MSVC runtimes — evidence that
+  load-order and co-location of these libraries is fiddly in practice. This,
+  not the bindings, is now the main integration cost for section 4. See
+  S4.6d for what WindNinja alone drags in.
+
+- *Q4.7 — Is desktop-only acceptable for spatial?* *[BLOCKER — product
+  decision, per S4.3]*
+
+- *Q4.8 — What landscape sizes and simulation durations must be supported?*
+  Drives memory strategy, whether we can hold outputs in the browser for
+  display, and whether we need progressive/tiled rendering of results.
+
+- *Q4.9 — Does FARSITE need to be interactive?* Live perimeter animation
+  during the run is a different integration than fire-and-wait-for-outputs —
+  though per Q4.6, =getflammapprogress= / =cancelflammap= already exist on the
+  FlamMap side, so progress reporting is cheap. Confirm whether the FARSITE
+  library exposes equivalents.
+
+- *Q4.10 — Is LANDFIRE auto-download in scope, and what's the licensing /
+  attribution expectation for cached data?* Also: which LANDFIRE version(s)
+  must we pin, given they revise periodically?
+
+- *Q4.11 — Are FARSITE's non-raster inputs in scope* (weather/wind streams,
+  fuel moisture conditioning, ignition shapefiles, barriers, suppression
+  actions)? These are substantial input-authoring UIs in their own right, and
+  easy to under-scope.
+
+* 4b. WindNinja: extraction feasibility, and the WebGPU question
+
+Verdict up front: *extracting WindNinja's mass-conservation solver is
+surprisingly tractable — but the right target is WASM, not WebGPU.* The
+numerics are clean and portable; WebGPU specifically collides with a hard
+language limitation and would require rewriting the solver rather than
+porting it.
+
+** The pipeline
+
+=ninja::simulate_wind()= (=src/ninja/ninja.cpp:245=) runs:
+
+1. =readInputFile()= / =set_position()= / =checkInputs()= — GDAL-bound I/O.
+2. Mesh generation (=mesh.cpp=) — structured hexahedral mesh, =NUMNP= nodes
+   over =nrows × ncols × nlayers=.
+3. Outer "matching" loop (up to =nMaxMatchingIters=, default 150, only for
+   point/observation initialization), each pass doing:
+   - =discretize()= (=ninja.cpp:1508=) — FEM assembly of the stiffness matrix
+     straight into CSR (=SK=, =RHS=, =row_ptr=, =col_ind=).
+   - =setBoundaryConditions()=.
+   - =solve()= (=ninja.cpp:676=) — preconditioned conjugate gradient, with
+     =solveMinres()= (=:866=) as a divergence fallback.
+   - =computeUVWField()= — recovers u/v/w from the potential =PHI=.
+4. =interp_uvw()=, =prepareOutput()=, =writeOutputFiles()= — GDAL/KML/VTK
+   output.
+
+=ninjafoam.cpp= is a *separate* momentum solver that shells out to OpenFOAM
+binaries (=blockMesh=, =simpleFoam=). It is categorically out of scope for
+any browser target — there is no path to running OpenFOAM in WASM. Only the
+mass-conservation solver is portable.
+
+** What makes extraction easy (better than expected)
+
+- *S4b.1 — The solver has no external linear-algebra dependency.* WindNinja
+  hand-rolled its own BLAS and sparse-BLAS subset inside =ninja.cpp=:
+  =cblas_dscal=, =cblas_dcopy=, =cblas_ddot=, =cblas_daxpy= (=:1113–1226=),
+  plus CSR SpMV as =mkl_dcsrmv= / =mkl_trans_dcsrmv= (=:1226–1341=). They
+  kept MKL's *names* but shipped their own implementations, so there is no
+  MKL, no OpenBLAS, no PETSc to port. The entire PCG is self-contained
+  double-precision C++ in roughly 450 lines.
+
+- *S4b.2 — There is already a file-free, in-memory API seam, purpose-built
+  for embedding.* The C API exposes =NinjaSetInMemoryDem= alongside
+  =NinjaGetOutputSpeedGrid=, =NinjaGetOutputDirectionGrid=,
+  =NinjaGetOutputGridProjection=, =NinjaGetOutputGridCellSize=,
+  =NinjaGetOutputGrid{xllCorner,yllCorner,nCols,nRows}=, backed by
+  =ninja::set_DEM(const double* dem, int nXSize, int nYSize, const double*
+  geoRef, std::string prj)= (=ninja.cpp:3785=) and, under =#ifdef C_API=, an
+  automatic =keepOutputGridsInMemory(true)=. That is exactly the boundary an
+  Emscripten build wants: =double*= elevation in, =double*= speed/direction
+  grids out, no filesystem. *This is the single most important finding in
+  this section* — it means a WASM port does not have to fight GDAL's I/O
+  layer in the compute path.
+
+- *S4b.3 — GDAL coupling is thin where the math lives.* =ninja.cpp= has only
+  ~66 GDAL/CPL/OGR references across 5,709 lines, nearly all in input/output
+  and path handling, versus 540 in =ninjafoam.cpp= and 391 in =gdal_util.cpp=.
+  Combined with S4b.2, the compute core can plausibly be compiled without
+  GDAL at all, leaving reprojection and raster I/O to the JS side (where we
+  already plan on geotiff.js per S2.2).
+
+- *S4b.4 — The hot loops are already proven data-parallel.* =ninja.cpp=
+  carries 38 OpenMP pragmas, including =#pragma omp parallel for= over the
+  SpMV and over element assembly in =discretize()=. Existing thread-parallel
+  decomposition is strong evidence the work is parallelizable in principle —
+  which is the opposite of the fire-spread situation in S4.1.
+
+- *S4b.5 — Problem sizes are modest.* Mesh targets are 4,000 (coarse) /
+  10,000 (medium) / 20,000 (fine) horizontal cells × vertical layers, so
+  =NUMNP= lands in the 10⁵–10⁶ range with a 27-point hexahedral stencil —
+  order 10⁷ nonzeros. That fits in WASM memory (roughly 150–250 MB for the
+  matrix plus CG vectors), though it is large enough to warrant care under
+  WASM32's 4 GB ceiling (S2.4).
+
+- *S4b.6 — The code is already instrumented for exactly this decision.*
+  =simulate_wind()= brackets each phase with =omp_get_wtime()=
+  (=startMesh=, =startBuildEq=, =startSolve=, =endSolve=, write-out). We can
+  measure the solve's share of wall-clock *before* investing in any
+  acceleration, rather than assuming the solver dominates. Amdahl's law
+  decides this, and the measurement is nearly free.
+
+** Why WebGPU specifically is the wrong target
+
+- *S4b.7 — WGSL has no =f64=. This is the blocking issue.* The entire solver
+  is =double= end to end: =SK=, =RHS=, =PHI=, the Jacobian machinery in
+  =element.h= (=DETJ=, =RJACV=, =DNDX/Y/Z=), and every BLAS routine. WebGPU
+  offers =f32= only (=f16= behind an extension), with no =f64= in the
+  specification. So a WebGPU port is not a port — it is a numerical
+  redesign, with three unappealing options: accept =f32= and risk CG
+  stalling on ill-conditioned stretched-terrain meshes; add mixed-precision
+  iterative refinement (=f32= inner solve, =f64= correction on the CPU);
+  or emulate double-double in software and surrender most of the speedup.
+
+- *S4b.8 — The preconditioner does not survive the move.* The default is
+  SSOR (=preconditioner.h=, =precondType{none, Jacobi, SSOR}=), which is a
+  sequential forward/backward triangular solve — close to worst-case for GPU
+  execution. On GPU we would have to fall back to Jacobi, which the code
+  already supports but which converges more slowly, raising iteration count
+  (=MAXITS= is set to 100,000) and partly cancelling the per-iteration gain.
+
+- *S4b.9 — Assembly uses floating-point atomics that core WebGPU lacks.*
+  =discretize()= scatters element contributions with =#pragma omp atomic= on
+  doubles. WebGPU's storage atomics are integer-only, so GPU assembly needs a
+  different algorithm entirely — graph coloring, or restructuring to
+  gather-by-node instead of scatter-by-element.
+
+- *S4b.10 — Buffer limits bite at fine resolution.* WebGPU's default
+  =maxStorageBufferBindingSize= is 128 MiB. A fine-mesh CSR matrix at =f32=
+  (values + column indices ≈ 80 MB) fits, but larger domains would need
+  chunked bindings and multi-pass SpMV — added complexity for a
+  memory-bandwidth-bound kernel whose realistic speedup is single-digit
+  multiples, not orders of magnitude.
+
+- *S4b.11 — And the strategic objection from S3.3 applies verbatim.*
+  Rewriting the solver in WGSL forks the numerics away from the Fire Lab's
+  C++, doubles the validation burden permanently, and means WindNinja
+  upstream changes no longer flow to us for free.
+
+** Recommendation
+
+1. *Port the mass-conservation core to WASM via Emscripten, through the
+   existing =NinjaSetInMemoryDem= / =NinjaGetOutputSpeedGrid= seam.* Keep
+   =double= precision (WASM has real =f64=, so the numerics are unchanged
+   and bit-comparable against the native build), drop OpenMP or map it to
+   pthreads, and compile without GDAL. This is the same WASM strategy already
+   proven for =behave-mirror=, and it would put gridded wind in the browser
+   with no numerical redesign and no second source of truth.
+2. *Measure first using the built-in phase timers (S4b.6).* If the solve is
+   not the dominant cost at the mesh sizes Behave will actually use, the
+   whole acceleration question is moot.
+3. *If the solve does dominate, parallelize the way S3.2 does — Web Workers
+   over tiles/runs, not WebGPU.* WindNinja runs are typically a *set* of
+   independent simulations (the =ninjaArmy= abstraction is literally a
+   collection of runs across wind speeds/directions/times). That is
+   embarrassingly parallel at the *run* level, which is far cheaper to
+   exploit than parallelizing inside one CG solve.
+4. *Treat WebGPU as a research spike only*, contingent on an explicit
+   performance target (cf. Q3.5) that WASM + per-run workers demonstrably
+   cannot hit.
+5. *Keep NinjaFOAM native-only.* The momentum solver stays behind the JNI
+   path in the desktop build; it cannot go to the browser at all.
+
+** Questions
+
+- *Q4b.12 — Does Behave actually need WindNinja's gridded wind in the
+  browser, or only as an input to FlamMap Spatial on the desktop?* If
+  WindNinja is only ever called as a =firemodels= dependency behind JNI
+  (sections 4/S4.6c), then the whole WASM/WebGPU question is premature and
+  we should simply consume the native library. *This is the question to
+  settle before any porting work.*
+- *Q4b.13 — Which initialization methods must we support?* Domain-average
+  is self-contained; point initialization adds the 150-iteration matching
+  loop; weather-model initialization (=wxModelInitialization=, NOMADS, WRF,
+  HRRR) pulls in netCDF and network fetching that make little sense in a
+  browser. Scope here determines how much of the non-solver code must come
+  along.
+- *Q4b.14 — Is =f32= output acceptable anywhere downstream?* Relevant only
+  if WebGPU is ever revisited, but worth asking the Fire Lab whether wind
+  grids have a documented precision requirement.
+
+* 4c. FSim: why it is the one model that should not go to the browser
+
+Verdict up front: *FSim should not be a WASM or WebGPU target at all.* It is
+a batch Monte Carlo product, its dependency closure is the heaviest in
+=firemodels=, and its existing parallelism relies on a shared-memory model
+that Web Workers specifically cannot reproduce cheaply. The right role for
+Behave is to *display FSim's outputs*, not to compute them.
+
+** What FSim is
+
+- *S4c.1 — It is a stochastic season simulator, not an interactive tool.*
+  =app/fsim/FSim2.cpp= is a 256-line batch CLI: load an ICF inputs file →
+  =GenerateFireSeasons()= → write =_DayTypes.csv=, =_SeasonDayType.csv=,
+  =_SeasonERC.csv= → =LaunchFSim()= → write =_SeasonFires.csv=,
+  =_BurnProbability.tif=, =_All.tif=, =_FireSizeList.csv=. One input file in,
+  a directory of CSVs and GeoTIFFs out. No interactivity, no incremental
+  results, nothing a user waits on in a browser tab.
+
+- *S4c.2 — The iteration count is the whole point.* Seasons come from
+  =m_icf->i_FSIM_numSims= (=CFSimManager.cpp:758=), and FSim's output —
+  burn probability — is only meaningful across a large ensemble of
+  simulated seasons. The compute budget is inherently orders of magnitude
+  above anything else discussed in this document.
+
+- *S4c.3 — FSim's spread engine is MTT, not FARSITE.* The chain runs through
+  =lib/mtt= (19,328 LOC) via =pOmpMTT[ompProcNum]=,
+  =GetArrivalTimeGrid()=, and =CMTTSpots= (=fireburner.cpp:1083+=).
+  =lib/farsite= (65,775 LOC) is *not* in FSim's dependency closure — useful
+  to know, because it means MTT and FARSITE are independent porting
+  decisions.
+
+** Why the browser is the wrong venue
+
+- *S4c.4 — The dependency closure is the heaviest in the repository.*
+  =fsimmanager= (7,185 LOC) links =flammap=, =icf=, =fireburner=,
+  =crasterlayer=, =csv_readrow=, GDAL, *SQLite3, and Spatialite*;
+  =fireburner= links =mtt=, =flammap=, =fsprocommon=; =mtt= again links
+  GDAL, SQLite3, and Spatialite. *Spatialite is the hard blocker* — it is a
+  GEOS/PROJ-dependent SQLite extension, a substantially bigger WASM lift
+  than GDAL alone (S3b.6), and nothing in FSim's design suggests it can be
+  trimmed out the way WindNinja can be stubbed for FlamMap (S3b.7).
+
+- *S4c.5 — FSim's parallelism depends on shared memory, which Workers do not
+  give us.* This is the decisive technical point.
+  =fireburner.cpp:736= does =CFlamMap* ompFlamMaps = new CFlamMap[numProcs]=
+  and loads the landscape into *every one of them*, then runs
+  =#pragma omp parallel for= over day-types (=:750=) and over fires
+  (=:1083=), each thread holding its own =CFlamMap= plus its own MTT
+  instance with an arrival-time grid. Under OpenMP those threads share one
+  process and one address space. Web Workers each get a *separate linear
+  memory*, so N workers means N complete landscape copies — and each WASM32
+  instance is independently capped at 4 GB, inside a far smaller real browser
+  budget. This is qualitatively worse than FlamMap Basic (S3.2/S3b.2), where
+  a worker only needs its own tile. *FSim's parallel design assumes the one
+  thing the browser's parallelism model withholds.*
+
+- *S4c.6 — And GPU does not help, for the S4.1 reason.* Each fire is an MTT
+  front-propagation computation — iterative expansion over a thin active
+  set, exactly the class of algorithm that does not reward array-parallel
+  hardware. FSim's parallelism is *across fires*, which OpenMP already
+  exploits well on a single node. There is no kernel here waiting for a GPU.
+
+- *S4c.7 — No distributed story exists today.* There is no MPI, no cluster
+  code, and no job-splitting layer anywhere in =lib/fsimmanager=,
+  =lib/fireburner=, or =app/fsim= — it is single-node OpenMP only. So
+  "run FSim on a server instead" is also not a drop-in; it would be a
+  single large machine, not a scale-out service.
+
+** Portability notes (minor, and mostly good news)
+
+- *S4c.8 — =fsimmanager='s Windows entry point is already excluded from the
+  build.* =lib/fsimmanager/src/dllmain.cpp= includes =<windows.h>=, but it
+  is *not* listed in =lib/fsimmanager/CMakeLists.txt= — dead leftover from
+  the Windows DLL build, not a portability problem.
+- *S4c.9 — FARSITE's =dllmain.cpp= IS built, but guards itself.* It appears
+  in =lib/farsite/CMakeLists.txt:64= unconditionally, but its body is behind
+  =#ifdef _MSC_VER=, so it compiles to nothing on other toolchains. Also
+  fine.
+
+** Recommendation
+
+1. *Do not port FSim to WASM or WebGPU.* The cost is the highest and the
+   user value in-browser is the lowest of anything in this review.
+2. *Treat FSim as a data producer, and Behave as its viewer.* Burn
+   probability arrives as a GeoTIFF; load it into the web map with
+   geotiff.js exactly like any other raster output (S2.2). This needs no
+   FSim port at all and delivers most of what users actually want to see.
+3. *If FSim must be runnable from Behave, it belongs behind the native JNI
+   path* (section 4), on the desktop, as a long-running background job with
+   progress — not in a browser tab. Note that =firemodels= ships no JNI
+   binding for =fsimmanager= today (only =jflammaplib=, =jfspro=, and
+   =jmintraveltime=), so that binding would be new work.
+4. *=jmintraveltime= is worth a closer look regardless*, since MTT is both
+   FSim's spread engine and FlamMap's MTT mode — it is the one spread
+   component that already has a JNI binding.
+
+** Questions
+
+- *Q4c.10 — Is FSim in scope at all?* It was not among the four feature sets
+  requested. If the Fire Lab wants burn probability in Behave, we should
+  establish whether they mean *running* FSim or *viewing* precomputed
+  national FSim products — these differ by orders of magnitude in effort.
+- *Q4c.11 — If running: what season counts and landscape extents?* This sets
+  whether it is a laptop-scale job at all, or something that must run on
+  dedicated hardware overnight.
+
+* 4d. FSPro vs. FSim — they are not variants of each other
+
+Both are Monte Carlo wrappers around the *same* spread engine
+(=CMinTravelTime=) on the *same* landscape (=CFlamMap=/LCP), both consume
+ERC-driven weather day-types (=CDayType=, =CFireStream=), both model
+containment, and both emit a burn-probability GeoTIFF. That shared surface
+makes them easy to conflate. *The difference is what the probability is
+conditioned on.*
+
+| | *FSPro* | *FSim* |
+|---+---+---|
+| Question | "Given *this* fire burning *now*, where might it go?" | "On this landscape, how often does a cell burn?" |
+| Ignition | *Given* — you supply the current perimeter | *Generated* stochastically |
+| Weather | Conditioned on *current obs + forecast* | Synthesized *seasons* from climatology |
+| Replicate unit | Weather realizations of *one* fire | Whole fire *seasons* |
+| Horizon | Days to weeks | Many simulated years |
+| Probability | *Conditional* on the incident existing | *Absolute*, annualized |
+| Use | Incident decision support (WFDSS) | Risk assessment / planning |
+
+** Evidence in the source
+
+- *S4d.1 — FSPro's ignition is an input.* =CFSProServer::SetIgnition(CBinaryGrid*)=
+  and =CFSProManager::AddPerimeter(int fireID, int numPoints, int numParts,
+  int *partStarts, float *pXvals, float *pYvals)= — you hand it the active
+  fire's perimeter as a polygon.
+- *S4d.2 — FSPro conditions on current and forecast weather.*
+  =SetWxValues(loc, ercAvg, ercStdDev, ercCurr)=,
+  =SetNumForecast()= / =SetForecastVal(day, val)=, plus =lag=, =polyDegree=,
+  and an autoregressive fit (=autocorr=, =rho=, chi-square, =ludcmp=,
+  =gaussj=) blending recent ERC observations against climatology.
+- *S4d.3 — FSPro's replicates are weather draws of the same fire.*
+  =SetNumFiresToDo(nSimsRequested)= and =GenerateFireStreams()= —
+  commented in-header as "generates all the streams of DayTypes for numFires
+  fires" — with =GetFiresDuration()= and =GetNumBurndays()= bounding a short
+  horizon. Outputs are incident-shaped: =WriteArrivalDayDistribution=,
+  =WriteDailyAcres=, =WritePerimeters=, =WriteContainSummary=,
+  =GetFireDailyAcres(fire, day)=.
+- *S4d.4 — FSim generates its own ignitions.*
+  =LFProb::GetRandomNumLargeFires(AreaSize)=,
+  =GetLargeFireProbability(ERC, AreaSize)=, and =PowerLaw()= fitting a
+  fire-size distribution with =m_powerLawMaxFires=.
+- *S4d.5 — FSim synthesizes whole seasons.* =GenerateFireSeasons()= over
+  =i_FSIM_numSims= (=CFSimManager.cpp:758=), built from =CFireSeason=,
+  =CERCDay=, =CWindDay=/=CWindBin=, and written out as =_SeasonERC.csv= /
+  =_SeasonDayType.csv= *before* simulation begins.
+- *S4d.6 — Only FSim models management policy spatially.*
+  =CPolicyManager::LoadPoliciesAndGrid()= / =GetPolicyNumber(x, y)= with
+  per-policy =suppression=, =suppressionFactor=, =fireSizeLimit=, and
+  =bpAdjustFactor=. FSPro has containment but no policy grid.
+
+** The architectural difference that matters for Behave
+
+- *S4d.7 — FSPro is the only model in =firemodels= with a service-oriented
+  design.* =lib/fspromanager= (13,284 LOC) orchestrates; =lib/fsproserver=
+  (1,267) runs *one fire at a time* via =RunFire(CFireStream*, int procNum)=
+  and returns results through =GetFireGrid=,
+  =GetFireArrivalTimeGrid=, =GetFireFlamelengthGrid=; =Perimeter4RPC= /
+  =DestroyPerim4RPC= and the manager's =numFiresClaimed= counter
+  (=FSProManager.cpp:68,1291=) show an explicit work-claiming/RPC split.
+  =lib/fspro= (414 LOC) is a thin facade over both. FSim, by contrast, is a
+  single monolithic manager plus a 256-line CLI with no RPC layer at all
+  (S4c.7).
+
+- *S4d.8 — Consequently FSPro is a far better Behave candidate than FSim.*
+  Its replicate unit is one fire from a user-supplied perimeter, so the job
+  is bounded, user-triggered, progress-reportable
+  (=GetNumFiresToDo()= / =GetNumFiresComplete()=) and cancellable
+  (=CancelFSPro()=, =CancelFire(id)=). It also *already has a JNI binding*
+  (=jni/jfspro=), which FSim does not. If the Fire Lab wants a probabilistic
+  product in Behave, FSPro is the one to reach for.
+
+- *S4d.9 — But the browser verdict is unchanged.* =fsproserver= and =mtt=
+  both link GDAL + SQLite3 + Spatialite, so FSPro inherits the Spatialite
+  blocker from S4c.4. FSPro belongs on the native/JNI path, not in WASM.
+
+** Maintenance note
+
+- *S4d.10 — FSim carries a diverged fork of FSPro's weather-input code.*
+  =fspro_inputs.{h,cpp}= and =timeseries.{h,cpp}= exist in *both*
+  =lib/fsimmanager= and =lib/fspromanager=, and they are *not* identical —
+  =fspro_inputs.h= is 121 lines in =fsimmanager= versus 318 in
+  =fspromanager=. So FSim descends from FSPro's weather machinery and has
+  since diverged. Worth asking upstream whether that divergence is
+  intentional, since it means ERC-stream fixes must be applied twice.
+
+* 4e. MTT (Minimum Travel Time) — the highest-leverage component
+
+*MTT is the single most important piece of =firemodels= for this project.* It
+is the spread engine shared by FlamMap's MTT mode, FSPro (S4d), and FSim
+(S4c) — =lib/mtt=, 19,328 LOC — and it is the only spread component that
+already ships a JNI binding (=jni/jmintraveltime=). One port serves three
+products.
+
+** The algorithm — and a correction to S4.1
+
+- *S4e.1 — MTT is not a moving-front simulation. It is a converged
+  shortest-path solve.* This revises the blanket claim in S4.1/S4c.6.
+  =CMTT::LaunchMTT()= (=MTT.cpp:~985-1030=) runs alternating *forward and
+  backward row sweeps* outward from the ignition row:
+
+  #+begin_src c++
+  do {  Changes = 0;
+        Changes += spread->Risk_CalcPositiveSpread(i--, 0, true);   // sweep up
+        Changes += spread->Risk_CalcPositiveSpread(j++, 0, false);  // sweep down
+        if (Changes == 0) break;
+  } while (NumRowsFinished < nodeSpread->GetNumRows() && !ShouldCancel);
+  // followed by one full forward and one full backward sweep
+  #+end_src
+
+  That is a *label-correcting / fast-sweeping* scheme — structurally the same
+  as a Gauss-Seidel sweep solver for the Eikonal equation — iterated to a
+  convergence test on =Changes==0=. It computes a minimum-travel-time field
+  over the *entire* lattice, not a thin advancing perimeter. *So the S4.1
+  objection (FLOPs on a small active set) does not apply to MTT.* It applies
+  to FARSITE's Huygens-style perimeter expansion, which is a different
+  algorithm in a different library (=lib/farsite=, not in MTT's or FSim's
+  chain).
+
+- *S4e.2 — MTT's design is row-sequential, column-parallel — and that
+  decomposition is already written.* Inside
+  =Spread::Risk_CalcPositiveSpread(long Row, long ExitRow, bool Forward)=
+  (=node3.cpp:578=), the row's columns are divided across workers:
+  =interval = ((double) NumCols) / ((double) NumThreads)=, with
+  =AllocNodeThreads()=, =CloseAllNodeThreads()=, and combine threads for
+  merging. This is precisely the shape of a parallel fast-sweeping solver.
+
+- *S4e.3 — But all of MTT's internal threading is compiled out.*
+  =NODESPREAD_MULTITHREAD= appears in ~10 =#ifdef= guards across
+  =node3.cpp= and =glbvar3.h= (the Win32 =_beginthreadex= calls at
+  =node3.cpp:5186, 5214, 6078=, and the =HANDLE **hSpreadEvent= /
+  =hNodeEvent= / =hMergeEvent= / =hCombEvent= members), and *is never
+  defined in any CMakeLists.txt*. So MTT runs single-threaded today — the
+  same situation as FlamMap (S3b.3). *There is free parallelism sitting
+  behind a =#define= and a Win32-to-portable-threads port.* That is almost
+  certainly the cheapest real speedup available anywhere in this review.
+
+- *S4e.4 — MTT already tiles its landscape data, and already uses =f32=.*
+  =MemTile.{h,cpp}= defines =Tile= / =TileSheet= / =TileStack= over
+  =struct Cell { float Dir, ADim, BDim, CDim, Spot, Slope, Aspect,
+  Intensity; }= — eight single-precision floats per cell, in explicitly
+  managed tiles for large landscapes. Two consequences: the memory story is
+  better than FSim's replicated-landscape model (S4c.5), and the =f64=
+  objection from S4b.7 is *weaker* here, since the per-cell spread data is
+  already single precision (travel times and =mintime= remain =double=).
+
+** Why MTT is nonetheless not a browser target
+
+- *S4e.5 — Same Spatialite blocker.* =lib/mtt= links =flammap=, GDAL,
+  SQLite3, and Spatialite; =jni/jmintraveltime= links only =mtt= and
+  inherits all of it transitively. Spatialite remains the hard WASM blocker
+  (S4c.4).
+- *S4e.6 — If anyone insists on a GPU argument, MTT is the only defensible
+  candidate in the stack* — it is an Eikonal-style sweep over a full
+  lattice, with a known parallel formulation, already decomposed by column,
+  already =f32= at the cell level. But the honest ordering is: *define
+  =NODESPREAD_MULTITHREAD= and port its Win32 threads to =std::thread= first
+  (S4e.3)*, measure, and only then consider whether a WGSL rewrite of 19k
+  lines buys anything. The S3.3 source-of-truth objection still stands.
+
+** Correction: the JNI bindings need Java-side work after all
+
+Earlier in this review I said =firemodels='s JNI bindings mean "no binding
+layer from us." *The C++ side is indeed written and wired into CMake; the
+Java loader layer is not usable as-is.* All three loaders are stale relative
+to the CMake targets, and inconsistent with each other:
+
+| Java loader | Loads | CMake actually builds |
+|---+---+---|
+| =JMinTravelTime.java= | =NodeSpread=, =JMinTravelTimeLib=, =WindNinjadll=, =FUELCONDITION=, =FlamMap=, + MSVC runtimes | =mtt=, =jmintraveltime= |
+| =JFSPro.java= | =NodeSpreadST=, =JFSProLib=, =FSProServer=, =FSProManager=, =FSPro=, =gdal304=, =vcomp140=, =WindNinja2= | =mtt=, =fsproserver=, =fspromanager=, =fspro=, =jfspro= |
+| =JFlamMap.java= | all commented out *except* =System.loadLibrary("libflammap")= | =flammap=, =jflammap= |
+
+- *S4e.7 — The =jmintraveltime= and =jfspro= loaders are Windows-only and
+  name libraries that no longer exist.* =NodeSpread= / =NodeSpreadST= is the
+  legacy DLL name for what CMake now builds as =mtt=; =JMinTravelTimeLib=
+  and =JFSProLib= are legacy names for =jmintraveltime= and =jfspro=. They
+  also unconditionally load =concrt140=, =msvcp140=, =vcruntime140=, and
+  =vcomp140=. The calls sit inside a =try/catch (UnsatisfiedLinkError)=, so
+  they fail *silently to stderr* rather than crashing — which makes this
+  easy to misdiagnose later.
+- *S4e.8 — =JFlamMap='s one live call is itself wrong.*
+  =System.loadLibrary("libflammap")= under a =//linux= comment will resolve
+  to =liblibflammap.so=, because the JVM adds the =lib= prefix and =.so=
+  suffix itself. The correct call is =loadLibrary("flammap")=. The
+  surrounding commented-out block suggests someone was mid-port and stopped.
+- *S4e.9 — Net effect on the estimate.* The JNI work is not zero, but it is
+  small and shallow: reconcile library names with CMake targets, drop the
+  MSVC runtime loads on non-Windows, and fix the =lib= prefix. No JNI
+  signatures change. The earlier claim that the integration surface already
+  exists holds — it is the *loader* that needs a afternoon, not the bindings.
+
+** What MTT gives us that FlamMap Basic does not
+
+=jmintraveltime='s output surface is notably rich, and these are products
+Behave has no other way to produce: =writerosgrid=,
+=writearrivaltimegrid=, =writeflimapgrid=, =writeinfluencegrid=,
+=writeflowpathsshapefile=, =writemajorpathsshapefile=,
+=writeembersshapefile= / =writeemberscsvfile=, =writeflamelengthgrid=,
+=writeignitiongrid=, plus =writeoutputlayersgeotiff=. Major flow paths and
+the influence grid in particular are distinctive FlamMap products and map
+naturally onto the web map (S2.2) as vector overlays on top of raster
+outputs. Control is complete too: =setignition=, =setbarrier=,
+=setmaxsimtime=, =setpathinterval=, =launchmtt=, =cancelmtt=,
+=getmttprogress=.
+
+** Recommendation
+
+1. *Treat MTT as the priority integration target, ahead of FARSITE.* One
+   JNI binding (already written) unlocks FlamMap MTT mode and is the engine
+   under FSPro — the two probabilistic products most worth having (S4d.8).
+2. *Fix the Java loaders first* (S4e.7–S4e.9) — this is the actual blocker
+   for the Linux JNI spike recommended in section 5, and it is cheap.
+3. *Then enable =NODESPREAD_MULTITHREAD= with portable threads* (S4e.3) for
+   a free speedup that benefits FlamMap MTT, FSPro, and FSim simultaneously.
+4. *Keep MTT off the WASM path* (S4e.5), and treat any WGSL idea as strictly
+   post-measurement (S4e.6).
+
+** Questions
+
+- *Q4e.10 — Was =NODESPREAD_MULTITHREAD= disabled deliberately?* It may have
+  been turned off for determinism (spotting RNG, cf. S3b.10) or because the
+  Win32 event synchronization was unreliable. The Fire Lab's answer decides
+  whether re-enabling it is a cheap win or a known trap.
+- *Q4e.11 — Is MTT's row-sweep convergence deterministic across thread
+  counts?* =Changes==0= is a global convergence test; if column-parallel
+  sweeps change the sweep order, arrival times could differ at the margin.
+  Needs confirmation before we promise desktop-equivalent outputs (Q0.7).
+
+* 5. Suggested shape for the walk-in proposal
+
+A unified landing page (Behave 7 / FOFEM / FlamMap Basic / FlamMap Spatial),
+all served from the same JAR via routing subtrees, is a good organizing idea
+and we support it. Our suggested sequencing, cheapest-and-most-certain first:
+
+1. *Consumption module* inside the existing engine (reuses everything;
+   blocked only on =fofemlib= existing — Q1.6 — and on output shape — Q1.7).
+2. *Map + Data Library* (OpenLayers + PMTiles + geotiff.js). Independently
+   useful, unblocks both FlamMap efforts, no native dependency.
+3. *FlamMap Basic* via Web Workers over the existing WASM. Stays fully
+   client-side, so it ships to both web and desktop.
+4. *FlamMap Spatial* via =firemodels='s existing JNI bindings, desktop-only,
+   contingent on Q4.6a (macOS build) and Q4.7 (desktop-only acceptable).
+
+Note that step 4 is now *less* speculative than step 1: =firemodels= already
+has the libraries, headless CLIs, and JNI bindings built and multiplatform,
+whereas =FOF_DLL= still needs a CMake build and an Emscripten port before it
+can enter the WASM pipeline. If the Fire Lab wants an early, demonstrable
+win, a JNI spike against =jflammaplib= on Linux is the cheapest proof of the
+whole spatial concept — possibly worth doing *before* next week. The build
+order for that spike is: GDAL → WindNinja C API (from the
+=FireBehaviorModels= branch, minimal build per S4.6d) → =firemodels= →
+=jflammaplib= → load from the JVM. *Budget time for fixing the Java loader
+names first (S4e.7–S4e.9) — that is the step most likely to look like a
+mysterious failure.* Consider spiking =jmintraveltime= rather than
+=jflammaplib=, since MTT is the higher-leverage engine (S4e).
+
+The questions that now most change this plan:
+
+1. *Q1.7* — do FOFEM's outputs (emissions time series, soil-temperature
+   profiles) fit the tabular worksheet model?
+2. *Q4.6a* — can =firemodels= build for macOS, or is spatial
+   Windows/Linux-only?
+3. *Q4.7* — is desktop-only acceptable for spatial at all?
+4. *Q0.6* — who owns adding/maintaining a CMake + Emscripten build for
+   =FOF_DLL=?
+5. *S4.6d* — is =PHONE_HOME_QUERIES= (and the other network-by-default
+   WindNinja features) acceptable in a shipped Behave installer?
+6. *Q4b.12* — is WindNinja needed in the browser at all, or only as a
+   native =firemodels= dependency? (Decides whether section 4b is work or
+   not.)
+7. *S3b.7* — does browser FlamMap Basic need gridded winds? If not, the
+   WASM port loses its WindNinja/boost/netCDF dependency and gets much
+   smaller.
+8. *Q3.6 / S3b.14* — run FlamMap's own equations in WASM, or reuse
+   =behave-mirror='s? Decides whether sections 3 and 3b are one project or
+   two.
+9. *Q4c.10* — is FSim in scope, and if so does "support FSim" mean running
+   it or viewing precomputed burn-probability products?
