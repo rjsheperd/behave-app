@@ -1,0 +1,14 @@
+{
+  "dependencies": {
+    "fzstd": "^0.1.1"
+  },
+  "name": "lcp-ingest-spike",
+  "private": true,
+  "description": "Plan C spike: cost of loading FlamMap LCP/GeoTIFF landscapes without GDAL",
+  "type": "module",
+  "scripts": {
+    "gen": "bun run gen.mjs",
+    "bench": "bun run bench.mjs",
+    "verify": "bun run verify.mjs"
+  }
+}

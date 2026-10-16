@@ -10,6 +10,7 @@
 import { readFileSync, statSync } from 'node:fs';
 import { gzipSync, deflateSync } from 'node:zlib';
 import { load, deinterleave, packCells, packCellsDirect } from './lcp.mjs';
+import { decoders } from './decoders-node.mjs';
 
 const REPS = 7; // median of 7 to damp JIT warmup and GC noise
 
@@ -40,7 +41,7 @@ function bench(path) {
   // NB: pass `ab` directly, never `ab.slice(0)` — slicing copies the whole
   // file (320 MB at 4096²) inside the timed loop and inflates this stage by
   // several hundred ms. `load` does not mutate its input.
-  const tParse = time('parse TIFF + assemble interleaved', () => load(ab));
+  const tParse = time('parse TIFF + decode + assemble', () => load(ab, { decoders }));
   const img = tParse.result;
   const cells = img.width * img.height;
 
@@ -75,7 +76,11 @@ function bench(path) {
     const m = img.meta;
     console.log(`  layout         ${m.tiled ? 'TILED' : 'STRIPPED'}` +
                 `${m.rowsPerStrip ? ` rowsPerStrip=${m.rowsPerStrip}` : ''}` +
-                `  chunks=${m.stripOrTileCount}  compression=${m.compression === 1 ? 'none' : m.compression}`);
+                `${m.tileSize ? ` tile=${m.tileSize}` : ''}` +
+                `  chunks=${m.stripOrTileCount}`);
+    console.log(`  codec          ${m.compressionName}  predictor=${m.predictor}` +
+                `   compressed=${(img.compressedBytes / 1048576).toFixed(2)} MB` +
+                `   ratio=${(img.bytesCopied / img.compressedBytes).toFixed(2)}:1`);
     console.log(`  geo            ${m.cellSize} m cells, origin (${m.originX}, ${m.originY})`);
   }
   if (img.header) {

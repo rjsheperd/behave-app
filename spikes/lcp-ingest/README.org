@@ -7,19 +7,28 @@ landscape data from a file into a GPU-ready buffer, without GDAL? The
 fire-behavior comparison half of Plan C ([[file:../../FLAMMAP_WEBGPU_PLANS.org][FLAMMAP_WEBGPU_PLANS.org]] §5) is
 not addressed here.
 
-Answer: *~190 ms single-threaded for a 4096² landscape* (16.8M cells,
-~123 km square at 30 m), producing 128 MB of packed cells. Ingest is not
-the bottleneck, and no GDAL is required.
+Answer: *~190 ms uncompressed, ~400–435 ms with DEFLATE, single-threaded,
+for a 4096² landscape* (16.8M cells, ~123 km square at 30 m), producing
+128 MB of packed cells. Ingest is not the bottleneck, and no GDAL is
+required.
+
+*Headline from the compression round (§Compression): shipping a
+predictor-2 compressed source raster and packing client-side beats
+shipping pre-packed cells — 17.9 MB versus 44.0 MB on the wire.* That
+inverts the network half of the research brief's ADR-02.
 
 * Files
 
-| =lcp.mjs= | Dependency-free reader: raw =.lcp=, LCP-as-GeoTIFF (stripped + tiled), deinterleave, 8 B/cell packing. Runs in browser or bun. |
+| =lcp.mjs= | Dependency-free reader: raw =.lcp=, LCP-as-GeoTIFF (stripped + tiled), DEFLATE/ZSTD, Predictor=2, deinterleave, 8 B/cell packing. Runs in browser or bun. |
+| =decoders-node.mjs= | Host-specific decoder wiring, with the browser equivalent documented. =lcp.mjs= itself takes decoders by injection and imports nothing host-specific. |
 | =bench.mjs= | Timing harness, median of 7, with projections. |
-| =gen.mjs= | Synthetic landscape generator, so scaling is measured rather than extrapolated. |
+| =verify.mjs= | Regression test: every codec x predictor variant must decode byte-identically to the uncompressed baseline of the same grid, at both sample and packed-cell level. |
+| =gen.mjs= | Synthetic landscape generator — codec x predictor variants, so scaling and compression are measured rather than extrapolated. |
 
 #+BEGIN_SRC shell
-bun run gen.mjs /tmp/lcp 4096 4096 --tiled --raw
-bun run bench.mjs /tmp/lcp/synth_4096x4096_tile.tif
+bun install                       # fzstd, for the ZSTD path
+bun run gen.mjs /tmp/lcp 4096 4096 --tiled --raw --compressed
+bun run bench.mjs /tmp/lcp/synth_4096x4096_deflate_p2.tif
 bun run bench.mjs ../../SpatialFOFEM/SampleData/Landscape/BlueMountain_LCP_FCCS.tif
 #+END_SRC
 
@@ -38,6 +47,24 @@ synthetic 10-band landscapes.
 
 Throughput settles at roughly *130 M cells/s* for the fused pack and
 *280 M cells/s* for TIFF assembly.
+
+* Compression
+
+4096² (16.8M cells, 10 bands, 320 MB raw), tiled 512², compared against the
+uncompressed baseline. All variants decode *byte-identical* to it, at both
+sample and packed-cell level.
+
+| Variant | File size | Ratio | Decode (ms) | Decode out MB/s | Total ingest (ms) |
+|---+---+---+---+---+---|
+| uncompressed | 320.0 MB | 1.00:1 | — | — | ~200 |
+| deflate, predictor 1 | 51.2 MB | 6.25:1 | 242 | 1322 | ~398 |
+| *deflate, predictor 2* | *17.9 MB* | *17.90:1* | *138* | *2315* | *~434* |
+| zstd, predictor 1 | 39.7 MB | 8.07:1 | 2554 | 125 | ~2757 |
+| zstd, predictor 2 | 19.7 MB | 16.26:1 | 695 | 460 | ~1061 |
+
+Decode is isolated (chunk decode only, best of 5). "Total ingest" is
+best-case parse+decode+predictor+fused-pack. The inverse predictor pass
+costs *124.6 ms* on its own at this size (1347 M samples/s).
 
 * Findings
 
@@ -59,23 +86,92 @@ output*, and it avoids allocating ~335 MB of intermediate planes.
 Per-band planes are never needed if the consumer is the GPU. Keep
 =deinterleave()= for debugging and validation only.
 
-** F3 — The brief's 5:1 compression assumption is too optimistic
+** F3 — The 5:1 assumption is wrong in both directions, depending on what you compress
 
-=wildfire-sim-research.org= flags this as a TODO ("the 5:1 figure is
-assumed"). Measured deflate on *packed* cells:
+=wildfire-sim-research.org= flags its 5:1 ZSTD ratio as an assumption. It
+turns out to matter enormously *what* is being compressed:
 
-| 1024² | 4.05:1 |
-| 2048² | 3.90:1 |
-| 4096² | *2.91:1* |
+- Compressing the *packed 8 B/cell* output: *2.91:1* at 4096² (4.05:1 at
+  1024², 3.90:1 at 2048²) — *worse* than 5:1, and degrading with area,
+  because packing has already stripped the redundancy compression would
+  find.
+- Compressing the *source 20 B/cell int16 raster* with Predictor=2:
+  *17.90:1* (deflate) or 16.26:1 (zstd) — far *better* than 5:1.
 
-The ratio *degrades with area*, because packing has already removed the
-redundancy that compression would otherwise find. ZSTD would do somewhat
-better than deflate, but *5:1 should not be used for sizing*. At 2.9:1 a
-4096² window is ~44 MB on the wire, not ~26 MB — i.e. ~3.5 s at 100 Mbit/s
-rather than 2.0 s.
+So 5:1 should not be used for sizing either pipeline. See F10 for the
+consequence.
 
-Caveat: synthetic terrain. Re-measure on real LANDFIRE windows before
-freezing any budget.
+Caveat: synthetic terrain, which is smoother than reality and therefore
+flatters horizontal differencing. The *mechanism* is real; the *magnitude*
+needs re-measuring on a real LANDFIRE window.
+
+** F9 — Predictor=2 is roughly CPU-neutral and a large wire win
+
+GDAL writes =PREDICTOR=2= (horizontal differencing) for integer rasters,
+and the research brief's COG profile recommends it for DEMs while noting
+"predictors don't help on codes." On a *pixel-interleaved multi-band LCP
+stack* it helps a great deal — 6.25:1 → 17.90:1 for deflate — because the
+continuous bands (elevation, aspect) difference to near-zero and the
+categorical bands (fuel model) sit in large contiguous patches that also
+difference to zero.
+
+The CPU accounting is almost a wash:
+
+| Smaller input to decode | −104 ms (242 → 138) |
+| Inverse predictor pass | +125 ms |
+| *Net* | *+21 ms* |
+
+For ~21 ms of CPU it removes *33 MB* from the wire at 4096². Clearly worth
+enabling.
+
+** F10 — Compressed source beats compressed packed cells on the wire
+
+This is the counter-intuitive one, and it inverts the network half of the
+brief's ADR-02 ("8 B/cell packed ... cuts network, decode, cache and VRAM
+by ~4x"):
+
+| 4096² delivered as | Wire bytes |
+|---+---|
+| packed 8 B/cell, deflated | 44.0 MB |
+| *source int16 raster, deflate + predictor 2* | *17.9 MB* |
+
+Packing to 8 bits *destroys* the smooth gradients that make differencing
+effective, and bit-packing heterogeneous fields into =u32= words produces a
+high-entropy mixture that compresses poorly. Compressing *before* packing
+preserves per-band spatial correlation.
+
+Same ordering at 1024² (1.12 MB vs 1.98 MB), so it is not a size artefact.
+
+*Revised recommendation:* ship predictor-2 compressed source rasters and
+pack on the client. ADR-02's packing is still correct for *VRAM* (128 MB vs
+537 MB as f32 layers) and for GPU bandwidth — it is only the network claim
+that inverts. The two concerns should be decoupled in any design doc.
+
+** F11 — The deflate-vs-zstd numbers here measure implementation, not codec
+
+DEFLATE decodes at 1.3–2.3 GB/s and ZSTD at 0.13–0.46 GB/s in this harness.
+*Do not read that as zstd being slower* — zstd is normally the faster
+codec. The comparison is unfair by construction:
+
+- DEFLATE goes through =node:zlib='s =inflateSync= — *native C*.
+- ZSTD goes through =fzstd= — *pure JavaScript*, and the brief already
+  identifies it as the slow option (~0.25–0.34 GB/s vs ~0.9–1.45 GB/s for
+  the =zstddec= WASM build).
+
+In a browser both would be comparable: =DecompressionStream('deflate')= is
+native, and a WASM zstd should land in the same 1–1.5 GB/s band. *The
+codec choice should be re-benchmarked with ZSTD-WASM before it is made.*
+This spike's ZSTD timings are a pessimistic floor, not a verdict.
+
+** F12 — The reader stays browser-portable, but DEFLATE forces async
+
+=lcp.mjs= imports nothing host-specific; decoders are injected
+(=decoders-node.mjs= shows the node wiring and documents the browser
+equivalent). One real consequence: the browser's
+=DecompressionStream('deflate')= is *async*, while the chunk-assembly loop
+is synchronous. Either the loop becomes async, or chunks are decoded up
+front — which is what the brief's ADR-05 (decode in CPU workers) implies
+anyway, and is the better shape regardless.
 
 ** F4 — TIFF sample data is NOT safely castable to Int16Array
 
@@ -139,6 +235,15 @@ stripped GeoTIFF, tiled GeoTIFF — and all three readers produce
 *byte-identical* interleaved output. The generator deliberately places
 sample data at an odd offset to reproduce F4.
 
+=verify.mjs= additionally checks every codec x predictor variant against the
+uncompressed baseline of its own grid — 10 variants across 1024² and 4096²,
+all *byte-identical* at both sample and packed-cell level, which exercises
+the DEFLATE path, the ZSTD path, and the Predictor=2 round trip.
+
+#+BEGIN_SRC shell
+bun run verify.mjs /tmp/lcp    # => ALL VARIANTS BYTE-IDENTICAL
+#+END_SRC
+
 The fused and two-pass packing paths are asserted byte-identical in
 =bench.mjs=. (They initially differed: one rounded canopy height, the other
 truncated. Quantization rounding must match exactly between any two paths
@@ -154,10 +259,11 @@ ARCHITECTURE_REVIEW Q0.7.)
 - *No HTTP/range-request path.* F5 explains why that is the interesting
   case for large landscapes, and it is untested here. The brief's COG
   profile, OPFS caching, and Zarr weather streaming are all unexercised.
-- *No compressed TIFF.* The reader rejects anything but
-  =Compression=1=. Real LANDFIRE COGs are DEFLATE or ZSTD, so a decoder is
-  required before this handles production data. That is the obvious next
-  increment and it will shift the cost balance toward decode.
+- *LZW is still unsupported.* The reader handles compression 1 (none),
+  8/32946 (DEFLATE) and 50000 (ZSTD). LZW (5) appears in older TIFFs and
+  would need adding for full coverage.
+- *ZSTD is measured with a pure-JS decoder.* See F11 — the numbers are a
+  floor, and the codec decision needs ZSTD-WASM first.
 - *No fire behavior.* Packing is validated for self-consistency, not
   against FlamMap. Whether these quantized inputs produce acceptable fire
   behavior is the other half of Plan C.
@@ -165,11 +271,16 @@ ARCHITECTURE_REVIEW Q0.7.)
 
 * Recommended next steps
 
-1. Add a DEFLATE/ZSTD decoder path (=DecompressionStream= for deflate,
-   ZSTD-WASM otherwise) and re-measure — this is what real LANDFIRE data
-   needs, and decode will likely dominate ingest afterwards.
-2. Port =bench.mjs= into =jessie='s Playwright harness for in-browser
-   numbers.
-3. Re-run F3 against a real LANDFIRE window rather than synthetic terrain.
-4. Feed the packed buffer into =jessie='s =rothermel.wgsl= to close the
+1. *DONE* — DEFLATE/ZSTD decode path with Predictor=2 (see §Compression,
+   F9–F12). Decode roughly doubles ingest CPU but cuts the wire payload
+   6–18x; clearly worth it.
+2. *Swap =fzstd= for a WASM zstd (=zstddec=) and re-run F11* before
+   choosing a codec. This is the highest-value remaining measurement.
+3. Re-run F3/F9/F10 against a *real LANDFIRE window* rather than synthetic
+   terrain. F10 in particular is a design-changing claim resting on
+   synthetic data.
+4. Port =bench.mjs= into =jessie='s Playwright harness for in-browser
+   numbers, and restructure chunk decode as async/worker-based per F12.
+5. Feed the packed buffer into =jessie='s =rothermel.wgsl= to close the
    loop on Plan C's fire-behavior question.
+6. Add LZW for older-TIFF coverage.

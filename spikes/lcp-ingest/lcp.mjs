@@ -81,6 +81,53 @@ export function readRawLcp(buf) {
 
 const TIFF_TYPE_BYTES = { 1:1, 2:1, 3:2, 4:4, 5:8, 6:1, 7:1, 8:2, 9:4, 10:8, 11:4, 12:8, 16:8, 17:8, 18:8 };
 
+// TIFF Compression tag (259) values we care about. GDAL writes 8 for
+// DEFLATE (and 32946 for the older zlib code) and 50000 for ZSTD.
+export const COMPRESSION = {
+  1: 'none', 5: 'lzw', 8: 'deflate', 32946: 'deflate-old', 50000: 'zstd',
+};
+
+/**
+ * Undo TIFF Predictor=2 (horizontal differencing) in place.
+ *
+ * Each sample is stored as a delta from the same band of the previous pixel,
+ * so the inverse walks the row adding the value `spp` samples back. Arithmetic
+ * must wrap at 16 bits, which Int16Array assignment gives us for free.
+ */
+export function undoPredictor2(i16, rowSamples, spp, rows) {
+  for (let r = 0; r < rows; r++) {
+    const base = r * rowSamples;
+    for (let i = spp; i < rowSamples; i++) {
+      i16[base + i] = i16[base + i] + i16[base + i - spp];
+    }
+  }
+}
+
+function decodeChunk(raw, compression, decoders) {
+  switch (compression) {
+    case 1:
+      return raw;
+    case 8:
+    case 32946: {
+      if (!decoders?.inflate) {
+        throw new Error('DEFLATE chunk but no inflate decoder supplied ' +
+          '(node: zlib.inflateSync; browser: DecompressionStream("deflate"))');
+      }
+      return decoders.inflate(raw);
+    }
+    case 50000: {
+      if (!decoders?.zstd) {
+        throw new Error('ZSTD chunk but no zstd decoder supplied ' +
+          '(browser: ZSTD-WASM, e.g. zstddec or fzstd)');
+      }
+      return decoders.zstd(raw);
+    }
+    default:
+      throw new Error(`compression ${compression} ` +
+        `(${COMPRESSION[compression] ?? 'unknown'}) not supported by this spike`);
+  }
+}
+
 function readTiffIFD(dv, buf, off, le, big) {
   const entries = new Map();
   const count = big ? Number(dv.getBigUint64(off, le)) : dv.getUint16(off, le);
@@ -121,7 +168,8 @@ function readTiffIFD(dv, buf, off, le, big) {
   return { entries, next };
 }
 
-export function readLcpGeoTiff(buf) {
+export function readLcpGeoTiff(buf, opts = {}) {
+  const { decoders } = opts;
   const dv = new DataView(buf);
   const le = dv.getUint16(0, true) === 0x4949;
   const magic = dv.getUint16(2, le);
@@ -139,9 +187,9 @@ export function readLcpGeoTiff(buf) {
   const planar = get(284, [1])[0];
   const sampleFormat = get(339, [2])[0];
 
-  if (compression !== 1) {
-    throw new Error(`compression ${compression} unsupported in this spike ` +
-                    `(only uncompressed; DEFLATE/ZSTD would need a decoder)`);
+  const predictor = get(317, [1])[0];
+  if (predictor !== 1 && predictor !== 2) {
+    throw new Error(`predictor ${predictor} unsupported (only 1=none, 2=horizontal)`);
   }
   if (bits.some((b) => b !== 16)) throw new Error(`expected 16-bit bands, got ${bits}`);
   if (planar !== 1) throw new Error(`expected pixel-interleaved (planar=1), got ${planar}`);
@@ -156,32 +204,65 @@ export function readLcpGeoTiff(buf) {
   const interleaved = new Int16Array(width * height * numBands);
   const dest8 = new Uint8Array(interleaved.buffer);
   const rowBytes = width * numBands * 2;
-  let bytesCopied = 0;
+  let bytesCopied = 0, compressedBytes = 0;
+
+  // Decode one chunk to an aligned Int16Array, undoing the predictor.
+  // `raw` may be a Buffer view with a non-zero byteOffset, and compressed
+  // payloads land at arbitrary offsets, so we always normalise to a fresh
+  // aligned buffer before creating the Int16 view (see F4 in README.org).
+  const chunkToI16 = (raw, rowSamples, rows) => {
+    const bytes = decodeChunk(raw, compression, decoders);
+    let u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+    let i16;
+    if (u8.byteOffset % 2 === 0 && u8.byteLength % 2 === 0) {
+      i16 = new Int16Array(u8.buffer, u8.byteOffset, u8.byteLength >> 1);
+    } else {
+      const aligned = new Uint8Array(u8.byteLength + (u8.byteLength & 1));
+      aligned.set(u8);
+      i16 = new Int16Array(aligned.buffer, 0, aligned.byteLength >> 1);
+    }
+    if (predictor === 2) undoPredictor2(i16, rowSamples, numBands, rows);
+    return i16;
+  };
 
   if (t.has(324)) {
     // Tiled.
     const tw = get(322)[0], th = get(323)[0];
     const offs = get(324), counts = get(325);
     const tilesAcross = Math.ceil(width / tw);
-    const tileRowBytes = tw * numBands * 2;
+    const tileRowSamples = tw * numBands;
     for (let i = 0; i < offs.length; i++) {
       const tx = (i % tilesAcross) * tw, ty = Math.floor(i / tilesAcross) * th;
+      compressedBytes += counts[i];
+      const tile = chunkToI16(new Uint8Array(buf, offs[i], counts[i]),
+                              tileRowSamples, th);
       for (let r = 0; r < th; r++) {
         const y = ty + r; if (y >= height) break;
-        const nBytes = Math.min(tw, width - tx) * numBands * 2;
-        const src = new Uint8Array(buf, offs[i] + r * tileRowBytes, nBytes);
-        dest8.set(src, y * rowBytes + tx * numBands * 2);
+        const cols = Math.min(tw, width - tx);
+        const from = r * tileRowSamples;
+        interleaved.set(tile.subarray(from, from + cols * numBands),
+                        y * width * numBands + tx * numBands);
+        bytesCopied += cols * numBands * 2;
       }
-      bytesCopied += counts[i];
     }
   } else {
-    // Stripped — the common LCP case (RowsPerStrip is typically 1).
+    // Stripped — the common LCP case (RowsPerStrip is often 1).
     const rps = get(278, [height])[0];
     const offs = get(273), counts = get(279);
     for (let i = 0; i < offs.length; i++) {
-      const src = new Uint8Array(buf, offs[i], counts[i]);
-      dest8.set(src, i * rps * rowBytes);
-      bytesCopied += counts[i];
+      compressedBytes += counts[i];
+      const rows = Math.min(rps, height - i * rps);
+      if (compression === 1 && predictor === 1) {
+        // Fast path: raw bytes, straight memcpy, no intermediate decode.
+        dest8.set(new Uint8Array(buf, offs[i], counts[i]), i * rps * rowBytes);
+        bytesCopied += counts[i];
+      } else {
+        const strip = chunkToI16(new Uint8Array(buf, offs[i], counts[i]),
+                                 width * numBands, rows);
+        interleaved.set(strip.subarray(0, rows * width * numBands),
+                        i * rps * width * numBands);
+        bytesCopied += rows * rowBytes;
+      }
     }
   }
 
@@ -197,10 +278,12 @@ export function readLcpGeoTiff(buf) {
 
   return {
     width, height, numBands, interleaved, source: 'geotiff',
-    bytesCopied,
+    bytesCopied, compressedBytes,
     meta: {
-      compression, planar, sampleFormat, bits: bits[0],
+      compression, compressionName: COMPRESSION[compression] ?? `?${compression}`,
+      predictor, planar, sampleFormat, bits: bits[0],
       tiled: t.has(324),
+      tileSize: t.has(322) ? get(322)[0] : null,
       rowsPerStrip: t.has(278) ? get(278)[0] : null,
       stripOrTileCount: (get(324) ?? get(273) ?? []).length,
       cellSize: scale[0], originX: tie[3], originY: tie[4],
@@ -301,10 +384,10 @@ export function packCellsDirect({ interleaved, numBands }, width, height) {
   return { packed: out, minElev, bytesPerCell: 8 };
 }
 
-export function load(buf) {
+export function load(buf, opts = {}) {
   // Discriminate by TIFF magic; anything else is treated as a raw .lcp.
   const dv = new DataView(buf);
   const b0 = dv.getUint16(0, true);
   const isTiff = (b0 === 0x4949 || b0 === 0x4d4d);
-  return isTiff ? readLcpGeoTiff(buf) : readRawLcp(buf);
+  return isTiff ? readLcpGeoTiff(buf, opts) : readRawLcp(buf);
 }
