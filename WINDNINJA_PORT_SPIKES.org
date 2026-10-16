@@ -1,0 +1,307 @@
+#+TITLE: WindNinja Port — Verification Spikes
+#+AUTHOR: RJ Sheperd
+#+DATE: 2026-10-15
+#+STARTUP: overview
+
+Companion to [[file:ARCHITECTURE_REVIEW.org][ARCHITECTURE_REVIEW.org]] §4b. Eleven spikes, in four gates, to
+establish whether WindNinja's mass-conservation solver can be ported safely.
+
+*Organising principle: almost every WebGPU risk can be tested in C++ before
+writing any WGSL.* Precision, preconditioner behaviour, and matrix storage
+are all properties of the existing solver, and all are cheap to probe by
+recompiling. Spend nothing on shaders until Gate 4 passes.
+
+Already settled (do *not* spike):
+- NinjaFOAM shells out to OpenFOAM binaries — unportable to any browser,
+  out of scope (review S4b, "the pipeline").
+- The C API exists at =src/ninja/windninja.h= with =extern "C"= linkage.
+- =FireBehaviorModels= is the branch to build (review S4.6c).
+
+* Gate 1 — Can it build and run detached from its world?
+
+** W1 — Minimal core build
+
+*Question:* does the mass-conservation solver compile and run with the GUI,
+OpenFOAM solver, and all network features removed — first natively, then
+under Emscripten?
+
+*Method:* native CMake with =NINJA_GUI=OFF=, =NINJAFOAM=OFF=,
+=WITH_NOMADS_SUPPORT=OFF=, =PHONE_HOME_QUERIES=OFF=,
+=DISABLE_THREDDS_UPDATE=ON=, =WITH_LCP_CLIENT=OFF=, =ENABLE_GMTED=OFF=.
+Then repeat with =emcmake=.
+
+*Grounding:* =PHONE_HOME_QUERIES_ENABLED= is an =#ifdef= at
+=ninja_init.cpp:359=, so it is compile-time removable rather than a code
+change. The network surface is broad but confined to *initialization*, not
+the solver — =srtmclient.cpp=, =landfireclient.cpp=, =nomads_wx_init.cpp=,
+=gcp_wx_init.cpp=, and six =ncep*Initialization.cpp= files. Scoping to
+domain-average initialization avoids all of them.
+
+*Success:* a domain-average run completes and matches the full build's
+output. *Fails if* the dependency graph cannot be cut without patching.
+
+*Why first:* if this fails, nothing below matters. It is also work the
+review recommends independently (S4b "Recommendation" step 1).
+
+** W2 — In-memory API round trip with zero filesystem access
+
+*Question:* does =NinjaSetInMemoryDem= → =NinjaGetOutputSpeedGrid= /
+=NinjaGetOutputDirectionGrid= actually complete without touching disk?
+
+*Method:* native run under =dtruss=/=strace=, asserting no =open()= outside
+the binary's own shared libraries. Then confirm under Emscripten with no
+MEMFS mounts.
+
+*Grounding:* this is Plan A's entire seam (review S4b.2), backed by
+=ninja::set_DEM(const double*, int, int, const double*, std::string)=
+(=ninja.cpp:3785=) and =keepOutputGridsInMemory(true)= under =#ifdef
+C_API=.
+
+*Likely failure mode:* GDAL needs its data directory (=proj.db= and
+friends) — which is precisely why =NinjaInitialize= takes a =pszGdalData=
+argument. Expect to either bundle a trimmed GDAL_DATA into MEMFS or
+eliminate GDAL from the compute path entirely.
+
+*Success:* a complete simulation, =double*= in and =double*= out, no file
+opens.
+
+* Gate 2 — Is the WASM build numerically faithful?
+
+** W10 — Assembly determinism (run this FIRST — it defines W3's criterion)
+
+*Question:* is the *native* build even deterministic run-to-run?
+
+*Grounding:* =discretize()= scatters element contributions with
+=#pragma omp atomic= on doubles. Floating-point addition is not
+associative, so thread-interleaved accumulation can produce different sums
+on different runs.
+
+*Method:* same input, N runs at N threads, bitwise-diff =PHI= and the
+output speed/direction grids. Repeat at 1 thread as a control.
+
+*Why it must come first:* if native is already nondeterministic, then
+"bit-identical to native" is an impossible success criterion for W3, and
+the whole validation strategy has to be stated as a tolerance instead. This
+also bears directly on review Q0.7 and on the golden-baseline idea in
+=FLAMMAP_WEBGPU_PLANS.org= §7.
+
+** W3 — libm bit-reproducibility: WASM versus native
+
+*Question:* how far do WASM results diverge from native, and why?
+
+*Grounding — this is the spike most likely to return an uncomfortable
+answer.* The solver path calls =pow()= 36 times, =sqrt()= 18, =sin()= 7,
+=log()= 7, =exp()= 6 (across =ninja.cpp=, =element.cpp=, =stability.cpp=,
+=cellDiurnal.cpp=). Of these, only =sqrt= is required by IEEE-754 to be
+correctly rounded. *=pow=, =exp=, =log=, and =sin= are not bit-identical
+across libm implementations*, and Emscripten's musl-derived libm will not
+agree with macOS or glibc. Native builds may additionally contract =a*b+c=
+into FMA.
+
+*Method:* dump =PHI= and the u/v/w fields from native and WASM on identical
+inputs. Report bitwise equality, max ULP difference, and max relative
+error. Rebuild native with =-ffp-contract=off= to separate FMA effects from
+libm differences.
+
+*Success:* *not* bit-identity — expect that to fail. Define and defend a
+tolerance (e.g. wind speed within 0.01 m/s, direction within 0.1°), and
+state it in the design doc.
+
+*Consequence if it diverges widely:* the review's framing of Plan A
+validation as "a tractable bit-comparison" (S4b, Plan A rationale) needs
+weakening to "agreement within a stated tolerance." Worth knowing before
+promising the Fire Lab bit-exactness.
+
+** W4 — Solver convergence parity
+
+*Question:* does PCG converge in the same iteration count under WASM, and
+does the MINRES fallback ever trigger where it did not natively?
+
+*Grounding:* =stop_tol= is =1E-1= on the 2-norm of the residual with
+=MAXITS=100000= (=ninja.cpp:~420=); SSOR is the default preconditioner with
+Jacobi as fallback; =solveMinres()= (=:866=) exists specifically for CG
+divergence, and the comment says divergence has not been observed.
+
+*Method:* instrument iteration counts; run a terrain suite — flat, steep,
+complex/canyon, and a high-aspect-ratio mesh.
+
+*Success:* iteration counts match within a few percent and MINRES never
+triggers. =f64= is =f64=, so this should pass; the risk is the interaction
+of a loose tolerance with W3's libm drift on ill-conditioned meshes.
+
+* Gate 3 — Is WASM fast enough, and does the solve even matter?
+
+** W7 — Amdahl, using instrumentation that already exists (near-free)
+
+*Question:* what fraction of wall-clock is the linear solve, at the mesh
+sizes Behave will actually use?
+
+*Grounding:* =simulate_wind()= already brackets every phase with
+=omp_get_wtime()= — =startMesh=, =startBuildEq=, =startSolve=, =endSolve=,
+write-out. No new instrumentation required.
+
+*Method:* read the timers at coarse (4,000 cells), medium (10,000) and fine
+(20,000) horizontal targets times the vertical layer count.
+
+*Why this gates Gate 4:* if the solve is not dominant, every WebGPU spike
+below is moot. Do this before W8.
+
+** W5 — Single-thread penalty, and the run-level alternative
+
+*Question:* how much slower is single-threaded WASM than multi-threaded
+native, and is per-run parallelism a better answer than intra-run threads?
+
+*Grounding:* 38 OpenMP pragmas in =ninja.cpp=, over the SpMV and element
+assembly. Emscripten pthreads requires =SharedArrayBuffer=, hence COOP/COEP
+cross-origin isolation — which the =jessie_fire_simulation= prototype
+confirms is real work (review S3.2 refinement: it had to serve
+=credentialless= headers from Flask).
+
+*Method:* native at =OMP_NUM_THREADS=1= versus N; then WASM
+single-threaded. Separately, measure N concurrent single-threaded WASM
+instances, one per Worker.
+
+*Grounding for the alternative:* =ninjaArmy= is literally a collection of
+runs across wind speeds, directions, and times. That is embarrassingly
+parallel at the *run* level, which is far cheaper to exploit than
+pthreads-in-WASM (review S4b "Recommendation" step 3).
+
+*Success:* a decision on whether to invest in an Emscripten pthreads build
+at all.
+
+** W6 — Memory ceiling
+
+*Question:* what is the largest mesh that fits in a browser?
+
+*Grounding — better than the review's earlier hedge.* =ninja.cpp:1536=
+gives the exact nonzero count, and =:1538= halves it because only the
+symmetric upper triangle is stored:
+
+#+BEGIN_SRC c++
+NZND = (8*8) + (intercols*4 + interrows*4 + interlayers*4)*12
+     + (intercols*interlayers*2 + interrows*interlayers*2
+        + intercols*interrows*2)*18
+     + (intercols*interrows*interlayers)*27;
+NZND = (NZND - mesh.NUMNP)/2 + mesh.NUMNP;   // upper triangle only
+#+END_SRC
+
+Allocations are =SK= =double[NZND]=, =col_ind= =int[NZND]=, =row_ptr=
+=int[NUMNP+1]=, plus =RHS= and =PHI= as =double[NUMNP]=. That is ~12 bytes
+per stored nonzero at ~13.5 nonzeros per row after symmetry, so roughly
+*160–170 bytes per node*. At 1M nodes that is ~165 MB plus CG vectors —
+*comfortable inside WASM32*. This materially de-risks review S4b.5, which
+hedged that the working set was "large enough to warrant care."
+
+*Method:* instrument peak RSS across mesh targets; find the node count that
+reaches a 2 GB practical browser ceiling.
+
+*Success:* a published maximum domain size per platform tier.
+
+* Gate 4 — Is WebGPU viable at all? (only if W7 says the solve dominates)
+
+** W8 — Can the solver survive =f32=? (the single most valuable spike)
+
+*Question:* does PCG still converge, and to acceptable accuracy, in single
+precision?
+
+*Why this is the key spike:* WGSL has no =f64= (review S4b.7), and that is
+the stated blocker for the whole WebGPU idea. *It can be answered entirely
+in C++ — no shaders, no GPU.* Recompile the solver in =f32= and observe.
+
+*Enabling work, and its real cost:* there is *no existing typedef* for the
+scalar type. =double= is hardcoded — 213 occurrences in =ninja.cpp=, 54 in
+=element.cpp=, 36 in =mesh.cpp=, 8 in =preconditioner.cpp=. So step zero is
+mechanically introducing a =ninja_real_t= typedef across the solver path.
+Bounded, tedious, and far cheaper than a WGSL rewrite — and useful
+regardless, since it also enables mixed-precision experiments.
+
+*Method:* with the typedef in place, build =f32= and =f64= variants. On a
+terrain suite (flat, steep, canyon, stretched mesh), compare: convergence
+or stall, iteration count, and wind speed/direction error against the
+=f64= reference.
+
+*Success criteria to agree in advance:* converges within the same iteration
+budget on *all* terrain cases, and wind error stays inside W3's tolerance.
+
+*Decision:* if =f32= stalls on ill-conditioned stretched-terrain meshes —
+which review S4b.7 predicts — *WebGPU is dead for this solver and the
+investigation stops here.* If it passes, mixed-precision iterative
+refinement (=f32= inner solve, =f64= correction) becomes a credible design.
+
+** W9 — Jacobi versus SSOR iteration cost
+
+*Question:* how many more iterations does Jacobi need than SSOR on real
+terrain?
+
+*Grounding:* =Preconditioner::precondType{none, Jacobi, SSOR}=, SSOR is the
+default, and it is a sequential forward/backward triangular solve — close
+to worst-case for GPU execution (review S4b.8). Jacobi is already
+implemented as the fallback, so this needs no new code.
+
+*Method:* flip the preconditioner natively, measure iteration counts and
+wall-clock across the terrain suite.
+
+*Why:* quantifies the trade — GPU gives a faster iteration, Jacobi demands
+more of them. If Jacobi inflates iteration count by more than the expected
+per-iteration speedup, WebGPU loses on arithmetic alone.
+
+** W11 — Symmetric storage versus GPU SpMV
+
+*Question:* what does it cost to make the matrix GPU-friendly?
+
+*Grounding — a consequence of W6's finding that is easy to miss.* The CSR
+holds only the *upper triangle* (=ninja.cpp:1538=). A symmetric-upper SpMV
+must scatter each off-diagonal contribution to its mirror row, which needs
+floating-point atomic *addition*. WGSL has no float atomics at all — and
+the =atomicCompareExchangeWeak=-on-=bitcast= trick from
+=jessie_fire_simulation= provides atomic *min*, not add (review S0c.3), so
+it does not help here. The fixed-point =atomicAdd= workaround trades
+exactness for a chosen scale, which is questionable for stiffness assembly
+with a wide dynamic range (review S4b.9).
+
+*Method:* expand to full (both-triangles) CSR and measure the memory and
+assembly cost — roughly double the nonzeros, so ~330 bytes/node. Check it
+still fits the WebGPU binding limits, noting the 128 MiB guaranteed floor
+(review S4b.10) against the ~4 GiB Apple Silicon actually grants
+(review S0c.5).
+
+*Success:* a concrete memory and bandwidth figure for the GPU variant, to
+weigh against W9's iteration inflation.
+
+* Summary table
+
+| Spike | Gate | Cost | Kills the port if it fails? |
+|---+---+---+---|
+| W1 minimal build | 1 | days | *yes* — WASM and WebGPU both |
+| W2 in-memory round trip | 1 | days | no — fallback is MEMFS plumbing |
+| W10 native determinism | 2 | hours | no — but sets W3's criterion |
+| W3 libm WASM vs native | 2 | days | no — but may weaken the fidelity promise |
+| W4 convergence parity | 2 | hours | unlikely |
+| W7 Amdahl (existing timers) | 3 | *hours* | no — but gates all of Gate 4 |
+| W5 single-thread penalty | 3 | days | no — informs pthreads decision |
+| W6 memory ceiling | 3 | hours | no — W6's estimate says comfortable |
+| W8 =f32= survival | 4 | ~1 week (typedef) | *yes* — for WebGPU specifically |
+| W9 Jacobi vs SSOR | 4 | hours | no — informs the economics |
+| W11 symmetric → full CSR | 4 | days | no — informs the economics |
+
+* Recommended sequence
+
+1. *W7* first. It is hours of work against existing instrumentation and it
+   decides whether Gate 4 is worth opening at all.
+2. *W1 + W2* next — the build and the seam. These are prerequisites for
+   Plan A in =FLAMMAP_WEBGPU_PLANS.org= regardless of the GPU question.
+3. *W10 → W3 → W4* to establish what "faithful" can even mean, in that
+   order, because W10 constrains W3's success criterion.
+4. *W5 + W6* to size the deployment envelope.
+5. *Only then W8*, and only if W7 showed the solve dominating. W8's typedef
+   work is the first non-trivial investment in the WebGPU path, so it
+   should be the last thing authorised.
+6. W9 and W11 alongside W8, since both are cheap once the typedef exists.
+
+* Open question for the Fire Lab
+
+- *Q — would the Fire Lab accept an =f32= WindNinja at all?* W8 answers
+  whether it is numerically possible; it does not answer whether a
+  single-precision wind solver is scientifically acceptable to the people
+  who own the model. Worth asking before W8 is funded, not after. This is
+  Q0b.4 (port vs. build) in its WindNinja-specific form.

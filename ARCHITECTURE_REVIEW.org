@@ -967,6 +967,22 @@ mass-conservation solver is portable.
 5. *Keep NinjaFOAM native-only.* The momentum solver stays behind the JNI
    path in the desktop build; it cannot go to the browser at all.
 
+** Verification spikes
+
+Eleven spikes across four gates are specified in
+[[file:WINDNINJA_PORT_SPIKES.org][WINDNINJA_PORT_SPIKES.org]]. Two points from that work revise statements
+above:
+
+- *S4b.12 — Memory is less of a concern than S4b.5 implied.*
+  =ninja.cpp:1538= stores only the symmetric upper triangle, giving
+  ~160–170 bytes per node — ~165 MB at 1M nodes, comfortable in WASM32.
+- *S4b.13 — "Bit-comparable against the native build" (Plan A rationale)
+  is probably too strong a promise.* The solver path calls =pow()= 36
+  times plus =exp=, =log=, and =sin=, none of which are bit-identical
+  across libm implementations; and =discretize()= accumulates through
+  =#pragma omp atomic=, so even native may be run-to-run nondeterministic.
+  Expect to state a tolerance instead of exactness.
+
 ** Questions
 
 - *Q4b.12 — Does Behave actually need WindNinja's gridded wind in the
