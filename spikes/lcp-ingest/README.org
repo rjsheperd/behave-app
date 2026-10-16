@@ -1,0 +1,175 @@
+#+TITLE: Plan C Spike — Cost of Loading GeoTIFF / LCP Landscapes
+#+AUTHOR: RJ Sheperd
+#+DATE: 2026-10-15
+
+Scope: the *ingest* question only — what does it cost to get FlamMap
+landscape data from a file into a GPU-ready buffer, without GDAL? The
+fire-behavior comparison half of Plan C ([[file:../../FLAMMAP_WEBGPU_PLANS.org][FLAMMAP_WEBGPU_PLANS.org]] §5) is
+not addressed here.
+
+Answer: *~190 ms single-threaded for a 4096² landscape* (16.8M cells,
+~123 km square at 30 m), producing 128 MB of packed cells. Ingest is not
+the bottleneck, and no GDAL is required.
+
+* Files
+
+| =lcp.mjs= | Dependency-free reader: raw =.lcp=, LCP-as-GeoTIFF (stripped + tiled), deinterleave, 8 B/cell packing. Runs in browser or bun. |
+| =bench.mjs= | Timing harness, median of 7, with projections. |
+| =gen.mjs= | Synthetic landscape generator, so scaling is measured rather than extrapolated. |
+
+#+BEGIN_SRC shell
+bun run gen.mjs /tmp/lcp 4096 4096 --tiled --raw
+bun run bench.mjs /tmp/lcp/synth_4096x4096_tile.tif
+bun run bench.mjs ../../SpatialFOFEM/SampleData/Landscape/BlueMountain_LCP_FCCS.tif
+#+END_SRC
+
+* Measurements
+
+Apple Silicon, bun 1.1.38, median of 7, single-threaded. Real sample is
+=SpatialFOFEM/SampleData/Landscape/BlueMountain_LCP_FCCS.tif=; the rest are
+synthetic 10-band landscapes.
+
+| Grid | Cells | Parse (ms) | Fused pack (ms) | *Total (ms)* | Packed | Deflated |
+|---+---+---+---+---+---+---|
+| 482 x 554 (real) | 267 K | 0.71 | 2.28 | *2.99* | 2.0 MB | 0.56 MB (3.64:1) |
+| 1024² | 1.05 M | 3.56 | 8.49 | *12.05* | 8.0 MB | 1.98 MB (4.05:1) |
+| 2048² | 4.19 M | 18.46 | 41.36 | *59.82* | 32 MB | 8.21 MB (3.90:1) |
+| 4096² | 16.8 M | 60.43 | 129.44 | *189.88* | 128 MB | 44.0 MB (2.91:1) |
+
+Throughput settles at roughly *130 M cells/s* for the fused pack and
+*280 M cells/s* for TIFF assembly.
+
+* Findings
+
+** F1 — Ingest is cheap enough to ignore, and GDAL is unnecessary
+
+190 ms for a 4096² landscape, against =jessie='s 74 ms of GPU simulation
+and ~950 ms end-to-end. Ingest is a minor term. More importantly the whole
+reader is *~300 lines with no dependencies* — confirming
+ARCHITECTURE_REVIEW S3b.6a that GDAL-in-WASM (10–20 MB of payload) can be
+avoided on the input path entirely.
+
+** F2 — Fusing deinterleave into packing is a free 2x
+
+The obvious two-pass structure (deinterleave to per-band planes, then pack)
+costs 405 ms at 4096². Writing the packed layout *directly* from the
+pixel-interleaved samples costs 190 ms — *2.13x faster, byte-identical
+output*, and it avoids allocating ~335 MB of intermediate planes.
+
+Per-band planes are never needed if the consumer is the GPU. Keep
+=deinterleave()= for debugging and validation only.
+
+** F3 — The brief's 5:1 compression assumption is too optimistic
+
+=wildfire-sim-research.org= flags this as a TODO ("the 5:1 figure is
+assumed"). Measured deflate on *packed* cells:
+
+| 1024² | 4.05:1 |
+| 2048² | 3.90:1 |
+| 4096² | *2.91:1* |
+
+The ratio *degrades with area*, because packing has already removed the
+redundancy that compression would otherwise find. ZSTD would do somewhat
+better than deflate, but *5:1 should not be used for sizing*. At 2.9:1 a
+4096² window is ~44 MB on the wire, not ~26 MB — i.e. ~3.5 s at 100 Mbit/s
+rather than 2.0 s.
+
+Caveat: synthetic terrain. Re-measure on real LANDFIRE windows before
+freezing any budget.
+
+** F4 — TIFF sample data is NOT safely castable to Int16Array
+
+Strip and tile offsets are arbitrary byte offsets and are routinely *odd* —
+the real BlueMountain file puts its first strip at byte 5049.
+=new Int16Array(buffer, 5049)= throws =RangeError: Byte offset is not
+aligned=. So zero-copy int16 views over TIFF payloads are not generally
+possible; one byte-wise copy per strip/tile into an aligned destination is
+unavoidable.
+
+This cost ~20 minutes of spike time and would have cost the same in any
+implementation. It is the single most likely thing to surprise someone
+writing this reader fresh.
+
+** F5 — Tiled vs stripped does not matter for whole-file reads
+
+At 1024², stripped 21.70 ms vs tiled 21.74 ms. Tiling matters for *HTTP
+range requests* (fetching a window without the whole file), not for local
+parse throughput. The research brief's tiling guidance (ADR-01, 512²
+tiles) is about network access patterns, and this spike does not exercise
+that — it measures the local path only.
+
+** F6 — Band count must come from the right source, per format
+
+A raw =.lcp= implies its band count from the header's =CrownFuels= /
+=GroundFuels= flags (=21= = present): 5 basic + 3 crown + 2 ground = 10.
+But the real =BlueMountain_LCP_FCCS.tif= has *9* bands, which no
+combination of those flags produces — it is an FCCS variant that does not
+follow strict LCP banding.
+
+So: *trust =SamplesPerPixel= for GeoTIFF, trust the flags only for raw
+=.lcp=.* A reader that assumes 10 bands, or that applies the LCP flag
+convention to a GeoTIFF, will stride incorrectly and silently produce
+garbage.
+
+** F7 — The 7,316-byte LCP header is confirmed, and must be parsed field-wise
+
+Summing =headdata= (=firemodels/lib/flammap/include/flammap3.h:190-269=)
+gives *exactly 7,316 bytes*, matching the research brief. Composition: 3
+longs + 4 doubles + 10 themes x 412 B + 2 longs + 4 doubles + 1 long +
+2 doubles + 10 shorts + 10 x 256 B filenames + 512 B description.
+
+But the equivalent C struct would be *7,320* bytes under natural alignment
+— a =double= at offset 12 forces 4 bytes of padding after the three
+leading longs. *The on-disk header is unpadded*, so it must be read
+field-by-field; a packed-struct memcpy will be off by 4 bytes from the
+first double onward.
+
+** F8 — Scaling is mildly super-linear
+
+Linear extrapolation from 1024² predicts 193 ms at 4096²; measured 190 ms
+for the fused path, but the two-pass path degrades (365 ms predicted vs
+405 ms measured, ~1.1x) and per-stage throughput drops as the working set
+leaves cache (deinterleave 82 → 74 M cells/s from 1024² to 4096²).
+Projections beyond 8192² should be treated as optimistic floors.
+
+* Correctness
+
+=gen.mjs= writes the same synthetic landscape three ways — raw =.lcp=,
+stripped GeoTIFF, tiled GeoTIFF — and all three readers produce
+*byte-identical* interleaved output. The generator deliberately places
+sample data at an odd offset to reproduce F4.
+
+The fused and two-pass packing paths are asserted byte-identical in
+=bench.mjs=. (They initially differed: one rounded canopy height, the other
+truncated. Quantization rounding must match exactly between any two paths
+that are meant to agree — a small instance of the general risk in
+ARCHITECTURE_REVIEW Q0.7.)
+
+* What this spike does NOT establish
+
+- *No browser measurement.* All timings are bun on the dev machine. Browser
+  typed-array performance should be comparable but is unconfirmed, and
+  =jessie='s harness (Playwright + =test_stress.mjs=) is the place to
+  confirm it.
+- *No HTTP/range-request path.* F5 explains why that is the interesting
+  case for large landscapes, and it is untested here. The brief's COG
+  profile, OPFS caching, and Zarr weather streaming are all unexercised.
+- *No compressed TIFF.* The reader rejects anything but
+  =Compression=1=. Real LANDFIRE COGs are DEFLATE or ZSTD, so a decoder is
+  required before this handles production data. That is the obvious next
+  increment and it will shift the cost balance toward decode.
+- *No fire behavior.* Packing is validated for self-consistency, not
+  against FlamMap. Whether these quantized inputs produce acceptable fire
+  behavior is the other half of Plan C.
+- *Synthetic compression ratios.* See F3's caveat.
+
+* Recommended next steps
+
+1. Add a DEFLATE/ZSTD decoder path (=DecompressionStream= for deflate,
+   ZSTD-WASM otherwise) and re-measure — this is what real LANDFIRE data
+   needs, and decode will likely dominate ingest afterwards.
+2. Port =bench.mjs= into =jessie='s Playwright harness for in-browser
+   numbers.
+3. Re-run F3 against a real LANDFIRE window rather than synthetic terrain.
+4. Feed the packed buffer into =jessie='s =rothermel.wgsl= to close the
+   loop on Plan C's fire-behavior question.
