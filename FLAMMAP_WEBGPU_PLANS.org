@@ -1,0 +1,300 @@
+#+TITLE: Adapting FlamMap to WebGPU — Candidate Plans
+#+AUTHOR: RJ Sheperd
+#+DATE: 2026-10-15
+#+STARTUP: overview
+
+Companion to [[file:ARCHITECTURE_REVIEW.org][ARCHITECTURE_REVIEW.org]]. Four plans, with a recommendation.
+Grounded in three things already in this repo as submodules:
+
+- =firemodels/lib/flammap= — FlamMap's per-cell fire behavior (~24k LOC)
+- =firemodels/lib/mtt= — the minimum-travel-time spread engine (~19k LOC)
+- =jessie_fire_simulation/= — a working, validated WebGPU fire simulator
+
+* 1. The structural insight
+
+*FlamMap's pipeline already has the same two-stage shape as
+=jessie_fire_simulation=.* This is the thing that makes the whole exercise
+tractable, and it is not a coincidence — both are "precompute per-cell
+spread rates, then solve for arrival times."
+
+| Stage | jessie | FlamMap / MTT |
+|---+---+---|
+| Per-cell fire behavior (one pass, embarrassingly parallel) | =rothermel.wgsl= | =BurnTheLandscape()= (=flmburn4.cpp:245=) |
+| Seed the wavefront | =compact_active.wgsl= | =Spread::FindIgnitionRow()= (=node3.cpp:270=) |
+| Propagate to arrival times (iterative, converged) | =fim_solve.wgsl= | =Risk_CalcPositiveSpread()= row sweeps (=node3.cpp:578=) |
+| Read back + render | =readResults()= | =writearrivaltimegrid= etc. |
+
+Two further alignments worth noting:
+
+- *MTT is already an Eikonal solver.* Per ARCHITECTURE_REVIEW S4e.1, MTT is
+  a label-correcting fast-sweeping scheme iterated to =Changes==0=, not a
+  moving-front simulation. FIM (Jeong & Whitaker 2008) is the GPU-native
+  formulation of exactly that problem, and =jessie= has it working.
+- *MTT's cell data is already =f32=.* =MemTile.h='s
+  =struct Cell { float Dir, ADim, BDim, CDim, Spot, Slope, Aspect, Intensity; }=
+  means no =f64= obstacle for the propagation stage (S4e.6a).
+
+* 2. The division-of-labor principle
+
+The governance objection throughout the architecture review (S3.3, S4b.11,
+Q0b.4) is that a WGSL rewrite forks the Fire Lab's equations. *That
+objection applies asymmetrically across the two stages:*
+
+- Stage 1 is *fire science*. Rothermel reaction intensity, Van Wagner crown
+  initiation, Scott & Burgan fuel models, Nelson moisture conditioning,
+  ember flight. The Fire Lab must own this, and it changes over time.
+- Stage 2 is *generic numerics*. "Solve for minimum arrival time over a
+  weighted lattice" is an Eikonal/shortest-path problem. Nobody needs to own
+  it as fire science — it is the same math whether the medium is fire, sound,
+  or light.
+
+*So the stages should be weighed separately.* Putting stage 2 on the GPU
+costs almost nothing in scientific ownership; putting stage 1 there costs a
+great deal. Plans A and D exploit this; B does not.
+
+* 3. Plan A — GPU propagation, WASM fire behavior (RECOMMENDED)
+
+Keep the Fire Lab's equations compiled, unmodified, from C++. Put only the
+Eikonal solve on the GPU.
+
+** Pipeline
+
+#+BEGIN_EXAMPLE
+LCP (+ .fmd/.fms) ──► WASM: FlamMap lib via Emscripten
+                        BurnTheLandscape() over N Worker tiles  (S3b.2)
+                        emits per-cell max_spread_rate[16 dirs], ellipse dims,
+                                   crown params, I_o/RAC
+                              │
+                              ▼  SoA Float32Array, zero-copy
+                      WebGPU: compact_active.wgsl  (seed from ignition)
+                              fim_solve.wgsl       (converge arrival times)
+                              │
+                              ▼
+                      readback ──► OpenLayers / geotiff.js overlay
+#+END_EXAMPLE
+
+** What is reused versus written
+
+- *Reused unchanged from =jessie=:* =fim_solve.wgsl= (the 7-binding FIM
+  solver), =compact_active.wgsl=, =atomic_min_float= CAS-on-bitcast, the
+  ping-pong active-list plumbing, SoA indexing =[dir * simSize + cell]=, the
+  indirect-dispatch self-termination, and the per-step-submit discipline.
+- *Reused unchanged from =firemodels=:* all of =lib/flammap=,
+  =lib/fuelcondition=, =lib/icf= — compiled to WASM per ARCHITECTURE_REVIEW
+  S3b.1–S3b.5.
+- *New work:* an Emscripten build of =lib/flammap= (which S3b already
+  recommends for its own sake), a packing step from FlamMap's output arrays
+  into the GPU's SoA buffers, and the ClojureScript orchestration layer.
+
+** Why this is the recommendation
+
+1. *It preserves the single source of truth.* FlamMap's equations run as
+   FlamMap's C++. Upstream fixes flow to us. Q0.7 validation is
+   "does the WASM build match the desktop build," which is a tractable
+   bit-comparison, not a scientific argument.
+2. *It puts the GPU where the win actually is.* Per =jessie='s
+   measurements, propagation went 970 ms → 74 ms (13.1x) while the per-cell
+   Rothermel stage was a *one-time* 46 ms init. Stage 1 is not the
+   bottleneck once it is off the main thread.
+3. *The =f64= objection evaporates.* Stage 1 keeps real =f64= in WASM;
+   stage 2 never needed it (S4e.6a).
+4. *It composes with the non-GPU plan.* If WebGPU is unavailable
+   (Chrome/Linux partial, Firefox/Linux Nightly-only — S0b.2), the same WASM
+   stage 1 feeds a WASM stage 2 and the app degrades rather than breaks.
+
+** Risks
+
+- The WASM↔GPU handoff is ~37 MB per spread-rate array at 581K cells
+  (=maxSpreadRateBuf=, 16 dirs x f32). At 4096² that is ~268 MB — over the
+  128 MiB guaranteed binding floor, so it needs the =requiredLimits= request
+  =jessie= already does, plus a banded fallback.
+- Stage 1 in WASM still costs what it costs. If FlamMap's
+  =GetFireEnvironment= conditioning dominates at large grid sizes, Plan A
+  caps out and Plan B's argument strengthens.
+
+* 4. Plan B — Full GPU (both stages in WGSL)
+
+Transcribe FlamMap's per-cell fire behavior into WGSL as well, mirroring
+=jessie='s =rothermel.wgsl= but with FlamMap's fuel models and crown model.
+
+** What this buys
+
+Eliminates the WASM stage entirely and the handoff with it. =jessie='s
+=rothermel.wgsl= precedent shows the per-cell stage maps cleanly: one thread
+per cell, a packed =fuel_models= LUT (13 =vec4<f32>= = 208 bytes per model),
+=cell_ints= / =cell_floats= input packing to stay inside the storage-buffer
+binding count, and a global max-spread-rate reduction via atomic CAS.
+
+** What it costs
+
+- *The full governance cost.* FlamMap's equations would exist twice, in C++
+  and WGSL, forever. Every upstream change needs porting; every discrepancy
+  needs adjudicating. This is the thing the Fire Lab is likely to object to.
+- *Much more surface than =jessie= ported.* =jessie= implements Rothermel
+  surface fire plus crown escalation. FlamMap adds: Scott & Burgan FBFM40
+  plus custom =.fmd= models, hourly fuel-moisture conditioning with solar
+  geometry (=lib/fuelcondition= — =cdtlib.h= computes solar altitude/azimuth
+  from slope/aspect/elevation with atmospheric, cloud, and canopy
+  transmittance), ember flight and spotting (=fsxwspot.cpp=), and the output
+  layers FlamMap users expect — including =TORCHINGINDEX=, =CROWNINGINDEX=,
+  =CROWNFRACTIONBURNED=, =ELLIPSEDIM_A/B/C=, =MAXSPOT= / =MAXSPOT_DIR= /
+  =MAXSPOT_DX=, =FUELMOISTURE100= / =FUELMOISTURE1000=.
+- *Conditioning is the hard part, not Rothermel.* It is a per-cell
+  *time integration* over an hourly weather stream (=fmc_fe3.cpp= indexes
+  =CurHist[sn][FuelSize]->i_Time=; =fmc_cl4.cpp= works out "how many hourly
+  records need to be used"). Parallel across cells but sequential in hours,
+  stateful, and branchy — the least GPU-friendly code in FlamMap, and the
+  part most likely to diverge numerically in =f32=.
+- *=f32= risk is real here*, unlike stage 2. Reaction intensity and the
+  effective-windspeed cap involve wide dynamic ranges.
+
+** When to choose it
+
+Only if Plan A measurably caps out *and* the Fire Lab explicitly accepts dual
+maintenance. A sane middle path: Plan A, but move *only Rothermel* (not
+conditioning) to WGSL, keeping conditioning in WASM.
+
+* 5. Plan C — Extend =jessie= in place (cheapest spike)
+
+Do not touch =firemodels= at all. Take =jessie_fire_simulation= and swap its
+fire-behavior inputs for FlamMap's:
+
+1. Replace its fuel-model table with FBFM40 (Scott & Burgan) in the same
+   13-=vec4= packing.
+2. Replace =terrain_sae.bin= ingest with an LCP reader (the 7,316-byte
+   header + int16 pixel-interleaved format — ARCHITECTURE_REVIEW S3b.6a
+   means this can be parsed in ClojureScript with no GDAL).
+3. Run FIM as-is.
+4. Validate against =runflammap= output on the same LCP.
+
+** Value
+
+This answers the question "how close does a =jessie=-class GPU model get to
+FlamMap on a real landscape?" in days, not months, and it produces the
+*error budget* that every other plan needs in order to be evaluated. It is
+the right first move regardless of which plan is ultimately chosen.
+
+** Limits
+
+It is a measurement instrument, not a product. It will not reproduce
+FlamMap's output layers, and its agreement with FlamMap is exactly what is
+being tested — so it cannot also be the thing that ships.
+
+* 6. Plan D — Per-cell only, no propagation (narrowest)
+
+Serves the "FlamMap Basic" feature set from the architecture review
+(section 3) and nothing more: fire type, spread rate, fireline intensity,
+flame length per cell, with no arrival-time solve.
+
+This needs *no FIM, no active list, no propagation* — just stage 1. And per
+ARCHITECTURE_REVIEW S3.2/S3b.2, stage 1 does not need the GPU at all: N Web
+Workers over =SetLandscapeRange= tiles captures the available parallelism,
+because the work is per-cell independent.
+
+*So Plan D's conclusion is that WebGPU is unnecessary for FlamMap Basic.*
+Include it as a plan because it is the cheapest way to ship the requested
+feature, and because stating it prevents the GPU work from being justified
+by a use case that does not require it.
+
+* 7. Cross-cutting: the WASM oracle
+
+Whichever plan is chosen, adopt =jessie='s validation pattern — its
+V1-reference test compares WebGPU output against the =fire_sim_lib= C++
+original at "95% of cells within ±2 timesteps."
+
+*Generalized for FlamMap:* the Emscripten build of =lib/flammap= (Plan A's
+stage 1, and recommended by S3b independently) doubles as a *validation
+oracle that runs in the same process as the thing being validated*. No
+file shuffling, no platform differences, no version skew — generate golden
+per-cell outputs in WASM, diff against the WGSL path, in-browser, in CI.
+
+This is the strongest answer available to Q0.7, and it is a reason to build
+the WASM path *first* even under Plan B.
+
+Carry over =jessie='s full correctness suite shape: V1-reference,
+V2-determinism (byte-identical reruns), V3-symmetry (circular spread on flat
+terrain, zero wind), plus the six numerical edge cases (zero wind, extreme
+wind, non-burnable, zero moisture, saturated, steep slope).
+
+* 8. Data layout — LCP maps onto the packed-cell scheme almost exactly
+
+=fsxlandt.h= defines the LCP cell as 10 =short= bands: =celldata= (elev,
+slope, aspect, fuel, cover), =crowndata= (height, base, density),
+=grounddata= (duff, woody). That is 20 bytes as int16, and it quantizes onto
+the research brief's 8 B/cell target with room to spare:
+
+| Field | Source band | Encoding | Bytes |
+|---+---+---+---|
+| Fuel model | =f= | u8 index into FBFM40 LUT | 1 |
+| Canopy cover | =c= | u8, 0–100% | 1 |
+| Canopy height | =h= | u8, 0.25 m steps | 1 |
+| Canopy base height | =b= | u8, 0.1 m steps | 1 |
+| Canopy bulk density | =p= | u8, kg/m³ x 100 | 1 |
+| Elevation | =e= | u16 m with offset | 2 |
+| Duff / woody / flags | =d=, =w= | u8 packed | 1 |
+| *Total* | | | *8* |
+
+Slope and aspect are *derived on the GPU* from the elevation stencil rather
+than stored, exactly as the brief recommends — which is also how FlamMap's
+own C++ gets them (=Slope.cpp=, =Aspect.cpp= in WindNinja; FlamMap reads
+them from the LCP but they are redundant with elevation).
+
+* 9. Shader inventory
+
+| Shader | Plan A | Plan B | Plan C | Plan D | Origin |
+|---+---+---+---+---+---|
+| =compact_active.wgsl= | reuse | reuse | reuse | — | jessie |
+| =fim_solve.wgsl= | reuse | reuse | reuse | — | jessie |
+| =rothermel.wgsl= (FlamMap fuel models) | — | *new* | adapt | *new* | jessie template |
+| =conditioning.wgsl= | — | *new, hard* | — | — | no precedent |
+| =crown.wgsl= (torching/crowning index) | — | *new* | — | *new* | jessie =crown_rate.wgsl= |
+| =spotting.wgsl= (ember event list) | — | *new, hard* | — | — | brief ADR; no precedent |
+| =unpack_lcp.wgsl= | *new* | *new* | *new* | *new* | brief ADR-05 |
+| =derive_slope_aspect.wgsl= | *new* | *new* | *new* | *new* | brief |
+
+* 10. Phasing with decision gates
+
+1. *Plan C spike* (days). Produces the FlamMap-vs-GPU error budget. *Gate:*
+   if agreement is poor on real landscapes, every GPU plan needs rethinking
+   before further investment.
+2. *Emscripten build of =lib/flammap=* (S3b, Plan A stage 1). Needed by Plan
+   A, and is the oracle for everything (section 7). *Gate:* does it build
+   with WindNinja stubbed and GDAL trimmed (S3b.7)?
+3. *Plan A integration* — wire WASM stage 1 into =jessie='s FIM. *Gate:*
+   does arrival time match =runflammap= / =runmtt= within the budget from
+   step 1?
+4. *Measure before extending.* Only if stage 1 dominates at target landscape
+   sizes does Plan B's Rothermel-only variant get opened.
+
+* 11. Risks specific to FlamMap that =jessie= did not face
+
+- *Spotting determinism.* =fsxwspot.cpp= is RNG-driven via
+  =GetSpottingSeed()=. Tiled or GPU-parallel execution changes the draw
+  order, so results will not reproduce desktop runs bit-for-bit
+  (ARCHITECTURE_REVIEW S3b.10). Decide early whether the seed is derived
+  per-cell or consumed sequentially.
+- *Output breadth.* FlamMap users expect ~24 output layers; =jessie=
+  produces arrival time. Several (=TORCHINGINDEX=, =CROWNINGINDEX=) are
+  cheap per-cell additions; others (=MAXSPOT*=) depend on the spotting model.
+- *Barriers and non-burnables.* MTT supports =setbarrier=; FIM needs barrier
+  cells excluded from the active list rather than merely slow.
+- *Flow paths and the influence grid.* =writeflowpathsshapefile= /
+  =writemajorpathsshapefile= / =writeinfluencegrid= are distinctive FlamMap
+  products (ARCHITECTURE_REVIEW S4e). FIM computes arrival times; recovering
+  *paths* requires storing a predecessor/backpointer per cell — an extra u32
+  per cell, and a GPU-side gather to trace them. Worth designing in from the
+  start rather than bolting on.
+- *Browser coverage.* Per S0b.2, WebGPU on Linux is partial in Chrome and
+  Nightly-only in Firefox. Whatever is chosen needs the WASM fallback path
+  that Plan A gets for free.
+
+* 12. Recommendation
+
+*Plan C to measure, then Plan A to ship.* Plan C costs days and produces the
+error budget that makes every other decision evidence-based. Plan A then
+delivers GPU-speed propagation while leaving the Fire Lab's equations
+authoritative and compiled from their own source — which is the only version
+of this that survives Q0b.4 without a governance fight.
+
+Treat Plan B as contingent on measurement, and Plan D as a reminder that the
+*requested* FlamMap Basic feature does not need any of this.

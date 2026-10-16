@@ -260,6 +260,9 @@ Readback ~1 ms. GPU memory ~98–102 MB. =:measured:=
 
 ** Implication for the walk-in proposal
 
+Concrete adaptation plans building on this prototype are in
+[[file:FLAMMAP_WEBGPU_PLANS.org][FLAMMAP_WEBGPU_PLANS.org]].
+
 This is a genuine asset and should be shown. It demonstrates that SIG can
 ship browser-native GPU fire simulation at interactive speed on
 multi-million-cell grids, which is a stronger position than arguing from
