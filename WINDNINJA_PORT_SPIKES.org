@@ -286,17 +286,69 @@ weigh against W9's iteration inflation.
 
 * Recommended sequence
 
-1. *W7* first. It is hours of work against existing instrumentation and it
-   decides whether Gate 4 is worth opening at all.
-2. *W1 + W2* next — the build and the seam. These are prerequisites for
-   Plan A in =FLAMMAP_WEBGPU_PLANS.org= regardless of the GPU question.
-3. *W10 → W3 → W4* to establish what "faithful" can even mean, in that
-   order, because W10 constrains W3's success criterion.
-4. *W5 + W6* to size the deployment envelope.
-5. *Only then W8*, and only if W7 showed the solve dominating. W8's typedef
-   work is the first non-trivial investment in the WebGPU path, so it
-   should be the last thing authorised.
-6. W9 and W11 alongside W8, since both are cheap once the typedef exists.
+Ordered so that the cheapest spikes answer the most consequential questions
+first, and so no expensive work is authorised before the measurement that
+justifies it. *The two hardest-to-reverse commitments — an Emscripten
+pthreads build (W5) and the =ninja_real_t= typedef (W8) — are deliberately
+last.*
+
+** Compact form
+
+#+BEGIN_EXAMPLE
+  W7 ──► W1 ──► W2 ──► W10 ──► W3 ──► W4 ──► W5 ──► W6 ──┬──► W8 ──► W9
+  │      │              │                                 │     │
+  │      │              └── sets W3's success criterion    │     └── W11
+  │      └── if this fails, STOP (no port of any kind)     │
+  └── if solve is not dominant, Gate 4 never opens ────────┘
+#+END_EXAMPLE
+
+** Phases
+
+| Phase | Spikes | Effort | Question it answers | Abort if |
+|---+---+---+---+---|
+| *0. Free measurement* | W7 | hours | Is the solve even the bottleneck? | — (never aborts; it *gates* Gate 4) |
+| *1. Can it be detached* | W1, W2 | days | Does it build and run with no GUI, no OpenFOAM, no network, no disk? | *W1 fails → stop entirely* |
+| *2. What does faithful mean* | W10 → W3 → W4 | days | How far does WASM drift from native, and is native even deterministic? | W4 fails → investigate before proceeding |
+| *3. Deployment envelope* | W5, W6 | days | How fast, and how big a domain? | — (sizing, not go/no-go) |
+| *4. WebGPU viability* | W8, then W9 + W11 | ~1 week + days | Does the solver survive =f32=? | *W8 fails → WebGPU dead, stop* |
+
+** Decision points
+
+1. *After W7.* If the linear solve is not a dominant share of wall-clock at
+   realistic mesh sizes, *close Gate 4 and never open it.* Phases 1–3 still
+   proceed, because they serve the WASM port (Plan A) on their own merits.
+2. *After W1.* A build that cannot shed Qt, OpenFOAM, and the network
+   features without patching upstream means the port is not viable in any
+   form. *Stop and renegotiate scope with the Fire Lab.*
+3. *After W10.* If native is nondeterministic run-to-run, W3 cannot assert
+   bit-identity, and the project's fidelity promise becomes "within a
+   stated tolerance." *Settle that wording with the Fire Lab before W3
+   runs*, so the criterion is agreed rather than rationalised afterwards.
+4. *After W6.* Publish the maximum domain size per platform tier. This is a
+   product constraint, not just an engineering note.
+5. *Before W8 is funded.* Ask the open question below. W8 costs about a week
+   of typedef work; it is wasted if the answer to "would you accept an
+   =f32= wind solver?" is no, regardless of what W8 measures.
+6. *After W8.* If =f32= stalls on ill-conditioned stretched-terrain meshes,
+   *stop — WebGPU is dead for this solver.* W9 and W11 become moot and the
+   WASM path (Plan A) is the answer.
+
+** What can run concurrently
+
+- W1 and W2 share a build; do them together.
+- W4, W5, and W6 are independent of each other once a WASM build exists
+  from W1 — three people could take one each.
+- W9 and W11 both become cheap once W8's typedef lands, and neither depends
+  on W8's *result*. If W8 is authorised at all, schedule all three together.
+- W3 is the only spike with a hard predecessor inside its own phase (W10).
+
+** Minimum viable path
+
+If only a few days are available before a decision is needed, run *W7, W1,
+W2, W10* in that order. That yields: whether the GPU question is live,
+whether the port is possible at all, whether the in-memory seam works, and
+what fidelity claim can honestly be made — which is enough to walk into a
+planning discussion without committing to anything.
 
 * Open question for the Fire Lab
 
