@@ -17,6 +17,9 @@ Added as submodules for inspection:
 - =firemodels/= — https://github.com/firelab/firemodels
 - =windninja/= — https://github.com/firelab/windninja (pinned to the
   =FireBehaviorModels= branch — see S4.6c)
+- =jessie_fire_simulation/= — https://github.com/rjsheperd/jessie_fire_simulation
+  — a *working, validated WebGPU fire simulator* (SIG work, 2026-04). See
+  section 0c; this is direct empirical evidence for the "build" column of 0b.
 
 Headline: *both "does an extractable library exist?" blockers are already
 answered yes, and =firemodels= ships working JNI bindings today.* The
@@ -100,13 +103,17 @@ data-ingest study, not a plan to reproduce FlamMap. So it does not conflict
 with this review's findings; it describes the alternative we would be
 choosing instead.
 
-- *S0b.1 — The brief's own evidence argues for the "port" column.* It found
-  *no published browser/WebGPU wildfire simulator* ingesting LANDFIRE COGs,
-  and notes that existing fire models are file-oriented CPU codes (CSIRO
-  Spark being the GPU exception, via OpenCL). It also notes there is *no
-  cuBLAS/cuSPARSE/cuFFT equivalent* in WebGPU — every kernel is hand-written.
-  So "GPU" necessarily means "new code," which is the S3.3 / Q0.6
-  source-of-truth problem in a different costume.
+- *S0b.1 — Partly superseded by section 0c.* The brief found *no published
+  browser/WebGPU wildfire simulator* ingesting LANDFIRE COGs, which this
+  review originally read as evidence for the "port" column. That argument is
+  now substantially weaker: =jessie_fire_simulation/= is a working WebGPU
+  fire simulator built in-house (section 0c), so the capability gap is not
+  hypothetical-and-unproven, it is *already closed for the compute half*.
+  What survives from the brief is the narrower and still-valid point that
+  there is *no cuBLAS/cuSPARSE/cuFFT equivalent* in WebGPU — every kernel is
+  hand-written. So "GPU" still means "new code," and that remains the
+  S3.3 / Q0.6 source-of-truth problem. The question is no longer *can it be
+  done* but *whose equations run*.
 
 - *S0b.2 — WebGPU deployment coverage is a material risk this review had
   understated.* Per the brief (as of Oct 2026): Chrome on Linux is *partial*
@@ -129,6 +136,137 @@ choosing instead.
   detail below. A hybrid is legitimate — port for the authoritative models,
   build for an exploratory fast-preview mode — but only if it is a decision
   rather than a drift. *[BLOCKER]*
+
+* 0c. Existing prototype: a working WebGPU fire simulator
+
+=jessie_fire_simulation/= (submodule, pinned at =754583c=) is a complete
+CUDA-to-WebGPU port of =fire_sim_lib= — an academic CUDA fire simulator from
+ruiwu1990 — running entirely in the browser. It is *not* a proposal; it is
+built, optimized across 13 commits, and validated. Its own
+=WEBGPU.org= and =OPTIMIZE.org= are the authoritative write-ups; this
+section records only what bears on the decisions in this review.
+
+Pipeline: =rothermel.wgsl= (once) → =compact_active.wgsl= (once) →
+=fim_solve.wgsl= (iterate to convergence) → readback → canvas, with a
+CUDA-subprocess fallback when =navigator.gpu= is absent.
+
+** Measured results
+
+906x642 grid (581,652 cells), 600 steps, Apple Silicon via Brave:
+
+| Stage                   | GPU (ms) | Total (ms) | GPU speedup |
+|-------------------------+----------+------------+-------------|
+| Baseline (CUDA path)    |      970 |       1900 | 1x          |
+| Phase 0 (micro-opts)    |      678 |       1625 | 1.43x       |
+| Phase 1 (active cells)  |      273 |       1309 | 3.55x       |
+| Phase 3 (memory layout) |      221 |       1205 | 4.39x       |
+| GPU Rothermel           |      207 |       1015 | 4.69x       |
+| FIM solver (current)    |   *74*   |      *956* | *13.1x*     |
+
+Scaling with FIM: 581K cells 74 ms; *2.3M cells 142 ms* (4.6x vs the
+fixed-timestep BD loop's 656 ms); *9.3M cells 267 ms* (9.3x vs 2496 ms).
+Readback ~1 ms. GPU memory ~98–102 MB. =:measured:=
+
+** The findings that change this review
+
+- *S0c.1 — S4e.6b is empirically refuted; the fix is implemented.* This
+  review argued that MTT-style sweep solvers are structurally blocked on
+  WebGPU because the convergence test is a host readback, violating "never
+  read back to the CPU inside the loop," with no cross-workgroup
+  forward-progress guarantee available as a substitute. *That objection has
+  a standard answer and this prototype implements it.* =fim_solve.wgsl= is
+  Jeong & Whitaker's Fast Iterative Method with a ping-pong active list:
+  each iteration atomically appends newly-reached cells to the output list
+  via =atomicAdd=, and =dispatchWorkgroupsIndirect= sizes the *next*
+  iteration from that atomic count — so the solver *self-terminates on the
+  GPU when the active list empties (0 workgroups), with zero CPU readback*.
+  There is also published prior art this review missed: *Weber et al. 2015,
+  "Efficient GPU Implementation of the FIM for Fire Spread"*, alongside
+  Jeong & Whitaker 2008. The control-flow redesign S4e.6b called for is a
+  solved problem.
+
+- *S0c.2 — FIM is step-count independent, which matters for long horizons.*
+  Because it solves directly for equilibrium arrival times rather than
+  stepping, 5x or 10x the step count makes no difference to runtime. For
+  spatial products where the question is "where does this fire get to over
+  N days," that decouples cost from simulated duration — a property the
+  fixed-timestep and perimeter-propagation approaches do not have.
+
+- *S0c.3 — The no-float-atomics problem has a better solution than the one
+  in S4b.9.* =atomic_min_float= does an =atomicCompareExchangeWeak= loop on
+  =bitcast<u32>=, exploiting the fact that positive IEEE 754 floats share
+  ordering with =u32=. Notably =WEBGPU.org= documents this as *more correct
+  than the CUDA original it replaced*: =kernel_BD.cu:74-79= used a
+  double-=atomicExch= pattern with a race window where a third thread could
+  clobber the value. *The WebGPU port fixed a latent race in the CUDA code.*
+
+- *S0c.4 — Narrow-band indirect dispatch is the dominant optimization,
+  confirmed empirically.* Replacing a full-grid dispatch with
+  atomic-append compaction plus =dispatchWorkgroupsIndirect= gave *57x* on
+  the propagation kernel, because the fire front is ~5K of 581K cells
+  (~0.9%). This is independent confirmation of the research brief's ADR-07
+  and its narrow-band guidance.
+
+- *S0c.5 — Field limits on this hardware are far above the spec floor.* The
+  test report records =maxBufferSize= and =maxStorageBufferBindingSize= both
+  at ~4 GiB on Apple Silicon, with =maxComputeInvocationsPerWorkgroup= 1024.
+  So S4b.10's 128 MiB concern is about the *guaranteed minimum* and about
+  Safari's ~21% prevalence — not about what capable hardware grants. The
+  prototype does raise =maxStorageBuffersPerShaderStage= to 10 via
+  =requiredLimits=, which is exactly the feature-detect-and-request pattern
+  the brief recommends.
+
+- *S0c.6 — Real WGSL pitfalls worth inheriting.* =OPTIMIZE.org= records
+  three that cost debugging time: =atomicAdd(&active_count[0u], ...)= is
+  invalid WGSL (a scalar =atomic<u32>= cannot be indexed);
+  =indirect_args= had to become =array<atomic<u32>>= for =atomicMax=; and
+  *=writeBuffer= is a queue operation that resolves before the next
+  =submit=, not interleaved with encoder commands* — batching 600 steps into
+  12 submits produced last-write-wins parameter corruption, fixed by
+  per-step submit. That last one is a correctness trap, not a perf note.
+
+** What this does *not* establish
+
+- *S0c.7 — It validates the method, not FlamMap equivalence.* The V1
+  reference test compares against =temp_final_tests.csv= — the
+  =fire_sim_lib= C++ reference — at "95% of cells within +/-2 timesteps."
+  That is agreement with *its own* CUDA original, not with FlamMap, FARSITE,
+  or MTT. Q0.7 (what counts as correct) is untouched by this work.
+
+- *S0c.8 — The MTT-family algorithms specifically were not ported.*
+  =fire_sim_lib= contains =MT.cu= and =IMT.cu= (Minimal Time / Iterative
+  Minimal Time), but =WEBGPU.org= states plainly that *only BD (Burn
+  Distance) was ported; MT and IMT were not*, BD being the only model used
+  in production. So a GPU port of the MTT family remains unproven even
+  here — though S0c.1 strongly suggests it is tractable.
+
+- *S0c.9 — Data ingest is primitive relative to the research brief.*
+  =preprocess_terrain.py= resamples a TIFF with PIL into a flat
+  interleaved float32 blob (=terrain_sae.bin=, 6.7 MB) fetched whole. No
+  COG, no tiling, no range requests, no OPFS, no Zarr. The prototype proves
+  the *compute* half of the brief; the *ingest* half (ADR-01 through ADR-05)
+  is still unbuilt. For a 4096^2+ landscape this is the gap that matters.
+
+- *S0c.10 — Scope of the physics is narrower than Behave's.* The ported
+  model is Rothermel surface fire plus crown escalation plus BD/FIM
+  propagation. It is not FlamMap's full output set (no influence grid, no
+  flow paths, no MTT spotting products per S4e), and =fire_sim_lib= is not
+  a Fire Lab code.
+
+- *Note on provenance:* =test_results/= (including =report.json=, the source
+  of the edge-case timings above) is *untracked* in the prototype repo and
+  therefore absent from the pinned submodule. The committed =OPTIMIZE.org=
+  and =README.org= tables carry the same measurements.
+
+** Implication for the walk-in proposal
+
+This is a genuine asset and should be shown. It demonstrates that SIG can
+ship browser-native GPU fire simulation at interactive speed on
+multi-million-cell grids, which is a stronger position than arguing from
+the literature. But it should be presented as *what the "build" column
+looks like* — a fast, validated, in-house model — and explicitly not as a
+path to running FlamMap's equations in a browser. Framed that way it
+sharpens Q0b.4 rather than pre-empting it.
 
 * 1. FOFEM mortality and consumption equations
 
@@ -298,6 +436,15 @@ choosing instead.
   Emscripten pthreads build, and works identically in the browser and in
   JCEF. We consider this the lowest-risk path and believe it removes the
   "WASM parallelization problem" as a blocker.
+
+  *Refinement from the prototype (0c):* the COOP/COEP claim holds only for
+  *separate-instance* workers, which is what is proposed here. The moment
+  workers need *zero-copy shared* data, =SharedArrayBuffer= is required and
+  cross-origin isolation comes back —
+  =jessie_fire_simulation= had to serve COOP + COEP =credentialless= headers
+  from Flask for exactly that reason. If we ever share a landscape buffer
+  between FlamMap workers rather than giving each its own tile copy, the
+  Behave server must set those headers.
 
 - *S3.3 — We'd argue against WebGPU here.* Running these equations on the GPU
   means reimplementing them in WGSL, which forks the source of truth away from
@@ -756,6 +903,13 @@ mass-conservation solver is portable.
   range is wide. =:measured:= (technique) / =:inference:= (applicability
   here)
 
+  For atomic *min/max* rather than accumulation there is a cleaner answer,
+  implemented and working in =jessie_fire_simulation= (S0c.3): a
+  =atomicCompareExchangeWeak= loop over =bitcast<u32>=, exploiting positive
+  IEEE 754 floats sharing ordering with =u32=. That is exact, not
+  approximate. It does not help FEM assembly (which needs =+=, not =min=),
+  but it fully solves the arrival-time case in sections 3b and 4e.
+
 - *S4b.10 — Buffer limits bite at fine resolution, and they fail silently.*
   WebGPU's default =maxStorageBufferBindingSize= is 128 MiB (>= 1 GiB on
   ~92% of devices in the field, but only when requested explicitly via
@@ -1117,22 +1271,38 @@ products.
   =f64= argument when discussing MTT specifically. =:inference:= (brief's
   own tag)
 
-- *S4e.6b — But the brief identifies a precise structural obstacle MTT hits
-  head-on.* The brief's rules for iterative solvers on WebGPU are: fuse
-  passes, batch many steps per submit, use indirect dispatch, and *"never
-  read back to the CPU inside the loop."* MTT's convergence test is exactly
-  that forbidden pattern — =Changes= is accumulated per sweep and compared
-  to zero *on the host*, every sweep (=MTT.cpp:~997-1013=). Compounding it:
-  WebGPU gives *no forward-progress guarantee across workgroups*, so a
-  single-pass global sync or spin-wait is not available (the WebSplatter
-  project had to switch to multi-dispatch for this reason); and per-dispatch
-  cost runs ~24 µs on Dawn/Vulkan, ~59–67 µs on Chrome/D3D12, and
-  *~1,040 µs on Firefox*. A sweep solver needing many dispatches with a host
-  round-trip for the convergence check would be overhead-bound before any
-  arithmetic happens. Restructuring to an on-GPU convergence flag with
-  batched sweeps is possible, but it is a redesign of the solver's control
-  flow — which is precisely the "not a port, a rewrite" conclusion.
-  =:measured:=
+- *S4e.6b — REFUTED (see S0c.1). Retained because the reasoning is
+  instructive and the conclusion inverted.* The original argument ran: the
+  brief's rules for iterative solvers on WebGPU are fuse passes, batch many
+  steps per submit, use indirect dispatch, and *"never read back to the CPU
+  inside the loop"* — and MTT's convergence test is exactly that forbidden
+  pattern, since =Changes= is accumulated per sweep and compared to zero *on
+  the host* every sweep (=MTT.cpp:~997-1013=). Compounding it, WebGPU gives
+  *no forward-progress guarantee across workgroups*, so single-pass global
+  sync is unavailable, and per-dispatch cost runs ~24 µs on Dawn/Vulkan,
+  ~59–67 µs on Chrome/D3D12, and *~1,040 µs on Firefox*. I concluded that
+  restructuring to on-GPU convergence was "a redesign of the solver's
+  control flow," and therefore a rewrite rather than a port.
+
+  *The premises are all correct; the conclusion was wrong.* That redesign is
+  a solved, standard technique — the Fast Iterative Method with an
+  atomic-append active list, where =dispatchWorkgroupsIndirect= takes its
+  workgroup count from the previous iteration's atomic counter and the
+  solver self-terminates at zero workgroups. No host round-trip, no global
+  sync, no spin-wait. It is implemented and measured in
+  =jessie_fire_simulation/static/js/shaders/fim_solve.wgsl= (S0c.1), with
+  published precedent in Weber et al. 2015 for fire spread specifically.
+  Dispatch count also stops being the problem, because FIM converges in
+  O(narrow-band) iterations rather than O(grid diameter / ROS / dt).
+
+  *What survives:* MTT's existing =Risk_CalcPositiveSpread= row-sweep
+  structure would not be *ported* to WGSL — it would be *replaced* by an
+  FIM formulation. So S3.3's source-of-truth objection still applies with
+  full force, and arguably more sharply: we would not be running the Fire
+  Lab's MTT, we would be running a different algorithm that computes the
+  same quantity. That is a scientific-governance question (Q0b.4), not a
+  feasibility one. The Firefox dispatch cost also remains a real
+  platform-tiering concern. =:measured:=
 
 ** Correction: the JNI bindings need Java-side work after all
 
@@ -1255,5 +1425,7 @@ The questions that now most change this plan:
    it or viewing precomputed burn-probability products?
 10. *Q0b.4* — port the Fire Lab's existing models, or build a new
     GPU-native simulator? Everything above assumes the former; the
-    companion research brief assumes the latter. *[BLOCKER — upstream of
-    every other item on this list]*
+    companion research brief assumes the latter, and section 0c shows the
+    latter is *already partly built and validated*. Note this is no longer
+    a feasibility question — it is a question about whose equations are
+    authoritative. *[BLOCKER — upstream of every other item on this list]*

@@ -14,3 +14,6 @@
 	path = windninja
 	url = https://github.com/firelab/windninja.git
 	branch = FireBehaviorModels
+[submodule "jessie_fire_simulation"]
+	path = jessie_fire_simulation
+	url = https://github.com/rjsheperd/jessie_fire_simulation.git
