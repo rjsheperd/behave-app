@@ -146,14 +146,39 @@ write-out. No new instrumentation required.
 *Why this gates Gate 4:* if the solve is not dominant, every WebGPU spike
 below is moot. Do this before W8.
 
-*Status: STARTED — see [[file:spikes/windninja-w7/README.org][spikes/windninja-w7/]].* The audit found two things that
-change how W7 must be run: the timers are all behind =#ifdef _OPENMP= (so a
-non-OpenMP or WASM build reports nothing), and =startSolve=/=endSolve= sit
-*inside* the matching loop that closes at =ninja.cpp:491=, so the reported
-solve time covers only the final outer iteration — an undercount of up to
-=nMaxMatchingIters= (150) for point-initialisation runs. A patch and a
-parser are in that directory. The measurement itself is blocked on a broken
-local Homebrew GDAL.
+*Status: COMPLETE — see [[file:spikes/windninja-w7/README.org][spikes/windninja-w7/]]. VERDICT: solve dominates at
+74–88%, rising with mesh size. GATE 4 OPENS.*
+
+Measured on real terrain (Blue Mountain, 482x554 at 30 m) via a =nix flake=
+build environment, which also sidestepped a broken local Homebrew GDAL:
+
+| Mesh | solve | TOTAL | solve % | Amdahl ceiling |
+|---+---+---+---+---|
+| coarse / medium / fine | 0.14–0.76 s | 0.17–1.00 s | 74–82% | 3.8–5.5x |
+| 90 m / 60 m | 1.15 / 2.65 s | 1.38 / 3.18 s | 83% | 6.0x |
+| *30 m (native)* | *14.95 s* | *17.04 s* | *87.8%* | *8.2x* |
+
+Three consequences that revise the plan below:
+
+1. *W9 is now the decisive follow-up, not W8.* The Amdahl ceiling is only
+   *6–8x*. If swapping SSOR for Jacobi inflates iteration count by more
+   than that, a GPU solve cannot win regardless of what W8 concludes about
+   =f32=. W9 is hours of work; do it first.
+2. *W11 is largely moot, and parts of S4b.9 with it.* Equation assembly is
+   just *5.1%* of runtime at 30 m, so assembly can simply stay on the CPU.
+   The symmetric-storage scatter problem and the float-atomics objection
+   both apply to a phase that barely matters.
+3. *The audit findings stand and still constrain how W7 is re-run:* timers
+   are all behind =#ifdef _OPENMP= (so a WASM build reports nothing), and
+   =startSolve=/=endSolve= sit inside the matching loop closing at
+   =ninja.cpp:491= — so these domain-average numbers are sound, but any
+   point-initialisation run needs =accumulate-timers.patch= first.
+
+Also surfaced three WindNinja portability bugs worth reporting upstream
+(format-string bug at =pointInitialization.cpp:840=, the CLI hardcoding
+=shapelib::shp= instead of =${SHAPELIB_LIBRARY}=, and netCDF lacking the
+pkg-config fallback that shapelib has) plus a second mandatory runtime data
+directory, =WINDNINJA_DATA=, which spike W2 must account for.
 
 ** W5 — Single-thread penalty, and the run-level alternative
 

@@ -6,9 +6,56 @@ Spike W7 from [[file:../../WINDNINJA_PORT_SPIKES.org][WINDNINJA_PORT_SPIKES.org]
 is not a dominant share of wall-clock, the WebGPU investigation closes and
 no shader work is authorised.
 
-*Status: partially complete.* The instrumentation audit is done and returned
-two findings that change how W7 must be run. The measurement itself is
-*blocked* on a broken local GDAL (see Blocker).
+*Status: COMPLETE. Verdict: the solve dominates — 74–88% of wall-clock, and
+the share grows with mesh size. Gate 4 is worth opening.*
+
+A =nix flake= in this directory provides a reliable build environment,
+sidestepping the broken Homebrew GDAL entirely. WindNinja builds and runs
+from it.
+
+#+BEGIN_SRC shell
+nix develop            # gdal 3.11.4, boost 1.87, openmp 21.1.7, cmake 4.1.2
+./run.sh <dem.tif>
+#+END_SRC
+
+* Results
+
+Blue Mountain DEM (482 x 554 at 30 m, elevation 939–1969 m, extracted from
+=SpatialFOFEM/SampleData/Landscape/BlueMountain_LCP_FCCS.tif= band 1),
+domain-average initialisation, 8 threads, Apple Silicon. Seconds.
+
+| Mesh | mesh | init | buildEq | solve | write | TOTAL | solve % | Amdahl ceiling |
+|---+---+---+---+---+---+---+---+---|
+| coarse (4k cells) | 0.002 | 0.003 | 0.010 | 0.142 | 0.005 | 0.174 | 81.8% | 5.5x |
+| medium (10k cells) | 0.005 | 0.055 | 0.035 | 0.382 | 0.007 | 0.517 | 74.0% | 3.8x |
+| fine (20k cells) | 0.006 | 0.045 | 0.105 | 0.756 | 0.009 | 0.995 | 75.9% | 4.2x |
+| 90 m resolution | 0.005 | 0.024 | 0.074 | 1.152 | 0.012 | 1.377 | 83.7% | 6.1x |
+| 60 m resolution | 0.038 | 0.101 | 0.171 | 2.651 | 0.020 | 3.180 | 83.4% | 6.0x |
+| *30 m resolution* | 0.065 | 0.247 | 0.873 | *14.954* | 0.089 | *17.038* | *87.8%* | *8.2x* |
+
+"Amdahl ceiling" is =total / (total − solve)= — the best possible speedup
+if the solve became free.
+
+** Verdict
+
+*Solve share is 74–88% and rises with problem size*, comfortably past the
+>60% threshold in =WINDNINJA_PORT_SPIKES.org= (W7 decision point 1).
+*Gate 4 opens.*
+
+Three things worth carrying forward:
+
+1. *Equation assembly is not the problem.* Even at 30 m it is 0.873 s of
+   17.0 s (5.1%). The review's concern about GPU assembly needing float
+   atomics (S4b.9) and the symmetric-storage scatter problem (W11) matter
+   much less than expected — *assembly could stay on the CPU entirely* and
+   cost almost nothing.
+2. *The realistic ceiling is ~6–8x, not orders of magnitude.* That is the
+   number to weigh against W9's Jacobi iteration inflation. If dropping SSOR
+   for Jacobi more than ~6x's the iteration count, a GPU solve loses outright
+   — so *W9 is now the decisive follow-up*, not W8.
+3. *Absolute times are small on this domain.* 17 s at native 30 m resolution
+   on a 482x554 DEM. A browser-side WASM build would be slower still
+   (W5), but this is not an hours-long computation.
 
 * Findings from the instrumentation audit
 
@@ -67,13 +114,90 @@ run-matchin     402000      6.10      19.40     312.50       6.2%     232.80    
 
 * Files
 
-| =accumulate-timers.patch= | Adds cumulative build/solve timers across the matching loop (F2). Hand-written against the current source; apply with =git -C windninja apply=. |
-| =run.sh= | Configures a minimal OpenMP build and runs coarse/medium/fine. *Unvalidated* — see Blocker. |
-| =parse_timers.mjs= | Parses timer output into an Amdahl table with a go/no-go interpretation guide. *Verified* against synthetic logs. |
+| =flake.nix= | Reliable build environment: GDAL 3.11.4, boost 1.87, OpenMP 21.1.7, cmake 4.1.2, plus the netCDF CMake shim and workarounds for B1–B5. *Builds WindNinja successfully.* |
+| =run.sh= | Configures the minimal OpenMP build, extracts a DEM, runs the mesh matrix, and reports. *Exercised end to end.* |
+| =parse_timers.mjs= | Parses timer output into an Amdahl table with a go/no-go interpretation guide. Verified against both synthetic and real logs. |
+| =accumulate-timers.patch= | Adds cumulative build/solve timers across the matching loop (F2). *Not yet applied* — only needed for point-initialisation runs. |
 
-* Blocker — local GDAL is broken
+* Build environment findings (the nix flake)
 
-WindNinja requires GDAL, and the Homebrew GDAL on this machine cannot load:
+Three things had to be worked around to get WindNinja to build. All three are
+*portability bugs or gaps in WindNinja*, not nix problems, and all three are
+worth reporting upstream.
+
+** B1 — A real format-string bug, surfaced by nixpkgs hardening
+
+nixpkgs enables =format= hardening by default, adding
+=-Werror=format-security=. That fails the build at
+=pointInitialization.cpp:840=:
+
+#+BEGIN_SRC c++
+CPLError(CE_Warning, CPLE_AppDefined, oWarnString.c_str());
+#+END_SRC
+
+A runtime-built =std::string= is passed as the *format* argument. The string
+embeds a weather-station name read from a user-supplied shapefile, so a
+station called =%s= would make =CPLError= consume varargs that were never
+passed — undefined behaviour from untrusted input. Correct form is
+=CPLError(CE_Warning, CPLE_AppDefined, "%s", oWarnString.c_str())=.
+
+Worked around with =hardeningDisable = [ "format" ]=.
+
+** B2 — The CLI links the wrong shapelib target name
+
+=CMakeLists.txt:97-116= has three shapelib discovery paths and sets
+=SHAPELIB_LIBRARY= to the right target for each — =shapelib::shp= for the
+CONFIG package, =PkgConfig::SHAPELIB= for the pkg-config fallback.
+=src/ninja/CMakeLists.txt:150= correctly uses =${SHAPELIB_LIBRARY}=.
+
+But =src/cli/CMakeLists.txt:53= hardcodes the CONFIG name:
+
+#+BEGIN_SRC cmake
+target_link_libraries(WindNinja_cli PRIVATE shapelib::shp GDAL::GDAL)
+#+END_SRC
+
+So on any system where shapelib is found via *pkg-config* rather than a
+CMake config — which includes nixpkgs — configuration succeeds and then the
+CLI link fails with undefined =_DBFAddField=, =_DBFClose=, =_DBFCreate=,
+=_SHPOpen= and friends. Fix upstream: use =${SHAPELIB_LIBRARY}=.
+
+Worked around by passing =pkg-config --libs shapelib= via
+=CMAKE_EXE_LINKER_FLAGS=.
+
+** B3 — netCDF has no pkg-config fallback
+
+=CMakeLists.txt:121= calls =find_package(netCDF REQUIRED)= and then uses the
+=netCDF::netcdf= imported target — with *no* pkg-config fallback, unlike
+shapelib three lines above. nixpkgs' netcdf ships pkg-config only and no
+CMake config package, so discovery fails outright.
+
+The flake synthesises a minimal =netCDFConfig.cmake= and points
+=netCDF_DIR= at it. Fix upstream: mirror the shapelib pattern with a
+=pkg_check_modules= fallback.
+
+** B4 — Homebrew leaked into the build
+
+Before =CMAKE_IGNORE_PREFIX_PATH=/opt/homebrew= was added, CMake picked up
+=/opt/homebrew/lib/libnetcdf.22.dylib= from inside the nix shell, producing
+=dylib was built for newer macOS version (15.0) than being linked (14.0)=
+warnings. Worth knowing for anyone reproducing: *a nix devShell does not by
+itself prevent Homebrew discovery* — CMake searches system prefixes too.
+
+** B5 — WINDNINJA_DATA is a second mandatory runtime data directory
+
+WindNinja aborts at startup with
+=std::runtime_error: no valid WINDNINJA_DATA found= unless the variable
+points at its 31 MB in-tree =data/= directory. This is *in addition* to
+=GDAL_DATA= and =PROJ_DATA=.
+
+Directly relevant to spike W2's "zero filesystem access" goal: the
+in-memory API path has at least three data-directory dependencies to
+account for, not one.
+
+* Superseded — the original GDAL blocker
+
+*Resolved by the nix flake — kept for the record.* WindNinja requires GDAL,
+and the Homebrew GDAL on this machine cannot load:
 
 #+BEGIN_EXAMPLE
 $ gdalinfo --version
@@ -93,22 +217,23 @@ Pointing =DYLD_FALLBACK_LIBRARY_PATH= at the older =libxml2= keg
 but then hits OpenEXR, so there is no clean non-invasive workaround.
 
 *Nothing about this blocker is WindNinja's fault or informative about the
-port* — it is ordinary Homebrew drift.
+port* — it is ordinary Homebrew drift. The nix flake avoids it entirely and
+no Homebrew repair was needed.
 
 * What remains
 
-1. Repair GDAL (=brew upgrade gdal=), then run =run.sh= against a real DEM.
-   =SpatialFOFEM/SampleData/Landscape/= has 30 m GeoTIFFs that will serve.
-2. Expect =run.sh= to need iteration — its CMake flags and CLI arguments are
-   taken from WindNinja's docs and =cli.cpp= (all flag names were verified
-   to exist in =src/ninja/cli.cpp=), but the build has never been exercised
-   here.
-3. Run the three mesh resolutions with domain-average initialisation first,
-   since F2 means those numbers are trustworthy unpatched.
-4. Then apply =accumulate-timers.patch= and add a point-initialisation run,
-   which is the case most likely to show the solve dominating.
-5. Feed the logs to =parse_timers.mjs= and record the verdict against the
-   thresholds in =WINDNINJA_PORT_SPIKES.org= (W7 decision point 1).
+1. *W9 is now the decisive follow-up*, not W8. The Amdahl ceiling is 6–8x,
+   so if swapping SSOR for Jacobi inflates iteration count by more than
+   that, a GPU solve cannot win regardless of what W8 finds about =f32=.
+   W9 is hours of work (flip the preconditioner, count iterations).
+2. Apply =accumulate-timers.patch= and add a *point-initialisation* run.
+   All results above use domain-average init, where the matching loop runs
+   once and the stock timers are correct (F2). The matching case is
+   untested and is where the solve runs most.
+3. Re-run on a *larger domain*. Blue Mountain is 482x554; the solve share
+   rose monotonically with mesh size here, so bigger domains should push it
+   above 88%, but that is an extrapolation.
+4. Carry B1–B3 upstream as bug reports.
 
 * Interpretation thresholds (restated from the spike plan)
 
