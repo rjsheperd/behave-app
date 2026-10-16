@@ -23,6 +23,14 @@ answered yes, and =firemodels= ships working JNI bindings today.* The
 proposal below shifts accordingly — the open risks move from "can this be
 extracted?" to "can it be built for macOS, and how do we ship GDAL."
 
+Also consulted: =wildfire-sim-research.org= (2026-10-15), a companion
+research brief on WebGPU compute and large-raster ingest for a *new*
+GPU-based simulator. It is design input for a different strategy than this
+review assesses; see section 0b for how the two relate, and note that its
+figures carry =:measured:= / =:secondary:= / =:estimate:= / =:inference:=
+tags which are preserved wherever they are cited here. That file is not
+committed to this branch.
+
 * 0. Cross-cutting statements (apply to all four feature sets)
 
 - *S0.1 — The current architecture's defining property is that all computation
@@ -68,6 +76,59 @@ extracted?" to "can it be built for macOS, and how do we ship GDAL."
   regression corpus (inputs → expected outputs) exported from the current
   desktop FOFEM / FlamMap / FARSITE for every module we port, or we have no
   way to prove equivalence. Who produces it?
+
+* 0b. Two strategies, not one answer: port vs. build
+
+Sections 3b, 4b, 4c and 4e all conclude "WASM yes, WebGPU no." A companion
+research brief (=wildfire-sim-research.org=, 2026-10-15, "WebGPU Compute +
+Large Raster Ingest for a GPU Wildfire Simulator") concludes that WebGPU is
+a viable target. *Both are correct, because they are answering different
+questions.* Stating that plainly matters more than either verdict.
+
+| | *Port* (this review) | *Build* (the research brief) |
+|---+---+---|
+| Subject | The Fire Lab's existing C++ (=firemodels=, =behave-mirror=) | A new simulator, written from scratch |
+| Method | Compile as-is to WASM, or call natively via JNI | Hand-written WGSL compute kernels |
+| Physics | Whatever FlamMap/FARSITE/FOFEM already implement | ELMFIRE/Spark-style level set or CA |
+| Equation ownership | Stays with the Fire Lab | Moves to whoever writes the kernels |
+| Validation | Match the desktop apps (Q0.7) | A new validation program against ELMFIRE/FlamMap |
+| Risk | Build and packaging complexity | Scientific divergence and permanent dual maintenance |
+
+Note that the brief explicitly scopes *out* "the fire physics itself
+(Rothermel, crown fire, spotting models)" — it is a platform and
+data-ingest study, not a plan to reproduce FlamMap. So it does not conflict
+with this review's findings; it describes the alternative we would be
+choosing instead.
+
+- *S0b.1 — The brief's own evidence argues for the "port" column.* It found
+  *no published browser/WebGPU wildfire simulator* ingesting LANDFIRE COGs,
+  and notes that existing fire models are file-oriented CPU codes (CSIRO
+  Spark being the GPU exception, via OpenCL). It also notes there is *no
+  cuBLAS/cuSPARSE/cuFFT equivalent* in WebGPU — every kernel is hand-written.
+  So "GPU" necessarily means "new code," which is the S3.3 / Q0.6
+  source-of-truth problem in a different costume.
+
+- *S0b.2 — WebGPU deployment coverage is a material risk this review had
+  understated.* Per the brief (as of Oct 2026): Chrome on Linux is *partial*
+  — Intel Gen12+ only since 144, NVIDIA Wayland-only, AMD not listed as
+  shipped; Firefox on Linux is *Nightly-only*; iOS Safari kills tabs below
+  ~500 MB; and =maxBufferSize= >= 2 GiB holds on ~95% of Chrome but only
+  *~21% of Safari*. For a tool that must run on whatever laptops agency
+  staff have, that argues for WASM on *portability* grounds alone,
+  independent of any numerical argument. =:measured:= / =:secondary:=
+
+- *S0b.3 — Evidence hygiene.* The brief tags its claims =:measured:=,
+  =:secondary:=, =:estimate:=, or =:inference:=, and asks that the tags
+  travel with any number carried forward. Figures reproduced in this review
+  keep those tags. Two in particular must not be quoted as measurements: the
+  load-time budget table is an =:estimate:=, and the ZSTD-WASM throughput
+  figures come from Node/V8 rather than a browser.
+
+- *Q0b.4 — Which column is the Fire Lab choosing?* This is arguably the real
+  question behind the whole review, and it is upstream of every WASM/WebGPU
+  detail below. A hybrid is legitimate — port for the authoritative models,
+  build for an exploratory fast-preview mode — but only if it is a decision
+  rather than a drift. *[BLOCKER]*
 
 * 1. FOFEM mortality and consumption equations
 
@@ -188,7 +249,22 @@ extracted?" to "can it be built for macOS, and how do we ship GDAL."
 - *S2.4 — Browser memory is a hard constraint on raster display.* WASM32 is
   capped at 4 GB and practical browser budgets are far lower, so any
   landscape-scale raster must be tiled/windowed for both compute and display.
-  This constraint recurs in sections 3 and 4.
+  This constraint recurs in sections 3 and 4. For concrete scale: LANDFIRE
+  CONUS is *97,283 x 154,208 cells* (~15 billion; ~30 GB for a single int16
+  layer), an 8-layer CONUS landscape is ~240 GB raw, and a California-sized
+  bounding box is ~1.4 billion cells / ~23 GB for 8 layers. A
+  whole-landscape in-browser grid is simply not on the table at any
+  precision. =:measured:= / =:estimate:=
+
+- *S2.5 — Critical distinction: PMTiles and friends are for *basemaps*, never
+  for physics inputs.* S2.3's PMTiles recommendation covers the OSM basemap
+  only. The research brief is explicit that PMTiles/WebP/KTX2 are
+  "visualization only," because *Web Mercator resampling is wrong for 30 m
+  equal-area physics*, and that lossy codecs (JPEG/WebP-lossy, BC/ASTC)
+  must *never* carry physics inputs since they corrupt categorical fuel
+  codes and DEM gradients. Model inputs stay in EPSG:5070 at 30 m. Keep
+  these two pipelines visibly separate in any design doc, or someone will
+  eventually feed a reprojected basemap tile to a solver.
 
 ** Questions
 
@@ -327,6 +403,23 @@ to port deliberately rather than wholesale. The compute path is:
   exists) but it adds meaningful payload — on the order of 10–20 MB of
   =.wasm= — plus real build complexity. Trimming GDAL to just the GTiff and
   LCP drivers is the obvious mitigation and worth scoping early.
+
+- *S3b.6a — There is a way to avoid GDAL-in-WASM on the input path
+  entirely.* The research brief documents LCP's on-disk layout: a
+  *7,316-byte header, int16, pixel-interleaved*. That is simple enough to
+  *write from ClojureScript directly* — fetch or decode the LANDFIRE tiles
+  on the JS side (see below), synthesize an LCP into Emscripten's MEMFS per
+  S3b.5, and let =ReadGdalLCP()= read it back. Whether that removes GDAL
+  from the bundle depends on the *output* path too (GeoTIFF writing still
+  goes through the GTiff driver), but it decouples the two problems and may
+  allow a much smaller GDAL build, or none on input.
+  Related brief findings worth heeding if we do raster work on the JS side:
+  =@developmentseed/geotiff= is preferred over =geotiff.js= for tile ingest
+  (=geotiff.js= is slow on non-tiled files), and *=gdal3.js= is "too heavy
+  for the hot path"* — acceptable for user-uploaded rasters only. Our
+  GDAL use is one-shot landscape loading rather than a per-frame hot path,
+  so S3b.6 still stands; but if the bundle size becomes the blocker, this is
+  the escape route. =:secondary:=
 
 - *S3b.7 — WindNinja is a hard link dependency of =lib/flammap=.*
   =target_link_libraries(flammap fuelcondition icf ${GDAL_LIBRARY}
@@ -651,16 +744,42 @@ mass-conservation solver is portable.
 
 - *S4b.9 — Assembly uses floating-point atomics that core WebGPU lacks.*
   =discretize()= scatters element contributions with =#pragma omp atomic= on
-  doubles. WebGPU's storage atomics are integer-only, so GPU assembly needs a
-  different algorithm entirely — graph coloring, or restructuring to
-  gather-by-node instead of scatter-by-element.
+  doubles. WebGPU's storage atomics are *32-bit int/uint only* — no float
+  atomics at all, and 64-bit is limited to min/max on =vec2u=. So GPU
+  assembly needs a different algorithm — graph coloring, or restructuring to
+  gather-by-node instead of scatter-by-element. *One mitigation I should
+  note:* the research brief documents the WebGPU-Ocean technique of
+  scattering floats as *fixed-point integers via 32-bit =atomicAdd=*, which
+  is a real workaround for accumulation-style scatters. It trades exactness
+  for a chosen fixed-point scale, which is tolerable for ember/intensity
+  deposition but questionable for FEM stiffness assembly where the dynamic
+  range is wide. =:measured:= (technique) / =:inference:= (applicability
+  here)
 
-- *S4b.10 — Buffer limits bite at fine resolution.* WebGPU's default
-  =maxStorageBufferBindingSize= is 128 MiB. A fine-mesh CSR matrix at =f32=
-  (values + column indices ≈ 80 MB) fits, but larger domains would need
-  chunked bindings and multi-pass SpMV — added complexity for a
-  memory-bandwidth-bound kernel whose realistic speedup is single-digit
-  multiples, not orders of magnitude.
+- *S4b.10 — Buffer limits bite at fine resolution, and they fail silently.*
+  WebGPU's default =maxStorageBufferBindingSize= is 128 MiB (>= 1 GiB on
+  ~92% of devices in the field, but only when requested explicitly via
+  =requiredLimits= at =requestDevice=). A fine-mesh CSR matrix at =f32=
+  (values + column indices ~80 MB) fits, but larger domains would need
+  chunked bindings and multi-pass SpMV. Worse than the complexity: the
+  research brief records that exceeding this limit caused *silently dropped
+  submits* in a production LBM solver, and a WebGPU cloth simulation was
+  *capped by the 128 MB buffer limit rather than by compute*. So this is a
+  correctness hazard requiring explicit size validation and error scopes,
+  not merely an optimization concern. =:measured:=
+
+- *S4b.10a — Correction to an earlier estimate.* An earlier draft of this
+  section described the realistic WebGPU speedup as "single-digit multiples,
+  not orders of magnitude." *That is too pessimistic as a general claim and
+  should be scoped.* The brief reports WebGPU at *4–20x over multithreaded
+  WASM SIMD*, and published GPU fire-spread work at 20x (vFirelib), 6–35x
+  (JaxWildfire), and >200x vs serial CPU (fireLib CUDA). The single-digit
+  figure is a fair expectation for *this* case — an SpMV-bound CG solve,
+  where the brief's own data puts WebGPU closest to native precisely because
+  bandwidth-bound kernels suffer least (mandatory bounds checks cost 1–5% on
+  bandwidth-bound work vs 14–42% on compute-bound). But it is not a general
+  ceiling, and it is not the number to quote for a purpose-built CA kernel.
+  =:measured:=
 
 - *S4b.11 — And the strategic objection from S3.3 applies verbatim.*
   Rewriting the solver in WGSL forks the numerics away from the Fire Lab's
@@ -765,11 +884,24 @@ Behave is to *display FSim's outputs*, not to compute them.
   a worker only needs its own tile. *FSim's parallel design assumes the one
   thing the browser's parallelism model withholds.*
 
-- *S4c.6 — And GPU does not help, for the S4.1 reason.* Each fire is an MTT
-  front-propagation computation — iterative expansion over a thin active
-  set, exactly the class of algorithm that does not reward array-parallel
-  hardware. FSim's parallelism is *across fires*, which OpenMP already
-  exploits well on a single node. There is no kernel here waiting for a GPU.
+  To put numbers on the replication cost: the research brief's packed
+  encoding gets a 4096^2 window down to *134 MB at 8 B/cell*, where the same
+  window as 8 separate =f32= layers is *537 MB*. FSim's model is one such
+  landscape *per thread*. At =omp_get_num_procs()= on a typical 8–16 core
+  machine that is 1–8.5 GB of duplicated landscape before any state grids —
+  untenable per-Worker in a browser, and the reason even the native build
+  wants a shared-memory process rather than isolated workers. =:estimate:=
+
+- *S4c.6 — And GPU does not obviously help — though the reasoning needs
+  care (see S4e.1).* FSim's parallelism is *across fires*, which OpenMP
+  already exploits well on a single node, so there is no idle kernel waiting
+  for a GPU at the ensemble level. Note that the per-fire engine is MTT,
+  which is *not* thin-active-set front propagation — it is a converged
+  sweep solve over the full lattice (S4e.1 corrects the earlier blanket
+  claim here). So an individual MTT solve is more GPU-shaped than this
+  section originally implied; what makes GPU unattractive for *FSim*
+  specifically is that the embarrassingly parallel axis (fires) is already
+  saturated, not that the inner solve is unparallelizable.
 
 - *S4c.7 — No distributed story exists today.* There is no MPI, no cluster
   code, and no job-splitting layer anywhere in =lib/fsimmanager=,
@@ -974,6 +1106,34 @@ products.
   (S4e.3)*, measure, and only then consider whether a WGSL rewrite of 19k
   lines buys anything. The S3.3 source-of-truth objection still stands.
 
+- *S4e.6a — The =f64= objection is genuinely weaker for MTT than elsewhere.*
+  S4b.7 presents no-=f64= as a blocking issue, and for WindNinja's
+  ill-conditioned FEM solve it is. For MTT it is not the same obstacle: the
+  cell data is already =f32= (S4e.4), and the research brief argues
+  explicitly that *fp32 is adequate for arrival time* — a multi-week fire
+  measured in seconds still retains sub-second resolution — and for
+  level-set phi. MTT's =mintime= / travel-time accumulators are =double=
+  today, but physically they need not be. The review should not lean on the
+  =f64= argument when discussing MTT specifically. =:inference:= (brief's
+  own tag)
+
+- *S4e.6b — But the brief identifies a precise structural obstacle MTT hits
+  head-on.* The brief's rules for iterative solvers on WebGPU are: fuse
+  passes, batch many steps per submit, use indirect dispatch, and *"never
+  read back to the CPU inside the loop."* MTT's convergence test is exactly
+  that forbidden pattern — =Changes= is accumulated per sweep and compared
+  to zero *on the host*, every sweep (=MTT.cpp:~997-1013=). Compounding it:
+  WebGPU gives *no forward-progress guarantee across workgroups*, so a
+  single-pass global sync or spin-wait is not available (the WebSplatter
+  project had to switch to multi-dispatch for this reason); and per-dispatch
+  cost runs ~24 µs on Dawn/Vulkan, ~59–67 µs on Chrome/D3D12, and
+  *~1,040 µs on Firefox*. A sweep solver needing many dispatches with a host
+  round-trip for the convergence check would be overhead-bound before any
+  arithmetic happens. Restructuring to an on-GPU convergence flag with
+  batched sweeps is possible, but it is a redesign of the solver's control
+  flow — which is precisely the "not a port, a rewrite" conclusion.
+  =:measured:=
+
 ** Correction: the JNI bindings need Java-side work after all
 
 Earlier in this review I said =firemodels='s JNI bindings mean "no binding
@@ -1093,3 +1253,7 @@ The questions that now most change this plan:
    two.
 9. *Q4c.10* — is FSim in scope, and if so does "support FSim" mean running
    it or viewing precomputed burn-probability products?
+10. *Q0b.4* — port the Fire Lab's existing models, or build a new
+    GPU-native simulator? Everything above assumes the former; the
+    companion research brief assumes the latter. *[BLOCKER — upstream of
+    every other item on this list]*
