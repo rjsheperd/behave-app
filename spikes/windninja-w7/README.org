@@ -1,0 +1,119 @@
+#+TITLE: W7 Spike — Is WindNinja's Linear Solve Actually Dominant?
+#+AUTHOR: RJ Sheperd
+#+DATE: 2026-10-15
+
+Spike W7 from [[file:../../WINDNINJA_PORT_SPIKES.org][WINDNINJA_PORT_SPIKES.org]]. It gates Gate 4: if the linear solve
+is not a dominant share of wall-clock, the WebGPU investigation closes and
+no shader work is authorised.
+
+*Status: partially complete.* The instrumentation audit is done and returned
+two findings that change how W7 must be run. The measurement itself is
+*blocked* on a broken local GDAL (see Blocker).
+
+* Findings from the instrumentation audit
+
+** F1 — All phase timers are gated behind =#ifdef _OPENMP=
+
+=ninja.cpp:578-595= wraps every timer print in =#ifdef _OPENMP=, and the
+=omp_get_wtime()= calls that populate them are similarly guarded
+(=:296-298=, =:407=, =:430=, =:441=, =:453=, =:570-571=).
+
+Two consequences:
+
+1. *W7 must be run on an OpenMP-enabled native build.* A non-OpenMP build
+   produces no measurements at all — not zeros, no lines.
+2. *A single-threaded Emscripten build silently loses all phase
+   instrumentation*, because =-fopenmp= will not be in play. Anyone doing
+   W5 (single-thread penalty) or the WASM port proper will need to replace
+   these timers with =std::chrono= before they can profile anything. Worth
+   doing once, properly, rather than rediscovering it later.
+
+** F2 — The reported "Solver time" is only the LAST outer iteration
+
+This is the finding that matters, and it means the stock numbers cannot be
+trusted for the case where the solve is called most often.
+
+=simulate_wind()= contains a =do { ... } while(matchingIterCount <
+max_matching_iters && !matchFlag)= loop that opens around =:360= and closes
+at *=:491=*. The timers sit *inside* it:
+
+| =startBuildEq= | =:407= |
+| =endBuildEq= | =:430= |
+| =startSolve= | =:441= |
+| =endSolve= | =:453= |
+
+Each outer iteration *overwrites* the previous values, so
+=endSolve - startSolve= describes one iteration, not the run.
+
+- *Domain-average initialisation:* =matched()= returns on
+  =input.matchWxStations == false=, so the loop runs once and the stock
+  numbers are correct.
+- *Point initialisation with station matching:* up to =nMaxMatchingIters=
+  (default *150*) iterations, so the printed solve time can understate the
+  real total by up to that factor.
+
+=accumulate-timers.patch= in this directory adds cumulative accumulators
+alongside the existing variables (leaving current output untouched) plus a
+solve-call count. *Apply it before running any point-initialisation case.*
+
+The parser demonstrates the trap on synthetic logs — the same run reads as
+*6.2%* solve from the stock timer and *74.5%* from the cumulative one:
+
+#+BEGIN_EXAMPLE
+        run      NUMNP   buildEq      solve      TOTAL    solve %   cumSolve     solves  cum solve %
+run-coarse.      84420      1.23       3.88       5.90      65.8%       0.00          —         0.0%
+run-matchin     402000      6.10      19.40     312.50       6.2%     232.80         12        74.5%
+#+END_EXAMPLE
+
+* Files
+
+| =accumulate-timers.patch= | Adds cumulative build/solve timers across the matching loop (F2). Hand-written against the current source; apply with =git -C windninja apply=. |
+| =run.sh= | Configures a minimal OpenMP build and runs coarse/medium/fine. *Unvalidated* — see Blocker. |
+| =parse_timers.mjs= | Parses timer output into an Amdahl table with a go/no-go interpretation guide. *Verified* against synthetic logs. |
+
+* Blocker — local GDAL is broken
+
+WindNinja requires GDAL, and the Homebrew GDAL on this machine cannot load:
+
+#+BEGIN_EXAMPLE
+$ gdalinfo --version
+dyld: Library not loaded: /opt/homebrew/opt/libxml2/lib/libxml2.2.dylib
+      (installed libxml2 2.15.1_1 ships libxml2.16.dylib)
+then: /opt/homebrew/opt/openexr/lib/libOpenEXR-3_3.32.dylib   (installed 3.4.4_1)
+#+END_EXAMPLE
+
+At least five bumped dylibs are missing against what =libgdal.dylib= was
+linked to — =libxml2=, three =OpenEXR= libraries, and =Imath=. =brew
+outdated= reports =gdal= as outdated, so =brew upgrade gdal= is the likely
+one-line fix, but that modifies the developer's environment and was left
+for them to decide.
+
+Pointing =DYLD_FALLBACK_LIBRARY_PATH= at the older =libxml2= keg
+(=2.13.7=, which does ship =libxml2.2.dylib=) gets past the first failure
+but then hits OpenEXR, so there is no clean non-invasive workaround.
+
+*Nothing about this blocker is WindNinja's fault or informative about the
+port* — it is ordinary Homebrew drift.
+
+* What remains
+
+1. Repair GDAL (=brew upgrade gdal=), then run =run.sh= against a real DEM.
+   =SpatialFOFEM/SampleData/Landscape/= has 30 m GeoTIFFs that will serve.
+2. Expect =run.sh= to need iteration — its CMake flags and CLI arguments are
+   taken from WindNinja's docs and =cli.cpp= (all flag names were verified
+   to exist in =src/ninja/cli.cpp=), but the build has never been exercised
+   here.
+3. Run the three mesh resolutions with domain-average initialisation first,
+   since F2 means those numbers are trustworthy unpatched.
+4. Then apply =accumulate-timers.patch= and add a point-initialisation run,
+   which is the case most likely to show the solve dominating.
+5. Feed the logs to =parse_timers.mjs= and record the verdict against the
+   thresholds in =WINDNINJA_PORT_SPIKES.org= (W7 decision point 1).
+
+* Interpretation thresholds (restated from the spike plan)
+
+| solve share | Verdict |
+|---+---|
+| < ~30% | Solve is not dominant — *close Gate 4*, do not pursue WebGPU |
+| 30–60% | GPU could help, but Amdahl caps it; weigh against W9's iteration inflation |
+| > ~60% | Solve dominates — Gate 4 is worth opening |

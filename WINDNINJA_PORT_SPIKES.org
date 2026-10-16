@@ -146,6 +146,15 @@ write-out. No new instrumentation required.
 *Why this gates Gate 4:* if the solve is not dominant, every WebGPU spike
 below is moot. Do this before W8.
 
+*Status: STARTED — see [[file:spikes/windninja-w7/README.org][spikes/windninja-w7/]].* The audit found two things that
+change how W7 must be run: the timers are all behind =#ifdef _OPENMP= (so a
+non-OpenMP or WASM build reports nothing), and =startSolve=/=endSolve= sit
+*inside* the matching loop that closes at =ninja.cpp:491=, so the reported
+solve time covers only the final outer iteration — an undercount of up to
+=nMaxMatchingIters= (150) for point-initialisation runs. A patch and a
+parser are in that directory. The measurement itself is blocked on a broken
+local Homebrew GDAL.
+
 ** W5 — Single-thread penalty, and the run-level alternative
 
 *Question:* how much slower is single-threaded WASM than multi-threaded

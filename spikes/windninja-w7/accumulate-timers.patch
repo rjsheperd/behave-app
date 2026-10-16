@@ -1,0 +1,58 @@
+Accumulate WindNinja phase timers across the outer "matching" loop.
+
+W7 finding: startBuildEq/endBuildEq (ninja.cpp:407,430) and
+startSolve/endSolve (:441,453) are assigned INSIDE the do/while matching
+loop that closes at :491. Each outer iteration overwrites the previous
+values, so the reported "Equation building time" and "Solver time" describe
+only the FINAL iteration.
+
+For domain-average initialisation the loop runs once and the numbers are
+correct. For point initialisation with weather-station matching it can run
+up to nMaxMatchingIters (default 150), so the printed solve time can
+understate the real cost by up to that factor — which would make W7's
+Amdahl answer badly wrong in exactly the case where the solve is called
+most often.
+
+This patch adds accumulators alongside the existing variables rather than
+replacing them, so current output is unchanged and the new totals appear as
+extra lines.
+
+Apply with:  git -C windninja apply ../spikes/windninja-w7/accumulate-timers.patch
+
+--- a/src/ninja/ninja.h
++++ b/src/ninja/ninja.h
+@@
+     double startBuildEq, endBuildEq;
+     double startSolve, endSolve;
++    // W7: per-iteration timers above are overwritten by the matching loop;
++    // these accumulate across all outer iterations.
++    double totalBuildEq, totalSolve;
++    int    solveCallCount;
+
+--- a/src/ninja/ninja.cpp
++++ b/src/ninja/ninja.cpp
+@@ (each of the three constructor/reset blocks that zero the timers)
+     startSolve=0.0;
+     endSolve=0.0;
++    totalBuildEq=0.0;
++    totalSolve=0.0;
++    solveCallCount=0;
+
+@@ (after endBuildEq = omp_get_wtime(); near :430)
+             endBuildEq = omp_get_wtime();
++            totalBuildEq += (endBuildEq - startBuildEq);
+
+@@ (after endSolve = omp_get_wtime(); near :453)
+             endSolve = omp_get_wtime();
++            totalSolve += (endSolve - startSolve);
++            solveCallCount++;
+
+@@ (in the timer reporting block near :583)
+             input.Com->ninjaCom(ninjaComClass::ninjaNone, "Solver time was %lf seconds.",endSolve-startSolve);
++            input.Com->ninjaCom(ninjaComClass::ninjaNone, "W7 cumulative equation building time was %lf seconds.", totalBuildEq);
++            input.Com->ninjaCom(ninjaComClass::ninjaNone, "W7 cumulative solver time was %lf seconds over %d solves.", totalSolve, solveCallCount);
++            input.Com->ninjaCom(ninjaComClass::ninjaNone, "W7 matching iterations = %d", matchingIterCount);
+
+Note: matchingIterCount is declared at :348, inside simulate_wind(), so the
+last line above must sit within that function's scope — which the existing
+reporting block does.
