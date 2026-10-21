@@ -12,7 +12,12 @@ bool beginsWithNumber(std::string const & str) {
   if (str.length() == 0) {
     return false;
   }
-  return isdigit(str[0]);
+  // A sign or a leading decimal point still starts a number ("-1", ".5")
+  size_t first = (str[0] == '-' || str[0] == '+') ? 1 : 0;
+  if (first < str.length() && str[first] == '.') {
+    first++;
+  }
+  return first < str.length() && isdigit(str[first]);
 }
 
 double str2double (std::string & str) {
