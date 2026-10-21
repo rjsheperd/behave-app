@@ -32,6 +32,7 @@ test:
 	./${TEST_DIR}/testSurface test/csv/surface.csv
 	./${TEST_DIR}/testContain test/csv/contain.csv
 	./${TEST_DIR}/testCrown test/csv/crown.csv
+	./${TEST_DIR}/testFireEffects
 
 ctags:
 	ctags -e -R --exclude=.git --exclude=build --exclude .ccls-cache .

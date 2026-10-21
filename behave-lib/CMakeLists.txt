@@ -142,11 +142,13 @@ SET(SOURCE
     include/cpp/sig-adapters/SIGContainAdapter.cpp
     include/cpp/sig-adapters/SIGCrown.cpp
     include/cpp/sig-adapters/SIGFineDeadFuelMoistureTool.cpp
+    include/cpp/sig-adapters/SIGFuelConsumption.cpp
     include/cpp/sig-adapters/SIGFuelModels.cpp
     include/cpp/sig-adapters/SIGIgnite.cpp
     include/cpp/sig-adapters/SIGMoistureScenarios.cpp
     include/cpp/sig-adapters/SIGMortality.cpp
     include/cpp/sig-adapters/SIGSlopeTool.cpp
+    include/cpp/sig-adapters/SIGSoilHeating.cpp
     include/cpp/sig-adapters/SIGSpot.cpp
     include/cpp/sig-adapters/SIGSurface.cpp)
 
@@ -216,11 +218,13 @@ SET(HEADERS
     include/cpp/sig-adapters/SIGCrown.h
     include/cpp/sig-adapters/SIGDiurnalROS.h
     include/cpp/sig-adapters/SIGFineDeadFuelMoistureTool.h
+    include/cpp/sig-adapters/SIGFuelConsumption.h
     include/cpp/sig-adapters/SIGFuelModels.cpp
     include/cpp/sig-adapters/SIGIgnite.h
     include/cpp/sig-adapters/SIGMoistureScenarios.h
     include/cpp/sig-adapters/SIGMortality.h
     include/cpp/sig-adapters/SIGSlopeTool.h
+    include/cpp/sig-adapters/SIGSoilHeating.h
     include/cpp/sig-adapters/SIGSpot.h
     include/cpp/sig-adapters/SIGString.h
     include/cpp/sig-adapters/SIGSurface.h)
@@ -267,6 +271,14 @@ IF(TEST_BEHAVE)
         ${CROWN_TEST_SOURCE}
         ${HEADERS})
     TARGET_LINK_LIBRARIES(testCrown testUtils)
+
+    SET(FIRE_EFFECTS_TEST_SOURCE
+        test/cpp/testFireEffects.cpp)
+    ADD_EXECUTABLE(testFireEffects
+        ${SOURCE}
+        ${FIRE_EFFECTS_TEST_SOURCE}
+        ${HEADERS})
+    TARGET_LINK_LIBRARIES(testFireEffects)
 ENDIF()
 
 IF(BEHAVE_JS)

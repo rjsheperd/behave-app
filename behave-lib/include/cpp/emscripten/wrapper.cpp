@@ -60,6 +60,8 @@
 #include "SIGSpot.cpp"
 #include "SIGMortality.cpp"
 #include "SIGSurface.cpp"
+#include "SIGFuelConsumption.cpp"
+#include "SIGSoilHeating.cpp"
 #include "fineDeadFuelMoistureTool.cpp"
 #include "SIGFineDeadFuelMoistureTool.cpp"
 #include "vaporPressureDeficitCalculator.cpp"
