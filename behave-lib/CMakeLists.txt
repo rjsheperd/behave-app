@@ -279,6 +279,18 @@ IF(TEST_BEHAVE)
         ${FIRE_EFFECTS_TEST_SOURCE}
         ${HEADERS})
     TARGET_LINK_LIBRARIES(testFireEffects)
+
+    ADD_EXECUTABLE(testFuelConsumption
+        ${SOURCE}
+        test/cpp/testFuelConsumption.cpp
+        ${HEADERS})
+    TARGET_LINK_LIBRARIES(testFuelConsumption testUtils)
+
+    ADD_EXECUTABLE(testSoilHeating
+        ${SOURCE}
+        test/cpp/testSoilHeating.cpp
+        ${HEADERS})
+    TARGET_LINK_LIBRARIES(testSoilHeating testUtils)
 ENDIF()
 
 IF(BEHAVE_JS)

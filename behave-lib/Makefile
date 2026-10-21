@@ -33,6 +33,8 @@ test:
 	./${TEST_DIR}/testContain test/csv/contain.csv
 	./${TEST_DIR}/testCrown test/csv/crown.csv
 	./${TEST_DIR}/testFireEffects
+	./${TEST_DIR}/testFuelConsumption test/csv/fuel_consumption.csv
+	./${TEST_DIR}/testSoilHeating test/csv/soil_heating.csv
 
 ctags:
 	ctags -e -R --exclude=.git --exclude=build --exclude .ccls-cache .
