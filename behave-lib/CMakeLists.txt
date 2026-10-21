@@ -291,6 +291,12 @@ IF(TEST_BEHAVE)
         test/cpp/testSoilHeating.cpp
         ${HEADERS})
     TARGET_LINK_LIBRARIES(testSoilHeating testUtils)
+
+    ADD_EXECUTABLE(testMortality
+        ${SOURCE}
+        test/cpp/testMortality.cpp
+        ${HEADERS})
+    TARGET_LINK_LIBRARIES(testMortality testUtils)
 ENDIF()
 
 IF(BEHAVE_JS)

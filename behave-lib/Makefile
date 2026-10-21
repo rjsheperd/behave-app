@@ -35,6 +35,7 @@ test:
 	./${TEST_DIR}/testFireEffects
 	./${TEST_DIR}/testFuelConsumption test/csv/fuel_consumption.csv
 	./${TEST_DIR}/testSoilHeating test/csv/soil_heating.csv
+	./${TEST_DIR}/testMortality test/csv/mortality.csv
 
 ctags:
 	ctags -e -R --exclude=.git --exclude=build --exclude .ccls-cache .
