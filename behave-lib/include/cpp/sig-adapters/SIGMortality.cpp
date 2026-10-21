@@ -173,6 +173,9 @@ void SIGMortality::setSurfaceFireFlameLengthFlanking(double value, LengthUnits::
 void SIGMortality::setSurfaceFireScorchHeight(double value, LengthUnits::LengthUnitsEnum lengthUnits)
 {
     heading_.setScorchHeight(value, lengthUnits);
+    // Mortality uses a scorch height only when the switch names it; without
+    // this the heading tree ignored the scorch height it was given
+    heading_.setFlameLengthOrScorchHeightSwitch(FlameLengthOrScorchHeightSwitch::scorch_height);
 }
 
 void SIGMortality::setSurfaceFireFirelineIntensity(double value, FirelineIntensityUnits::FirelineIntensityUnitsEnum firelineIntensityUnits)
