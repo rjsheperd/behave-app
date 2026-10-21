@@ -12,7 +12,9 @@
 (defn within? [precision a b]
   (> precision (Math/abs (- a b))))
 
-(def within-four-percent? (partial within? 4.0))
+;; MortAvgPercent is FOFEM's mortality rounded to a whole percent. (The old
+;; 4-point tolerance hid a scorch height SIGMortality ignored.)
+(def within-rounding? (partial within? (+ 0.5 1e-9)))
 
 (defn- clean-values [row]
   (into {}
@@ -39,7 +41,7 @@
                        -1)
        species-code  (get row "TreeSpecies")]
 
-    (mortality/setGACCRegion module (enums/gacc "SouthernArea"))
+    (mortality/setGeographicAreaCoordinationCenter module (enums/gacc "SouthernArea"))
 
     (mortality/setEquationType module  equation-type)
 
@@ -65,7 +67,7 @@
 
     (let [Diameter (get row "Diameter")]
       (when (not-blank? Diameter)
-        (mortality/setDBH module Diameter (enums/length-units "Inches"))))
+        (mortality/setDiameterAtBreastHeight module Diameter (enums/length-units "Inches"))))
 
     (let [TreeHeight (get row "TreeHeight")]
       (when (not-blank? TreeHeight)
@@ -93,15 +95,15 @@
 
     (let [line-number (+ row-idx 2)]
       (testing (str "csv line #:" line-number)
-        (mortality/calculateMortalityAllDirections module (enums/probability-units "Percent"))
+        (mortality/calculateMortalityAllDirections module (enums/fraction-units "Percent"))
         (let [expected (get row "MortAvgPercent")
-              observed (mortality/getProbabilityOfMortality module (enums/probability-units "Percent"))]
-          (when (not (within-four-percent? expected observed))
+              observed (mortality/getProbabilityOfMortality module (enums/fraction-units "Percent"))]
+          (when (not (within-rounding? expected observed))
             (swap! failing-tests
                    conj
                    (str/join "," [line-number expected observed (Math/abs (- expected observed))])))
 
-          (is (within-four-percent? expected observed)
+          (is (within-rounding? expected observed)
               (str "Expected: " expected "  Observed: " observed)))))))
 
 (deftest mortality-test
