@@ -20,8 +20,14 @@
 (defn checkIsInGACCRegionAtSpeciesTableIndex [self index region]
   (.checkIsInGACCRegionAtSpeciesTableIndex self index region))
 
+(defn checkIsInGeographicAreaCoordinationCenterAtSpeciesTableIndex [self index region]
+  (.checkIsInGeographicAreaCoordinationCenterAtSpeciesTableIndex self index region))
+
 (defn checkIsInGACCRegionFromSpeciesCode [self speciesCode region]
   (.checkIsInGACCRegionFromSpeciesCode self speciesCode region))
+
+(defn checkIsInGeographicAreaCoordinationCenterFromSpeciesCode [self speciesCode region]
+  (.checkIsInGeographicAreaCoordinationCenterFromSpeciesCode self speciesCode region))
 
 (defn getBarkEquationNumberAtSpeciesTableIndex [self index]
   (.getBarkEquationNumberAtSpeciesTableIndex self index))
@@ -34,6 +40,9 @@
 
 (defn getBasalAreaKillled [self]
   (.getBasalAreaKillled self))
+
+(defn getBasalAreaKilled [self]
+  (.getBasalAreaKilled self))
 
 (defn getBasalAreaPostfire [self]
   (.getBasalAreaPostfire self))
@@ -146,6 +155,9 @@
 (defn getGACCRegion [self]
   (.getGACCRegion self))
 
+(defn getGeographicAreaCoordinationCenter [self]
+  (.getGeographicAreaCoordinationCenter self))
+
 (defn getRequiredFieldVector [self]
   (.getRequiredFieldVector self))
 
@@ -173,8 +185,14 @@
 (defn getSpeciesRecordVectorForGACCRegion [self region]
   (.getSpeciesRecordVectorForGACCRegion self region))
 
+(defn getSpeciesRecordVectorForGeographicAreaCoordinationCenter [self region]
+  (.getSpeciesRecordVectorForGeographicAreaCoordinationCenter self region))
+
 (defn getSpeciesRecordVectorForGACCRegionAndEquationType [self region equationType]
   (.getSpeciesRecordVectorForGACCRegionAndEquationType self region equationType))
+
+(defn getSpeciesRecordVectorForGeographicAreaCoordinationCenterAndEquationType [self region equationType]
+  (.getSpeciesRecordVectorForGeographicAreaCoordinationCenterAndEquationType self region equationType))
 
 (defn getSpeciesTableIndexFromSpeciesCode [self speciesNameCode]
   (.getSpeciesTableIndexFromSpeciesCode self speciesNameCode))
@@ -215,8 +233,14 @@
 (defn postfireCanopyCover [self]
   (.postfireCanopyCover self))
 
+(defn getCanopyCoverPostfire [self]
+  (.getCanopyCoverPostfire self))
+
 (defn prefireCanopyCover [self]
   (.prefireCanopyCover self))
+
+(defn getCanopyCoverPrefire [self]
+  (.getCanopyCoverPrefire self))
 
 (defn setAirTemperature [self airTemperature temperatureUnits]
   (.setAirTemperature self airTemperature temperatureUnits))
@@ -238,6 +262,9 @@
 
 (defn setDBH [self dbh diameterUnits]
   (.setDBH self dbh diameterUnits))
+
+(defn setDiameterAtBreastHeight [self dbh diameterUnits]
+  (.setDiameterAtBreastHeight self dbh diameterUnits))
 
 (defn setEquationType [self equationType]
   (.setEquationType self equationType))
@@ -265,6 +292,9 @@
 
 (defn setGACCRegion [self region]
   (.setGACCRegion self region))
+
+(defn setGeographicAreaCoordinationCenter [self region]
+  (.setGeographicAreaCoordinationCenter self region))
 
 (defn setSpeciesCode [self speciesCode]
   (.setSpeciesCode self speciesCode))

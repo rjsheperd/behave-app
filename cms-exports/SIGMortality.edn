@@ -97,6 +97,10 @@
    {:id "setFireSeverity",
     :parameters [{:id "fireSeverity", :type "FireSeverity"}],
     :type "void"},
+   :getGeographicAreaCoordinationCenter
+   {:type "GACC",
+    :id "getGeographicAreaCoordinationCenter",
+    :parameters []},
    :getTreeCrownLengthScorched
    {:id "getTreeCrownLengthScorched",
     :parameters
@@ -146,6 +150,13 @@
    {:id "setBeetleDamage",
     :parameters [{:id "beetleDamage", :type "BeetleDamage"}],
     :type "void"},
+   :getSpeciesRecordVectorForGeographicAreaCoordinationCenterAndEquationType
+   {:type "SpeciesMasterTableRecordVector",
+    :id
+    "getSpeciesRecordVectorForGeographicAreaCoordinationCenterAndEquationType",
+    :parameters
+    [{:id "region", :type "GACC"}
+     {:id "equationType", :type "EquationType"}]},
    :calculateScorchHeight
    {:id "calculateScorchHeight",
     :parameters
@@ -188,11 +199,19 @@
    {:id "getMortalityEquationNumberFromSpeciesCode",
     :parameters [{:id "speciesCode", :type "char"}],
     :type "int"},
+   :getCanopyCoverPrefire
+   {:type "double", :id "getCanopyCoverPrefire", :parameters []},
    :checkIsInGACCRegionAtSpeciesTableIndex
    {:id "checkIsInGACCRegionAtSpeciesTableIndex",
     :parameters
     [{:id "index", :type "int"} {:id "region", :type "GACC"}],
     :type "bool"},
+   :setDiameterAtBreastHeight
+   {:type "void",
+    :id "setDiameterAtBreastHeight",
+    :parameters
+    [{:id "dbh", :type "double"}
+     {:id "diameterUnits", :type "LengthUnits::LengthUnitsEnum"}]},
    :setSurfaceFireFirelineIntensityFlanking
    {:id "setSurfaceFireFirelineIntensityFlanking",
     :parameters
@@ -226,6 +245,8 @@
     :parameters
     [{:id "userProvidedWindAdjustmentFactor", :type "double"}],
     :type "void"},
+   :getBasalAreaKilled
+   {:type "double", :id "getBasalAreaKilled", :parameters []},
    :getMortalityEquationNumberAtSpeciesTableIndex
    {:id "getMortalityEquationNumberAtSpeciesTableIndex",
     :parameters [{:id "index", :type "int"}],
@@ -307,6 +328,11 @@
      {:id "boleCharHeightUnits",
       :type "LengthUnits::LengthUnitsEnum"}],
     :type "void"},
+   :checkIsInGeographicAreaCoordinationCenterAtSpeciesTableIndex
+   {:type "bool",
+    :id "checkIsInGeographicAreaCoordinationCenterAtSpeciesTableIndex",
+    :parameters
+    [{:id "index", :type "int"} {:id "region", :type "GACC"}]},
    :setMidFlameWindSpeed
    {:id "setMidFlameWindSpeed",
     :parameters
@@ -332,6 +358,14 @@
       :type "WindHeightInputMode::WindHeightInputModeEnum"}
      {:id "userProvidedWindAdjustmentFactor", :type "double"}],
     :type "void"},
+   :getSpeciesRecordVectorForGeographicAreaCoordinationCenter
+   {:type "SpeciesMasterTableRecordVector",
+    :id "getSpeciesRecordVectorForGeographicAreaCoordinationCenter",
+    :parameters [{:id "region", :type "GACC"}]},
+   :setGeographicAreaCoordinationCenter
+   {:type "void",
+    :id "setGeographicAreaCoordinationCenter",
+    :parameters [{:id "region", :type "GACC"}]},
    :getScorchHeight
    {:id "getScorchHeight",
     :parameters
@@ -365,6 +399,12 @@
     :type "void"},
    :initializeMembers
    {:id "initializeMembers", :parameters [], :type "void"},
+   :checkIsInGeographicAreaCoordinationCenterFromSpeciesCode
+   {:type "bool",
+    :id "checkIsInGeographicAreaCoordinationCenterFromSpeciesCode",
+    :parameters
+    [{:id "speciesCode", :type "string"}
+     {:id "region", :type "GACC"}]},
    :getFireSeverity
    {:id "getFireSeverity", :parameters [], :type "FireSeverity"},
    :getTreeHeight
@@ -430,6 +470,8 @@
     [{:id "windSpeed", :type "double"}
      {:id "windSpeedUnits", :type "SpeedUnits::SpeedUnitsEnum"}],
     :type "void"},
+   :getCanopyCoverPostfire
+   {:type "double", :id "getCanopyCoverPostfire", :parameters []},
    :getProbabilityOfMortalityFlanking
    {:id "getProbabilityOfMortalityFlanking",
     :parameters

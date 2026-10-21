@@ -1,0 +1,42 @@
+{:global
+ {:EmissionFactorTable
+  {:getGroupType
+   {:type "EmissionFactorGroupType::EmissionFactorGroupTypeEnum",
+    :id "getGroupType",
+    :parameters [{:id "groupNumber", :type "int"}]},
+   :getNumberOfSpecies
+   {:type "int", :id "getNumberOfSpecies", :parameters []},
+   :getEmissionFactor
+   {:type "double",
+    :id "getEmissionFactor",
+    :parameters
+    [{:id "groupNumber", :type "int"}
+     {:id "species", :type "EmissionSpecies::EmissionSpeciesEnum"}
+     {:id "emissionFactorUnits",
+      :type "EmissionFactorUnits::EmissionFactorUnitsEnum"}]},
+   :getSpeciesName
+   {:type "char",
+    :id "getSpeciesName",
+    :parameters [{:id "speciesIndex", :type "int"}]},
+   :getNumberOfGroups
+   {:type "int", :id "getNumberOfGroups", :parameters []},
+   :getEmissionFactorBySpeciesIndex
+   {:type "double",
+    :id "getEmissionFactorBySpeciesIndex",
+    :parameters
+    [{:id "groupNumber", :type "int"}
+     {:id "speciesIndex", :type "int"}
+     {:id "emissionFactorUnits",
+      :type "EmissionFactorUnits::EmissionFactorUnitsEnum"}]},
+   :getCoverType
+   {:type "char",
+    :id "getCoverType",
+    :parameters [{:id "groupNumber", :type "int"}]},
+   :getSpeciesCode
+   {:type "char",
+    :id "getSpeciesCode",
+    :parameters [{:id "speciesIndex", :type "int"}]},
+   :isValidGroup
+   {:type "bool",
+    :id "isValidGroup",
+    :parameters [{:id "groupNumber", :type "int"}]}}}}

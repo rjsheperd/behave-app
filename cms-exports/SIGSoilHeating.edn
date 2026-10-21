@@ -1,0 +1,215 @@
+{:global
+ {:SIGSoilHeating
+  {:getMaximumTemperatureAtLayer
+   {:type "double",
+    :id "getMaximumTemperatureAtLayer",
+    :parameters
+    [{:id "layer", :type "int"}
+     {:id "temperatureUnits",
+      :type "TemperatureUnits::TemperatureUnitsEnum"}]},
+   :getDeepestLayerReachingSixtyDegreesCelsius
+   {:type "int",
+    :id "getDeepestLayerReachingSixtyDegreesCelsius",
+    :parameters []},
+   :getSoilHeatingModelUsed
+   {:type "SoilHeatingModel::SoilHeatingModelEnum",
+    :id "getSoilHeatingModelUsed",
+    :parameters []},
+   :setDuffConsumed
+   {:type "void",
+    :id "setDuffConsumed",
+    :parameters
+    [{:id "duffConsumed", :type "double"}
+     {:id "fractionUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :getDuffDepthPrefire
+   {:type "double",
+    :id "getDuffDepthPrefire",
+    :parameters
+    [{:id "lengthUnits", :type "LengthUnits::LengthUnitsEnum"}]},
+   :setFuelbedIgnited
+   {:type "void",
+    :id "setFuelbedIgnited",
+    :parameters [{:id "isFuelbedIgnited", :type "bool"}]},
+   :setDuffDepthPostfire
+   {:type "void",
+    :id "setDuffDepthPostfire",
+    :parameters
+    [{:id "duffDepth", :type "double"}
+     {:id "lengthUnits", :type "LengthUnits::LengthUnitsEnum"}]},
+   :getHerbShrubFireIntensity
+   {:type "double",
+    :id "getHerbShrubFireIntensity",
+    :parameters
+    [{:id "index", :type "int"}
+     {:id "intensityUnits",
+      :type
+      "HeatSourceAndReactionIntensityUnits::HeatSourceAndReactionIntensityUnitsEnum"}]},
+   :setDuffLoadPrefire
+   {:type "void",
+    :id "setDuffLoadPrefire",
+    :parameters
+    [{:id "duffLoad", :type "double"}
+     {:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getHerbShrubHeatEfficiency
+   {:type "double",
+    :id "getHerbShrubHeatEfficiency",
+    :parameters
+    [{:id "fractionUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :getMessage {:type "char", :id "getMessage", :parameters []},
+   :getNumberOfTimeSteps
+   {:type "int", :id "getNumberOfTimeSteps", :parameters []},
+   :setDuffHeatEfficiency
+   {:type "void",
+    :id "setDuffHeatEfficiency",
+    :parameters
+    [{:id "efficiency", :type "double"}
+     {:id "fractionUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :getTimeStep
+   {:type "double",
+    :id "getTimeStep",
+    :parameters [{:id "timeUnits", :type "TimeUnits::TimeUnitsEnum"}]},
+   :getDuffConsumed
+   {:type "double",
+    :id "getDuffConsumed",
+    :parameters
+    [{:id "fractionUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :getWoodLitterFireIntensity
+   {:type "double",
+    :id "getWoodLitterFireIntensity",
+    :parameters
+    [{:id "index", :type "int"}
+     {:id "intensityUnits",
+      :type
+      "HeatSourceAndReactionIntensityUnits::HeatSourceAndReactionIntensityUnitsEnum"}]},
+   :getStartingSoilTemperature
+   {:type "double",
+    :id "getStartingSoilTemperature",
+    :parameters
+    [{:id "temperatureUnits",
+      :type "TemperatureUnits::TemperatureUnitsEnum"}]},
+   :getFuelbedIgnited
+   {:type "bool", :id "getFuelbedIgnited", :parameters []},
+   :getTimeOfMaximumTemperatureAtLayer
+   {:type "double",
+    :id "getTimeOfMaximumTemperatureAtLayer",
+    :parameters
+    [{:id "layer", :type "int"}
+     {:id "timeUnits", :type "TimeUnits::TimeUnitsEnum"}]},
+   :SIGSoilHeating
+   {:id "SIGSoilHeating",
+    :parameters [{:id "rhs", :type "SIGSoilHeating"}]},
+   :getTemperatureAtLayerAndTimeStep
+   {:type "double",
+    :id "getTemperatureAtLayerAndTimeStep",
+    :parameters
+    [{:id "layer", :type "int"}
+     {:id "timeStep", :type "int"}
+     {:id "temperatureUnits",
+      :type "TemperatureUnits::TemperatureUnitsEnum"}]},
+   :clearFireIntensities
+   {:type "void", :id "clearFireIntensities", :parameters []},
+   :setHerbShrubHeatEfficiency
+   {:type "void",
+    :id "setHerbShrubHeatEfficiency",
+    :parameters
+    [{:id "efficiency", :type "double"}
+     {:id "fractionUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :setSoilMoisture
+   {:type "void",
+    :id "setSoilMoisture",
+    :parameters
+    [{:id "soilMoisture", :type "double"}
+     {:id "moistureUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :getDeepestLayerReachingTwoHundredSeventyFiveDegreesCelsius
+   {:type "int",
+    :id "getDeepestLayerReachingTwoHundredSeventyFiveDegreesCelsius",
+    :parameters []},
+   :getWoodLitterHeatEfficiency
+   {:type "double",
+    :id "getWoodLitterHeatEfficiency",
+    :parameters
+    [{:id "fractionUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :getDuffLoadPrefire
+   {:type "double",
+    :id "getDuffLoadPrefire",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :setWoodLitterHeatEfficiency
+   {:type "void",
+    :id "setWoodLitterHeatEfficiency",
+    :parameters
+    [{:id "efficiency", :type "double"}
+     {:id "fractionUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :addFireIntensity
+   {:type "void",
+    :id "addFireIntensity",
+    :parameters
+    [{:id "woodLitterIntensity", :type "double"}
+     {:id "herbShrubIntensity", :type "double"}
+     {:id "intensityUnits",
+      :type
+      "HeatSourceAndReactionIntensityUnits::HeatSourceAndReactionIntensityUnitsEnum"}]},
+   :getNumberOfFireIntensities
+   {:type "int", :id "getNumberOfFireIntensities", :parameters []},
+   :doSoilHeatingRun
+   {:type "bool", :id "doSoilHeatingRun", :parameters []},
+   :setDuffMoisture
+   {:type "void",
+    :id "setDuffMoisture",
+    :parameters
+    [{:id "duffMoisture", :type "double"}
+     {:id "moistureUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :initializeMembers
+   {:type "void", :id "initializeMembers", :parameters []},
+   :setDuffDepthPrefire
+   {:type "void",
+    :id "setDuffDepthPrefire",
+    :parameters
+    [{:id "duffDepth", :type "double"}
+     {:id "lengthUnits", :type "LengthUnits::LengthUnitsEnum"}]},
+   :setStartingSoilTemperature
+   {:type "void",
+    :id "setStartingSoilTemperature",
+    :parameters
+    [{:id "temperature", :type "double"}
+     {:id "temperatureUnits",
+      :type "TemperatureUnits::TemperatureUnitsEnum"}]},
+   :getProportionOfHeatReachingSoilThroughDuff
+   {:type "double",
+    :id "getProportionOfHeatReachingSoilThroughDuff",
+    :parameters
+    [{:id "fractionUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :getSoilMoisture
+   {:type "double",
+    :id "getSoilMoisture",
+    :parameters
+    [{:id "moistureUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :setInputsFromFuelConsumption
+   {:type "void",
+    :id "setInputsFromFuelConsumption",
+    :parameters [{:id "fuelConsumption", :type "FuelConsumption"}]},
+   :getDuffDepthPostfire
+   {:type "double",
+    :id "getDuffDepthPostfire",
+    :parameters
+    [{:id "lengthUnits", :type "LengthUnits::LengthUnitsEnum"}]},
+   :getSoilFamily
+   {:type "SoilFamily::SoilFamilyEnum",
+    :id "getSoilFamily",
+    :parameters []},
+   :setSoilFamily
+   {:type "void",
+    :id "setSoilFamily",
+    :parameters
+    [{:id "soilFamily", :type "SoilFamily::SoilFamilyEnum"}]},
+   :getDuffMoisture
+   {:type "double",
+    :id "getDuffMoisture",
+    :parameters
+    [{:id "moistureUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :getDuffHeatEfficiency
+   {:type "double",
+    :id "getDuffHeatEfficiency",
+    :parameters
+    [{:id "fractionUnits",
+      :type "FractionUnits::FractionUnitsEnum"}]}}}}

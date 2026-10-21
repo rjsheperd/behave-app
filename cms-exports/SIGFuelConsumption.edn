@@ -1,0 +1,1445 @@
+{:global
+ {:SIGFuelConsumption
+  {:getFuelLoadPostfireRottenThousandHour
+   {:type "double",
+    :id "getFuelLoadPostfireRottenThousandHour",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadPrefireHerbaceous
+   {:type "double",
+    :id "getFuelLoadPrefireHerbaceous",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getDuffType
+   {:type "DuffType::DuffTypeEnum", :id "getDuffType", :parameters []},
+   :getPercentConsumedTenHour
+   {:type "double",
+    :id "getPercentConsumedTenHour",
+    :parameters
+    [{:id "fractionUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :getFuelLoadPrefireSoundTwentyInchAndLarger
+   {:type "double",
+    :id "getFuelLoadPrefireSoundTwentyInchAndLarger",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadPostfireRottenNineToTwentyInch
+   {:type "double",
+    :id "getFuelLoadPostfireRottenNineToTwentyInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getDuffDepthReductionEquation
+   {:type "DuffConsumptionEquation::DuffConsumptionEquationEnum",
+    :id "getDuffDepthReductionEquation",
+    :parameters []},
+   :getFuelLoadConsumedSoundTwentyInchAndLarger
+   {:type "double",
+    :id "getFuelLoadConsumedSoundTwentyInchAndLarger",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getHerbaceousConsumptionEquation
+   {:type
+    "HerbaceousConsumptionEquation::HerbaceousConsumptionEquationEnum",
+    :id "getHerbaceousConsumptionEquation",
+    :parameters []},
+   :setDuffConsumptionEquation
+   {:type "void",
+    :id "setDuffConsumptionEquation",
+    :parameters
+    [{:id "equation",
+      :type "DuffConsumptionEquation::DuffConsumptionEquationEnum"}]},
+   :getEmissionsFlamingCarbonDioxide
+   {:type "double",
+    :id "getEmissionsFlamingCarbonDioxide",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :setFuelLoadHundredHour
+   {:type "void",
+    :id "setFuelLoadHundredHour",
+    :parameters
+    [{:id "fuelLoad", :type "double"}
+     {:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonConsumedHerbaceous
+   {:type "double",
+    :id "getCarbonConsumedHerbaceous",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonConsumedSoundSixToNineInch
+   {:type "double",
+    :id "getCarbonConsumedSoundSixToNineInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadPrefireSoundSixToNineInch
+   {:type "double",
+    :id "getFuelLoadPrefireSoundSixToNineInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadPostfireSoundThreeToSixInch
+   {:type "double",
+    :id "getFuelLoadPostfireSoundThreeToSixInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonConsumedHundredHour
+   {:type "double",
+    :id "getCarbonConsumedHundredHour",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getPercentConsumedSoundThreeToSixInch
+   {:type "double",
+    :id "getPercentConsumedSoundThreeToSixInch",
+    :parameters
+    [{:id "fractionUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :isFuelbedIgnited
+   {:type "bool", :id "isFuelbedIgnited", :parameters []},
+   :getEmissionsSmolderingCarbonDioxide
+   {:type "double",
+    :id "getEmissionsSmolderingCarbonDioxide",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadConsumedRottenThreeToSixInch
+   {:type "double",
+    :id "getFuelLoadConsumedRottenThreeToSixInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadConsumedHundredHour
+   {:type "double",
+    :id "getFuelLoadConsumedHundredHour",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadConsumedHerbaceous
+   {:type "double",
+    :id "getFuelLoadConsumedHerbaceous",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonPostfireLitter
+   {:type "double",
+    :id "getCarbonPostfireLitter",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadDuff
+   {:type "double",
+    :id "getFuelLoadDuff",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :setUseConsumptionEquations
+   {:type "void",
+    :id "setUseConsumptionEquations",
+    :parameters [{:id "useConsumptionEquations", :type "bool"}]},
+   :setFuelLoadCrownBranch
+   {:type "void",
+    :id "setFuelLoadCrownBranch",
+    :parameters
+    [{:id "fuelLoad", :type "double"}
+     {:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadPrefireSoundNineToTwentyInch
+   {:type "double",
+    :id "getFuelLoadPrefireSoundNineToTwentyInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getEmissionsDuffSmolderingCarbonMonoxide
+   {:type "double",
+    :id "getEmissionsDuffSmolderingCarbonMonoxide",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadCrownBranch
+   {:type "double",
+    :id "getFuelLoadCrownBranch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getEmissionsDuffSmolderingParticulateMatterTwoPointFive
+   {:type "double",
+    :id "getEmissionsDuffSmolderingParticulateMatterTwoPointFive",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getEmissionsFlamingSulfurDioxide
+   {:type "double",
+    :id "getEmissionsFlamingSulfurDioxide",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonConsumedSoundNineToTwentyInch
+   {:type "double",
+    :id "getCarbonConsumedSoundNineToTwentyInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadPostfireCrownFoliage
+   {:type "double",
+    :id "getFuelLoadPostfireCrownFoliage",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getConsumptionEquationNumberDuff
+   {:type "int",
+    :id "getConsumptionEquationNumberDuff",
+    :parameters []},
+   :getFuelLoadConsumedRottenThousandHour
+   {:type "double",
+    :id "getFuelLoadConsumedRottenThousandHour",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadConsumedOneHour
+   {:type "double",
+    :id "getFuelLoadConsumedOneHour",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getPercentConsumedCrownBranch
+   {:type "double",
+    :id "getPercentConsumedCrownBranch",
+    :parameters
+    [{:id "fractionUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :distributeThousandHourFuelLoad
+   {:type "void",
+    :id "distributeThousandHourFuelLoad",
+    :parameters
+    [{:id "totalFuelLoad", :type "double"}
+     {:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}
+     {:id "rottenFraction", :type "double"}
+     {:id "fractionUnits", :type "FractionUnits::FractionUnitsEnum"}
+     {:id "distribution",
+      :type
+      "ThousandHourLoadDistribution::ThousandHourLoadDistributionEnum"}]},
+   :getBurnSeason
+   {:type "BurnSeason::BurnSeasonEnum",
+    :id "getBurnSeason",
+    :parameters []},
+   :setMoistureThousandHour
+   {:type "void",
+    :id "setMoistureThousandHour",
+    :parameters
+    [{:id "moisture", :type "double"}
+     {:id "moistureUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :getFuelLoadPostfireSoundTwentyInchAndLarger
+   {:type "double",
+    :id "getFuelLoadPostfireSoundTwentyInchAndLarger",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getConsumptionEquationNumberSoundNineToTwentyInch
+   {:type "int",
+    :id "getConsumptionEquationNumberSoundNineToTwentyInch",
+    :parameters []},
+   :setRegion
+   {:type "void",
+    :id "setRegion",
+    :parameters
+    [{:id "region",
+      :type "FuelConsumptionRegion::FuelConsumptionRegionEnum"}]},
+   :getMoistureThousandHour
+   {:type "double",
+    :id "getMoistureThousandHour",
+    :parameters
+    [{:id "moistureUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :getFuelLoadPrefireTenHour
+   {:type "double",
+    :id "getFuelLoadPrefireTenHour",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonPrefireSoundSixToNineInch
+   {:type "double",
+    :id "getCarbonPrefireSoundSixToNineInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadRottenTwentyInchAndLarger
+   {:type "double",
+    :id "getFuelLoadRottenTwentyInchAndLarger",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :setFuelLoadRottenThreeToSixInch
+   {:type "void",
+    :id "setFuelLoadRottenThreeToSixInch",
+    :parameters
+    [{:id "fuelLoad", :type "double"}
+     {:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getDuffDepthPrefire
+   {:type "double",
+    :id "getDuffDepthPrefire",
+    :parameters
+    [{:id "lengthUnits", :type "LengthUnits::LengthUnitsEnum"}]},
+   :getConsumptionEquationNumberSoundSixToNineInch
+   {:type "int",
+    :id "getConsumptionEquationNumberSoundSixToNineInch",
+    :parameters []},
+   :getEmissionsFlamingCarbonMonoxide
+   {:type "double",
+    :id "getEmissionsFlamingCarbonMonoxide",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getConsumptionEquationNumberCrownBranch
+   {:type "int",
+    :id "getConsumptionEquationNumberCrownBranch",
+    :parameters []},
+   :getEmissionsDuffSmolderingCarbonDioxide
+   {:type "double",
+    :id "getEmissionsDuffSmolderingCarbonDioxide",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :setMoistureLitter
+   {:type "void",
+    :id "setMoistureLitter",
+    :parameters
+    [{:id "moisture", :type "double"}
+     {:id "moistureUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :getDuffSmolderingEmission
+   {:type "double",
+    :id "getDuffSmolderingEmission",
+    :parameters
+    [{:id "species", :type "EmissionSpecies::EmissionSpeciesEnum"}
+     {:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadConsumedRottenSixToNineInch
+   {:type "double",
+    :id "getFuelLoadConsumedRottenSixToNineInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonConsumedTotal
+   {:type "double",
+    :id "getCarbonConsumedTotal",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getPercentDuffDepthReduction
+   {:type "double",
+    :id "getPercentDuffDepthReduction",
+    :parameters
+    [{:id "fractionUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :getFuelLoadConsumedFlaming
+   {:type "double",
+    :id "getFuelLoadConsumedFlaming",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :setFuelLoadCrownFoliage
+   {:type "void",
+    :id "setFuelLoadCrownFoliage",
+    :parameters
+    [{:id "fuelLoad", :type "double"}
+     {:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadPostfireSoundThousandHour
+   {:type "double",
+    :id "getFuelLoadPostfireSoundThousandHour",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadSoundNineToTwentyInch
+   {:type "double",
+    :id "getFuelLoadSoundNineToTwentyInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonPostfire
+   {:type "double",
+    :id "getCarbonPostfire",
+    :parameters
+    [{:id "component",
+      :type "FuelConsumptionComponent::FuelConsumptionComponentEnum"}
+     {:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadRottenSixToNineInch
+   {:type "double",
+    :id "getFuelLoadRottenSixToNineInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getConsumptionEquationNumberHundredHour
+   {:type "int",
+    :id "getConsumptionEquationNumberHundredHour",
+    :parameters []},
+   :getDuffDepthReduction
+   {:type "double",
+    :id "getDuffDepthReduction",
+    :parameters
+    [{:id "lengthUnits", :type "LengthUnits::LengthUnitsEnum"}]},
+   :getPercentConsumedCrownFoliage
+   {:type "double",
+    :id "getPercentConsumedCrownFoliage",
+    :parameters
+    [{:id "fractionUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :setFuelLoadDuff
+   {:type "void",
+    :id "setFuelLoadDuff",
+    :parameters
+    [{:id "fuelLoad", :type "double"}
+     {:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonPostfireRottenThreeToSixInch
+   {:type "double",
+    :id "getCarbonPostfireRottenThreeToSixInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadPrefireLitter
+   {:type "double",
+    :id "getFuelLoadPrefireLitter",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadPrefireRottenThousandHour
+   {:type "double",
+    :id "getFuelLoadPrefireRottenThousandHour",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadConsumedCrownFoliage
+   {:type "double",
+    :id "getFuelLoadConsumedCrownFoliage",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getMoistureDuff
+   {:type "double",
+    :id "getMoistureDuff",
+    :parameters
+    [{:id "moistureUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :getDuffEmissionFactorGroup
+   {:type "int", :id "getDuffEmissionFactorGroup", :parameters []},
+   :getCoverGroup
+   {:type "CoverGroup::CoverGroupEnum",
+    :id "getCoverGroup",
+    :parameters []},
+   :getCarbonConsumedRottenThreeToSixInch
+   {:type "double",
+    :id "getCarbonConsumedRottenThreeToSixInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getSmolderingDuration
+   {:type "double",
+    :id "getSmolderingDuration",
+    :parameters [{:id "timeUnits", :type "TimeUnits::TimeUnitsEnum"}]},
+   :getDuffConsumptionEquation
+   {:type "DuffConsumptionEquation::DuffConsumptionEquationEnum",
+    :id "getDuffConsumptionEquation",
+    :parameters []},
+   :getDuffFireIntensity
+   {:type "double",
+    :id "getDuffFireIntensity",
+    :parameters
+    [{:id "intensityUnits",
+      :type
+      "HeatSourceAndReactionIntensityUnits::HeatSourceAndReactionIntensityUnitsEnum"}]},
+   :getPercentConsumedSoundNineToTwentyInch
+   {:type "double",
+    :id "getPercentConsumedSoundNineToTwentyInch",
+    :parameters
+    [{:id "fractionUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :getCarbonPostfireRottenTwentyInchAndLarger
+   {:type "double",
+    :id "getCarbonPostfireRottenTwentyInchAndLarger",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getPercentConsumedSoundTwentyInchAndLarger
+   {:type "double",
+    :id "getPercentConsumedSoundTwentyInchAndLarger",
+    :parameters
+    [{:id "fractionUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :getCarbonConsumedRottenTwentyInchAndLarger
+   {:type "double",
+    :id "getCarbonConsumedRottenTwentyInchAndLarger",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getConsumptionEquationNumberHerbaceous
+   {:type "int",
+    :id "getConsumptionEquationNumberHerbaceous",
+    :parameters []},
+   :getFuelLoadHerbaceous
+   {:type "double",
+    :id "getFuelLoadHerbaceous",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getPercentConsumedOneHour
+   {:type "double",
+    :id "getPercentConsumedOneHour",
+    :parameters
+    [{:id "fractionUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :getConsumptionEquationNumberSoundThousandHour
+   {:type "int",
+    :id "getConsumptionEquationNumberSoundThousandHour",
+    :parameters []},
+   :getConsumptionEquationNumberSoundThreeToSixInch
+   {:type "int",
+    :id "getConsumptionEquationNumberSoundThreeToSixInch",
+    :parameters []},
+   :getFuelLoadPrefireShrub
+   {:type "double",
+    :id "getFuelLoadPrefireShrub",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getEmissionsSmolderingCarbonMonoxide
+   {:type "double",
+    :id "getEmissionsSmolderingCarbonMonoxide",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonConsumedTenHour
+   {:type "double",
+    :id "getCarbonConsumedTenHour",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadConsumedSoundThreeToSixInch
+   {:type "double",
+    :id "getFuelLoadConsumedSoundThreeToSixInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonPrefireLitter
+   {:type "double",
+    :id "getCarbonPrefireLitter",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :setMoistureTenHour
+   {:type "void",
+    :id "setMoistureTenHour",
+    :parameters
+    [{:id "moisture", :type "double"}
+     {:id "moistureUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :getEmissionsFlamingNitrogenOxides
+   {:type "double",
+    :id "getEmissionsFlamingNitrogenOxides",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadPostfireRottenSixToNineInch
+   {:type "double",
+    :id "getFuelLoadPostfireRottenSixToNineInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getEmissionsFlamingParticulateMatterTwoPointFive
+   {:type "double",
+    :id "getEmissionsFlamingParticulateMatterTwoPointFive",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonConsumedSoundTwentyInchAndLarger
+   {:type "double",
+    :id "getCarbonConsumedSoundTwentyInchAndLarger",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonPrefireSoundTwentyInchAndLarger
+   {:type "double",
+    :id "getCarbonPrefireSoundTwentyInchAndLarger",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonPrefireRottenSixToNineInch
+   {:type "double",
+    :id "getCarbonPrefireRottenSixToNineInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonPostfireRottenThousandHour
+   {:type "double",
+    :id "getCarbonPostfireRottenThousandHour",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonPostfireTenHour
+   {:type "double",
+    :id "getCarbonPostfireTenHour",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonPrefire
+   {:type "double",
+    :id "getCarbonPrefire",
+    :parameters
+    [{:id "component",
+      :type "FuelConsumptionComponent::FuelConsumptionComponentEnum"}
+     {:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadPostfireShrub
+   {:type "double",
+    :id "getFuelLoadPostfireShrub",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :setFuelLoadRottenTwentyInchAndLarger
+   {:type "void",
+    :id "setFuelLoadRottenTwentyInchAndLarger",
+    :parameters
+    [{:id "fuelLoad", :type "double"}
+     {:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :setFuelLoadShrub
+   {:type "void",
+    :id "setFuelLoadShrub",
+    :parameters
+    [{:id "fuelLoad", :type "double"}
+     {:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getEmissionsSmolderingParticulateMatterTwoPointFive
+   {:type "double",
+    :id "getEmissionsSmolderingParticulateMatterTwoPointFive",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonPostfireTotal
+   {:type "double",
+    :id "getCarbonPostfireTotal",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getDuffDepth
+   {:type "double",
+    :id "getDuffDepth",
+    :parameters
+    [{:id "lengthUnits", :type "LengthUnits::LengthUnitsEnum"}]},
+   :getFuelLoadConsumedDuff
+   {:type "double",
+    :id "getFuelLoadConsumedDuff",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadRottenNineToTwentyInch
+   {:type "double",
+    :id "getFuelLoadRottenNineToTwentyInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadSoundThreeToSixInch
+   {:type "double",
+    :id "getFuelLoadSoundThreeToSixInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadPrefireRottenNineToTwentyInch
+   {:type "double",
+    :id "getFuelLoadPrefireRottenNineToTwentyInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonPrefireShrub
+   {:type "double",
+    :id "getCarbonPrefireShrub",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getPercentConsumedRottenThousandHour
+   {:type "double",
+    :id "getPercentConsumedRottenThousandHour",
+    :parameters
+    [{:id "fractionUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :getFuelLoadSoundTwentyInchAndLarger
+   {:type "double",
+    :id "getFuelLoadSoundTwentyInchAndLarger",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadPrefireSoundThousandHour
+   {:type "double",
+    :id "getFuelLoadPrefireSoundThousandHour",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonConsumedLitter
+   {:type "double",
+    :id "getCarbonConsumedLitter",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonConsumedCrownFoliage
+   {:type "double",
+    :id "getCarbonConsumedCrownFoliage",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonPostfireHerbaceous
+   {:type "double",
+    :id "getCarbonPostfireHerbaceous",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonPrefireRottenThousandHour
+   {:type "double",
+    :id "getCarbonPrefireRottenThousandHour",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :setFuelLoadOneHour
+   {:type "void",
+    :id "setFuelLoadOneHour",
+    :parameters
+    [{:id "fuelLoad", :type "double"}
+     {:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonPostfireSoundSixToNineInch
+   {:type "double",
+    :id "getCarbonPostfireSoundSixToNineInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :setLitterConsumptionEquation
+   {:type "void",
+    :id "setLitterConsumptionEquation",
+    :parameters
+    [{:id "equation",
+      :type
+      "LitterConsumptionEquation::LitterConsumptionEquationEnum"}]},
+   :getCarbonPrefireTenHour
+   {:type "double",
+    :id "getCarbonPrefireTenHour",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getPercentConsumedShrub
+   {:type "double",
+    :id "getPercentConsumedShrub",
+    :parameters
+    [{:id "fractionUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :getDuffBurnTime
+   {:type "double",
+    :id "getDuffBurnTime",
+    :parameters [{:id "timeUnits", :type "TimeUnits::TimeUnitsEnum"}]},
+   :getFuelLoadConsumedShrub
+   {:type "double",
+    :id "getFuelLoadConsumedShrub",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFlamingEmission
+   {:type "double",
+    :id "getFlamingEmission",
+    :parameters
+    [{:id "species", :type "EmissionSpecies::EmissionSpeciesEnum"}
+     {:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :setFuelLoadTenHour
+   {:type "void",
+    :id "setFuelLoadTenHour",
+    :parameters
+    [{:id "fuelLoad", :type "double"}
+     {:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadPostfireDuff
+   {:type "double",
+    :id "getFuelLoadPostfireDuff",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :setFuelLoadSoundSixToNineInch
+   {:type "void",
+    :id "setFuelLoadSoundSixToNineInch",
+    :parameters
+    [{:id "fuelLoad", :type "double"}
+     {:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonConsumedRottenNineToTwentyInch
+   {:type "double",
+    :id "getCarbonConsumedRottenNineToTwentyInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonConsumedRottenSixToNineInch
+   {:type "double",
+    :id "getCarbonConsumedRottenSixToNineInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadConsumedSoundSixToNineInch
+   {:type "double",
+    :id "getFuelLoadConsumedSoundSixToNineInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getEmissionsDuffSmolderingNitrogenOxides
+   {:type "double",
+    :id "getEmissionsDuffSmolderingNitrogenOxides",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadPostfire
+   {:type "double",
+    :id "getFuelLoadPostfire",
+    :parameters
+    [{:id "component",
+      :type "FuelConsumptionComponent::FuelConsumptionComponentEnum"}
+     {:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCoarseWoodyEmissionFactorGroup
+   {:type "int",
+    :id "getCoarseWoodyEmissionFactorGroup",
+    :parameters []},
+   :getErrorMessage
+   {:type "char", :id "getErrorMessage", :parameters []},
+   :getCarbonPrefireRottenTwentyInchAndLarger
+   {:type "double",
+    :id "getCarbonPrefireRottenTwentyInchAndLarger",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadConsumedTotal
+   {:type "double",
+    :id "getFuelLoadConsumedTotal",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonConsumedRottenThousandHour
+   {:type "double",
+    :id "getCarbonConsumedRottenThousandHour",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonPrefireHerbaceous
+   {:type "double",
+    :id "getCarbonPrefireHerbaceous",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonConsumedSoundThreeToSixInch
+   {:type "double",
+    :id "getCarbonConsumedSoundThreeToSixInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonConsumedShrub
+   {:type "double",
+    :id "getCarbonConsumedShrub",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getPercentConsumedRottenTwentyInchAndLarger
+   {:type "double",
+    :id "getPercentConsumedRottenTwentyInchAndLarger",
+    :parameters
+    [{:id "fractionUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :getEmissionsSmolderingParticulateMatterTen
+   {:type "double",
+    :id "getEmissionsSmolderingParticulateMatterTen",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getConsumptionEquationNumber
+   {:type "int",
+    :id "getConsumptionEquationNumber",
+    :parameters
+    [{:id "component",
+      :type
+      "FuelConsumptionComponent::FuelConsumptionComponentEnum"}]},
+   :setMoistureDuff
+   {:type "void",
+    :id "setMoistureDuff",
+    :parameters
+    [{:id "moisture", :type "double"}
+     {:id "moistureUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :getFuelLoadPrefireRottenThreeToSixInch
+   {:type "double",
+    :id "getFuelLoadPrefireRottenThreeToSixInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadConsumedTenHour
+   {:type "double",
+    :id "getFuelLoadConsumedTenHour",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadPrefireHundredHour
+   {:type "double",
+    :id "getFuelLoadPrefireHundredHour",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonConsumedSoundThousandHour
+   {:type "double",
+    :id "getCarbonConsumedSoundThousandHour",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :SIGFuelConsumption
+   {:id "SIGFuelConsumption",
+    :parameters [{:id "rhs", :type "SIGFuelConsumption"}]},
+   :getEmissionsFlamingParticulateMatterTen
+   {:type "double",
+    :id "getEmissionsFlamingParticulateMatterTen",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonPostfireCrownBranch
+   {:type "double",
+    :id "getCarbonPostfireCrownBranch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getPercentConsumed
+   {:type "double",
+    :id "getPercentConsumed",
+    :parameters
+    [{:id "component",
+      :type "FuelConsumptionComponent::FuelConsumptionComponentEnum"}
+     {:id "fractionUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :getConsumptionEquationNumberCrownFoliage
+   {:type "int",
+    :id "getConsumptionEquationNumberCrownFoliage",
+    :parameters []},
+   :getFlamingEmissionFactorGroup
+   {:type "int", :id "getFlamingEmissionFactorGroup", :parameters []},
+   :getFlamingDuration
+   {:type "double",
+    :id "getFlamingDuration",
+    :parameters [{:id "timeUnits", :type "TimeUnits::TimeUnitsEnum"}]},
+   :getEmissionsDuffSmolderingParticulateMatterTen
+   {:type "double",
+    :id "getEmissionsDuffSmolderingParticulateMatterTen",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonPrefireRottenNineToTwentyInch
+   {:type "double",
+    :id "getCarbonPrefireRottenNineToTwentyInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :setDuffType
+   {:type "void",
+    :id "setDuffType",
+    :parameters [{:id "duffType", :type "DuffType::DuffTypeEnum"}]},
+   :getCarbonPostfireRottenSixToNineInch
+   {:type "double",
+    :id "getCarbonPostfireRottenSixToNineInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :setFuelLoadHerbaceous
+   {:type "void",
+    :id "setFuelLoadHerbaceous",
+    :parameters
+    [{:id "fuelLoad", :type "double"}
+     {:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getConsumptionEquationNumberTenHour
+   {:type "int",
+    :id "getConsumptionEquationNumberTenHour",
+    :parameters []},
+   :getCarbonConsumed
+   {:type "double",
+    :id "getCarbonConsumed",
+    :parameters
+    [{:id "component",
+      :type "FuelConsumptionComponent::FuelConsumptionComponentEnum"}
+     {:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadPrefireRottenTwentyInchAndLarger
+   {:type "double",
+    :id "getFuelLoadPrefireRottenTwentyInchAndLarger",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonPostfireOneHour
+   {:type "double",
+    :id "getCarbonPostfireOneHour",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getConsumptionEquationNumberRottenTwentyInchAndLarger
+   {:type "int",
+    :id "getConsumptionEquationNumberRottenTwentyInchAndLarger",
+    :parameters []},
+   :getFuelLoadConsumedRottenNineToTwentyInch
+   {:type "double",
+    :id "getFuelLoadConsumedRottenNineToTwentyInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadPostfireSoundSixToNineInch
+   {:type "double",
+    :id "getFuelLoadPostfireSoundSixToNineInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :setBurnSeason
+   {:type "void",
+    :id "setBurnSeason",
+    :parameters
+    [{:id "burnSeason", :type "BurnSeason::BurnSeasonEnum"}]},
+   :getCarbonPostfireCrownFoliage
+   {:type "double",
+    :id "getCarbonPostfireCrownFoliage",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadLitter
+   {:type "double",
+    :id "getFuelLoadLitter",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadConsumedCrownBranch
+   {:type "double",
+    :id "getFuelLoadConsumedCrownBranch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonConsumedDuff
+   {:type "double",
+    :id "getCarbonConsumedDuff",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadConsumedSmoldering
+   {:type "double",
+    :id "getFuelLoadConsumedSmoldering",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadPrefireRottenSixToNineInch
+   {:type "double",
+    :id "getFuelLoadPrefireRottenSixToNineInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadConsumedSoundThousandHour
+   {:type "double",
+    :id "getFuelLoadConsumedSoundThousandHour",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadPostfireTotal
+   {:type "double",
+    :id "getFuelLoadPostfireTotal",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :setMineralSoilExposureEquation
+   {:type "void",
+    :id "setMineralSoilExposureEquation",
+    :parameters
+    [{:id "equation",
+      :type
+      "MineralSoilExposureEquation::MineralSoilExposureEquationEnum"}]},
+   :getConsumptionEquationNumberLitter
+   {:type "int",
+    :id "getConsumptionEquationNumberLitter",
+    :parameters []},
+   :getFuelLoadPrefireSoundThreeToSixInch
+   {:type "double",
+    :id "getFuelLoadPrefireSoundThreeToSixInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getEmissionsDuffSmolderingMethane
+   {:type "double",
+    :id "getEmissionsDuffSmolderingMethane",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :setEmissionFactorGroups
+   {:type "bool",
+    :id "setEmissionFactorGroups",
+    :parameters
+    [{:id "flamingGroupNumber", :type "int"}
+     {:id "coarseWoodyGroupNumber", :type "int"}
+     {:id "duffGroupNumber", :type "int"}]},
+   :getFuelLoadPrefireDuff
+   {:type "double",
+    :id "getFuelLoadPrefireDuff",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getSmolderingEmission
+   {:type "double",
+    :id "getSmolderingEmission",
+    :parameters
+    [{:id "species", :type "EmissionSpecies::EmissionSpeciesEnum"}
+     {:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :setFuelLoadRottenNineToTwentyInch
+   {:type "void",
+    :id "setFuelLoadRottenNineToTwentyInch",
+    :parameters
+    [{:id "fuelLoad", :type "double"}
+     {:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :setFuelLoadRottenSixToNineInch
+   {:type "void",
+    :id "setFuelLoadRottenSixToNineInch",
+    :parameters
+    [{:id "fuelLoad", :type "double"}
+     {:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :setFuelLoadLitter
+   {:type "void",
+    :id "setFuelLoadLitter",
+    :parameters
+    [{:id "fuelLoad", :type "double"}
+     {:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getConsumptionEquationNumberRottenThreeToSixInch
+   {:type "int",
+    :id "getConsumptionEquationNumberRottenThreeToSixInch",
+    :parameters []},
+   :getConsumptionEquationNumberOneHour
+   {:type "int",
+    :id "getConsumptionEquationNumberOneHour",
+    :parameters []},
+   :getPercentConsumedTotal
+   {:type "double",
+    :id "getPercentConsumedTotal",
+    :parameters
+    [{:id "fractionUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :getFuelLoadTenHour
+   {:type "double",
+    :id "getFuelLoadTenHour",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :initializeMembers
+   {:type "void", :id "initializeMembers", :parameters []},
+   :getFuelLoadShrub
+   {:type "double",
+    :id "getFuelLoadShrub",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getRegion
+   {:type "FuelConsumptionRegion::FuelConsumptionRegionEnum",
+    :id "getRegion",
+    :parameters []},
+   :getFuelLoadConsumedRottenTwentyInchAndLarger
+   {:type "double",
+    :id "getFuelLoadConsumedRottenTwentyInchAndLarger",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadCrownFoliage
+   {:type "double",
+    :id "getFuelLoadCrownFoliage",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getMineralSoilExposureEquation
+   {:type
+    "MineralSoilExposureEquation::MineralSoilExposureEquationEnum",
+    :id "getMineralSoilExposureEquation",
+    :parameters []},
+   :setCoverGroup
+   {:type "void",
+    :id "setCoverGroup",
+    :parameters
+    [{:id "coverGroup", :type "CoverGroup::CoverGroupEnum"}]},
+   :getEmissionsSmolderingNitrogenOxides
+   {:type "double",
+    :id "getEmissionsSmolderingNitrogenOxides",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonPostfireSoundThousandHour
+   {:type "double",
+    :id "getCarbonPostfireSoundThousandHour",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonPostfireDuff
+   {:type "double",
+    :id "getCarbonPostfireDuff",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getPercentOfCrownBurned
+   {:type "double",
+    :id "getPercentOfCrownBurned",
+    :parameters
+    [{:id "fractionUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :setHerbaceousConsumptionEquation
+   {:type "void",
+    :id "setHerbaceousConsumptionEquation",
+    :parameters
+    [{:id "equation",
+      :type
+      "HerbaceousConsumptionEquation::HerbaceousConsumptionEquationEnum"}]},
+   :getFuelLoadPostfireCrownBranch
+   {:type "double",
+    :id "getFuelLoadPostfireCrownBranch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelCategory
+   {:type "FuelCategory::FuelCategoryEnum",
+    :id "getFuelCategory",
+    :parameters []},
+   :setFuelCategory
+   {:type "void",
+    :id "setFuelCategory",
+    :parameters
+    [{:id "fuelCategory", :type "FuelCategory::FuelCategoryEnum"}]},
+   :getFuelLoadPrefire
+   {:type "double",
+    :id "getFuelLoadPrefire",
+    :parameters
+    [{:id "component",
+      :type "FuelConsumptionComponent::FuelConsumptionComponentEnum"}
+     {:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getMineralSoilExposed
+   {:type "double",
+    :id "getMineralSoilExposed",
+    :parameters
+    [{:id "fractionUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :getCarbonPrefireDuff
+   {:type "double",
+    :id "getCarbonPrefireDuff",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getEmissionsFlamingMethane
+   {:type "double",
+    :id "getEmissionsFlamingMethane",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :setDuffDepthReductionEquation
+   {:type "void",
+    :id "setDuffDepthReductionEquation",
+    :parameters
+    [{:id "equation",
+      :type "DuffConsumptionEquation::DuffConsumptionEquationEnum"}]},
+   :getPercentConsumedLitter
+   {:type "double",
+    :id "getPercentConsumedLitter",
+    :parameters
+    [{:id "fractionUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :getFuelLoadPostfireRottenThreeToSixInch
+   {:type "double",
+    :id "getFuelLoadPostfireRottenThreeToSixInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonPostfireShrub
+   {:type "double",
+    :id "getCarbonPostfireShrub",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getConsumptionEquationNumberRottenNineToTwentyInch
+   {:type "int",
+    :id "getConsumptionEquationNumberRottenNineToTwentyInch",
+    :parameters []},
+   :getFuelLoadPostfireHerbaceous
+   {:type "double",
+    :id "getFuelLoadPostfireHerbaceous",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :setFuelLoadSoundThreeToSixInch
+   {:type "void",
+    :id "setFuelLoadSoundThreeToSixInch",
+    :parameters
+    [{:id "fuelLoad", :type "double"}
+     {:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadOneHour
+   {:type "double",
+    :id "getFuelLoadOneHour",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonPrefireOneHour
+   {:type "double",
+    :id "getCarbonPrefireOneHour",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadPostfireHundredHour
+   {:type "double",
+    :id "getFuelLoadPostfireHundredHour",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadRottenThreeToSixInch
+   {:type "double",
+    :id "getFuelLoadRottenThreeToSixInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getMoistureLitter
+   {:type "double",
+    :id "getMoistureLitter",
+    :parameters
+    [{:id "moistureUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :getCarbonPrefireSoundNineToTwentyInch
+   {:type "double",
+    :id "getCarbonPrefireSoundNineToTwentyInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getMoistureTenHour
+   {:type "double",
+    :id "getMoistureTenHour",
+    :parameters
+    [{:id "moistureUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :getDuffMoistureMethod
+   {:type "DuffMoistureMethod::DuffMoistureMethodEnum",
+    :id "getDuffMoistureMethod",
+    :parameters []},
+   :getPercentConsumedHerbaceous
+   {:type "double",
+    :id "getPercentConsumedHerbaceous",
+    :parameters
+    [{:id "fractionUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :getFuelLoadPrefireCrownBranch
+   {:type "double",
+    :id "getFuelLoadPrefireCrownBranch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :setShrubConsumptionEquation
+   {:type "void",
+    :id "setShrubConsumptionEquation",
+    :parameters
+    [{:id "equation",
+      :type
+      "ShrubConsumptionEquation::ShrubConsumptionEquationEnum"}]},
+   :getCarbonConsumedOneHour
+   {:type "double",
+    :id "getCarbonConsumedOneHour",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getConsumptionEquationNumberRottenSixToNineInch
+   {:type "int",
+    :id "getConsumptionEquationNumberRottenSixToNineInch",
+    :parameters []},
+   :getCarbonPostfireSoundTwentyInchAndLarger
+   {:type "double",
+    :id "getCarbonPostfireSoundTwentyInchAndLarger",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getPercentConsumedDuff
+   {:type "double",
+    :id "getPercentConsumedDuff",
+    :parameters
+    [{:id "fractionUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :setFuelLoadSoundNineToTwentyInch
+   {:type "void",
+    :id "setFuelLoadSoundNineToTwentyInch",
+    :parameters
+    [{:id "fuelLoad", :type "double"}
+     {:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadPostfireOneHour
+   {:type "double",
+    :id "getFuelLoadPostfireOneHour",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getEmissionsDuffSmolderingSulfurDioxide
+   {:type "double",
+    :id "getEmissionsDuffSmolderingSulfurDioxide",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getShrubConsumptionEquation
+   {:type "ShrubConsumptionEquation::ShrubConsumptionEquationEnum",
+    :id "getShrubConsumptionEquation",
+    :parameters []},
+   :getFuelLoadPrefireOneHour
+   {:type "double",
+    :id "getFuelLoadPrefireOneHour",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadThousandHour
+   {:type "double",
+    :id "getFuelLoadThousandHour",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getDuffDepthPostfire
+   {:type "double",
+    :id "getDuffDepthPostfire",
+    :parameters
+    [{:id "lengthUnits", :type "LengthUnits::LengthUnitsEnum"}]},
+   :setDuffDepth
+   {:type "void",
+    :id "setDuffDepth",
+    :parameters
+    [{:id "duffDepth", :type "double"}
+     {:id "lengthUnits", :type "LengthUnits::LengthUnitsEnum"}]},
+   :setDuffMoistureMethod
+   {:type "void",
+    :id "setDuffMoistureMethod",
+    :parameters
+    [{:id "duffMoistureMethod",
+      :type "DuffMoistureMethod::DuffMoistureMethodEnum"}]},
+   :getEmissionsSmolderingMethane
+   {:type "double",
+    :id "getEmissionsSmolderingMethane",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonPrefireSoundThousandHour
+   {:type "double",
+    :id "getCarbonPrefireSoundThousandHour",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadHundredHour
+   {:type "double",
+    :id "getFuelLoadHundredHour",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonPrefireCrownBranch
+   {:type "double",
+    :id "getCarbonPrefireCrownBranch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getUseConsumptionEquations
+   {:type "bool", :id "getUseConsumptionEquations", :parameters []},
+   :getCarbonPostfireSoundThreeToSixInch
+   {:type "double",
+    :id "getCarbonPostfireSoundThreeToSixInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getPercentConsumedRottenSixToNineInch
+   {:type "double",
+    :id "getPercentConsumedRottenSixToNineInch",
+    :parameters
+    [{:id "fractionUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :getFuelLoadPrefireCrownFoliage
+   {:type "double",
+    :id "getFuelLoadPrefireCrownFoliage",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonPrefireTotal
+   {:type "double",
+    :id "getCarbonPrefireTotal",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadConsumedLitter
+   {:type "double",
+    :id "getFuelLoadConsumedLitter",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonConsumedCrownBranch
+   {:type "double",
+    :id "getCarbonConsumedCrownBranch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getEmissionsSmolderingSulfurDioxide
+   {:type "double",
+    :id "getEmissionsSmolderingSulfurDioxide",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getMineralSoilExposureEquationNumber
+   {:type "int",
+    :id "getMineralSoilExposureEquationNumber",
+    :parameters []},
+   :getFuelLoadConsumed
+   {:type "double",
+    :id "getFuelLoadConsumed",
+    :parameters
+    [{:id "component",
+      :type "FuelConsumptionComponent::FuelConsumptionComponentEnum"}
+     {:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadPrefireTotal
+   {:type "double",
+    :id "getFuelLoadPrefireTotal",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadConsumedSoundNineToTwentyInch
+   {:type "double",
+    :id "getFuelLoadConsumedSoundNineToTwentyInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :setFuelLoadSoundTwentyInchAndLarger
+   {:type "void",
+    :id "setFuelLoadSoundTwentyInchAndLarger",
+    :parameters
+    [{:id "fuelLoad", :type "double"}
+     {:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :setPercentOfCrownBurned
+   {:type "void",
+    :id "setPercentOfCrownBurned",
+    :parameters
+    [{:id "percentOfCrownBurned", :type "double"}
+     {:id "fractionUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :getFuelLoadPostfireLitter
+   {:type "double",
+    :id "getFuelLoadPostfireLitter",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getConsumptionEquationNumberSoundTwentyInchAndLarger
+   {:type "int",
+    :id "getConsumptionEquationNumberSoundTwentyInchAndLarger",
+    :parameters []},
+   :getFuelLoadSoundSixToNineInch
+   {:type "double",
+    :id "getFuelLoadSoundSixToNineInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getFuelLoadPostfireTenHour
+   {:type "double",
+    :id "getFuelLoadPostfireTenHour",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonPostfireRottenNineToTwentyInch
+   {:type "double",
+    :id "getCarbonPostfireRottenNineToTwentyInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :doFuelConsumptionRun
+   {:type "bool", :id "doFuelConsumptionRun", :parameters []},
+   :setUseLegacyEmissionFactors
+   {:type "void",
+    :id "setUseLegacyEmissionFactors",
+    :parameters [{:id "useLegacyEmissionFactors", :type "bool"}]},
+   :getFuelLoadPostfireRottenTwentyInchAndLarger
+   {:type "double",
+    :id "getFuelLoadPostfireRottenTwentyInchAndLarger",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonPrefireSoundThreeToSixInch
+   {:type "double",
+    :id "getCarbonPrefireSoundThreeToSixInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getPercentConsumedRottenThreeToSixInch
+   {:type "double",
+    :id "getPercentConsumedRottenThreeToSixInch",
+    :parameters
+    [{:id "fractionUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :getFuelLoadPostfireSoundNineToTwentyInch
+   {:type "double",
+    :id "getFuelLoadPostfireSoundNineToTwentyInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getPercentConsumedRottenNineToTwentyInch
+   {:type "double",
+    :id "getPercentConsumedRottenNineToTwentyInch",
+    :parameters
+    [{:id "fractionUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :getCarbonPrefireCrownFoliage
+   {:type "double",
+    :id "getCarbonPrefireCrownFoliage",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonPostfireSoundNineToTwentyInch
+   {:type "double",
+    :id "getCarbonPostfireSoundNineToTwentyInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getConsumptionEquationNumberShrub
+   {:type "int",
+    :id "getConsumptionEquationNumberShrub",
+    :parameters []},
+   :getCarbonPrefireHundredHour
+   {:type "double",
+    :id "getCarbonPrefireHundredHour",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getCarbonPrefireRottenThreeToSixInch
+   {:type "double",
+    :id "getCarbonPrefireRottenThreeToSixInch",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getUseLegacyEmissionFactors
+   {:type "bool", :id "getUseLegacyEmissionFactors", :parameters []},
+   :getCarbonPostfireHundredHour
+   {:type "double",
+    :id "getCarbonPostfireHundredHour",
+    :parameters
+    [{:id "loadingUnits", :type "LoadingUnits::LoadingUnitsEnum"}]},
+   :getConsumptionEquationNumberRottenThousandHour
+   {:type "int",
+    :id "getConsumptionEquationNumberRottenThousandHour",
+    :parameters []},
+   :getPercentConsumedHundredHour
+   {:type "double",
+    :id "getPercentConsumedHundredHour",
+    :parameters
+    [{:id "fractionUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :getPercentConsumedSoundSixToNineInch
+   {:type "double",
+    :id "getPercentConsumedSoundSixToNineInch",
+    :parameters
+    [{:id "fractionUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :getLitterConsumptionEquation
+   {:type "LitterConsumptionEquation::LitterConsumptionEquationEnum",
+    :id "getLitterConsumptionEquation",
+    :parameters []},
+   :getPercentConsumedSoundThousandHour
+   {:type "double",
+    :id "getPercentConsumedSoundThousandHour",
+    :parameters
+    [{:id "fractionUnits", :type "FractionUnits::FractionUnitsEnum"}]},
+   :getDuffDepthReductionEquationNumber
+   {:type "int",
+    :id "getDuffDepthReductionEquationNumber",
+    :parameters []}}}}
