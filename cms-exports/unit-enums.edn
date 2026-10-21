@@ -24,7 +24,9 @@
  [:PoundsPerSquareFoot
   :TonsPerAcre
   :TonnesPerHectare
-  :KilogramsPerSquareMeter]
+  :KilogramsPerSquareMeter
+  :PoundsPerAcre
+  :GramsPerSquareMeter]
 
  :PressureUnits_PressureUnitsEnum
  [:Pascal
@@ -102,4 +104,17 @@
   :Seconds
   :Hours
   :Days
-  :Years]}
+  :Years]
+
+ :EmissionFactorUnits_EmissionFactorUnitsEnum
+ [:GramsPerKilogram
+  :PoundsPerTon]
+
+ :HeatCapacityUnits_HeatCapacityUnitsEnum
+ [:BtusPerPoundPerFahrenheit
+  :JoulesPerKilogramPerKelvin
+  :KilojoulesPerKilogramPerKelvin]
+
+ :ThermalConductivityUnits_ThermalConductivityUnitsEnum
+ [:BtusPerHourPerFootPerFahrenheit
+  :WattsPerMeterPerKelvin]}
