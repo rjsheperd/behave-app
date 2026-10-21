@@ -123,6 +123,20 @@ SET(SOURCE
     behave-mirror/src/behave/windAdjustmentFactor.cpp
     behave-mirror/src/behave/windSpeedUtility.cpp
     behave-mirror/src/behave/CrownFirebrandProcessor.cpp
+    # FOFEM fire effects
+    behave-mirror/src/behave/burnup.cpp
+    behave-mirror/src/behave/burnupInputs.cpp
+    behave-mirror/src/behave/burnupSimulation.cpp
+    behave-mirror/src/behave/emissionFactorTable.cpp
+    behave-mirror/src/behave/emissions.cpp
+    behave-mirror/src/behave/fuelConsumption.cpp
+    behave-mirror/src/behave/fuelConsumptionDecisions.cpp
+    behave-mirror/src/behave/fuelConsumptionEquations.cpp
+    behave-mirror/src/behave/fuelConsumptionInputs.cpp
+    behave-mirror/src/behave/soilFamilyTable.cpp
+    behave-mirror/src/behave/soilHeating.cpp
+    behave-mirror/src/behave/soilHeatingInputs.cpp
+    behave-mirror/src/behave/soilHeatingSimulation.cpp
 
     include/cpp/sig-adapters/SIGBehaveRun.cpp
     include/cpp/sig-adapters/SIGContainAdapter.cpp
@@ -180,6 +194,22 @@ SET(HEADERS
     behave-mirror/src/behave/windSpeedUtility.h
     behave-mirror/src/behave/vaporPressureDeficitCalculator.h
     behave-mirror/src/behave/CrownFirebrandProcessor.h
+    # FOFEM fire effects
+    behave-mirror/src/behave/burnup.h
+    behave-mirror/src/behave/burnupInputs.h
+    behave-mirror/src/behave/burnupSimulation.h
+    behave-mirror/src/behave/emissionFactorTable.h
+    behave-mirror/src/behave/emissions.h
+    behave-mirror/src/behave/fuelConsumption.h
+    behave-mirror/src/behave/fuelConsumptionDecisions.h
+    behave-mirror/src/behave/fuelConsumptionEquations.h
+    behave-mirror/src/behave/fuelConsumptionInputs.h
+    behave-mirror/src/behave/soilFamilyTable.h
+    behave-mirror/src/behave/soilHeating.h
+    behave-mirror/src/behave/soilHeatingInputs.h
+    behave-mirror/src/behave/soilHeatingSimulation.h
+    behave-mirror/src/behave/emissionFactorTableData.h
+    behave-mirror/src/behave/fireEffectsInputEnums.h
 
     include/cpp/sig-adapters/SIGBehaveRun.h
     include/cpp/sig-adapters/SIGContainAdapter.h
