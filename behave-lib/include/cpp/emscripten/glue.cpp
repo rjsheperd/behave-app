@@ -437,6 +437,51 @@ void EMSCRIPTEN_KEEPALIVE emscripten_bind_TimeUnits___destroy___0(TimeUnits* sel
   delete self;
 }
 
+// Interface: EmissionFactorUnits
+
+
+double EMSCRIPTEN_KEEPALIVE emscripten_bind_EmissionFactorUnits_toBaseUnits_2(double value, EmissionFactorUnits_EmissionFactorUnitsEnum units) {
+  return EmissionFactorUnits::toBaseUnits(value, units);
+}
+
+double EMSCRIPTEN_KEEPALIVE emscripten_bind_EmissionFactorUnits_fromBaseUnits_2(double value, EmissionFactorUnits_EmissionFactorUnitsEnum units) {
+  return EmissionFactorUnits::fromBaseUnits(value, units);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_EmissionFactorUnits___destroy___0(EmissionFactorUnits* self) {
+  delete self;
+}
+
+// Interface: HeatCapacityUnits
+
+
+double EMSCRIPTEN_KEEPALIVE emscripten_bind_HeatCapacityUnits_toBaseUnits_2(double value, HeatCapacityUnits_HeatCapacityUnitsEnum units) {
+  return HeatCapacityUnits::toBaseUnits(value, units);
+}
+
+double EMSCRIPTEN_KEEPALIVE emscripten_bind_HeatCapacityUnits_fromBaseUnits_2(double value, HeatCapacityUnits_HeatCapacityUnitsEnum units) {
+  return HeatCapacityUnits::fromBaseUnits(value, units);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_HeatCapacityUnits___destroy___0(HeatCapacityUnits* self) {
+  delete self;
+}
+
+// Interface: ThermalConductivityUnits
+
+
+double EMSCRIPTEN_KEEPALIVE emscripten_bind_ThermalConductivityUnits_toBaseUnits_2(double value, ThermalConductivityUnits_ThermalConductivityUnitsEnum units) {
+  return ThermalConductivityUnits::toBaseUnits(value, units);
+}
+
+double EMSCRIPTEN_KEEPALIVE emscripten_bind_ThermalConductivityUnits_fromBaseUnits_2(double value, ThermalConductivityUnits_ThermalConductivityUnitsEnum units) {
+  return ThermalConductivityUnits::fromBaseUnits(value, units);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_ThermalConductivityUnits___destroy___0(ThermalConductivityUnits* self) {
+  delete self;
+}
+
 // Interface: FireSize
 
 
@@ -2740,8 +2785,16 @@ bool EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGMortality_checkIsInGACCRegionAtSpec
   return self->checkIsInGACCRegionAtSpeciesTableIndex(index, region);
 }
 
+bool EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGMortality_checkIsInGeographicAreaCoordinationCenterAtSpeciesTableIndex_2(SIGMortality* self, int index, GACC region) {
+  return self->checkIsInGeographicAreaCoordinationCenterAtSpeciesTableIndex(index, region);
+}
+
 bool EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGMortality_checkIsInGACCRegionFromSpeciesCode_2(SIGMortality* self, char* speciesCode, GACC region) {
   return self->checkIsInGACCRegionFromSpeciesCode(speciesCode, region);
+}
+
+bool EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGMortality_checkIsInGeographicAreaCoordinationCenterFromSpeciesCode_2(SIGMortality* self, char* speciesCode, GACC region) {
+  return self->checkIsInGeographicAreaCoordinationCenterFromSpeciesCode(speciesCode, region);
 }
 
 bool EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGMortality_updateInputsForSpeciesCodeAndEquationType_2(SIGMortality* self, char* speciesCode, EquationType equationType) {
@@ -2832,12 +2885,24 @@ const GACC EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGMortality_getGACCRegion_0(SIG
   return self->getGACCRegion();
 }
 
+const GACC EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGMortality_getGeographicAreaCoordinationCenter_0(SIGMortality* self) {
+  return self->getGeographicAreaCoordinationCenter();
+}
+
 const SpeciesMasterTableRecordVector* EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGMortality_getSpeciesRecordVectorForGACCRegion_1(SIGMortality* self, GACC region) {
   return self->getSpeciesRecordVectorForGACCRegion(region);
 }
 
+const SpeciesMasterTableRecordVector* EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGMortality_getSpeciesRecordVectorForGeographicAreaCoordinationCenter_1(SIGMortality* self, GACC region) {
+  return self->getSpeciesRecordVectorForGeographicAreaCoordinationCenter(region);
+}
+
 const SpeciesMasterTableRecordVector* EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGMortality_getSpeciesRecordVectorForGACCRegionAndEquationType_2(SIGMortality* self, GACC region, EquationType equationType) {
   return self->getSpeciesRecordVectorForGACCRegionAndEquationType(region, equationType);
+}
+
+const SpeciesMasterTableRecordVector* EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGMortality_getSpeciesRecordVectorForGeographicAreaCoordinationCenterAndEquationType_2(SIGMortality* self, GACC region, EquationType equationType) {
+  return self->getSpeciesRecordVectorForGeographicAreaCoordinationCenterAndEquationType(region, equationType);
 }
 
 const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGMortality_getBarkThickness_1(SIGMortality* self, LengthUnits_LengthUnitsEnum barkThicknessUnits) {
@@ -2846,6 +2911,10 @@ const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGMortality_getBarkThickness_
 
 const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGMortality_getBasalAreaKillled_0(SIGMortality* self) {
   return self->getBasalAreaKillled();
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGMortality_getBasalAreaKilled_0(SIGMortality* self) {
+  return self->getBasalAreaKilled();
 }
 
 const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGMortality_getBasalAreaPostfire_0(SIGMortality* self) {
@@ -2964,8 +3033,16 @@ const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGMortality_postfireCanopyCov
   return self->postfireCanopyCover();
 }
 
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGMortality_getCanopyCoverPostfire_0(SIGMortality* self) {
+  return self->getCanopyCoverPostfire();
+}
+
 const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGMortality_prefireCanopyCover_0(SIGMortality* self) {
   return self->prefireCanopyCover();
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGMortality_getCanopyCoverPrefire_0(SIGMortality* self) {
+  return self->getCanopyCoverPrefire();
 }
 
 const int EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGMortality_getBarkEquationNumberAtSpeciesTableIndex_1(SIGMortality* self, int index) {
@@ -3036,6 +3113,10 @@ void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGMortality_setDBH_2(SIGMortality* se
   self->setDBH(dbh, diameterUnits);
 }
 
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGMortality_setDiameterAtBreastHeight_2(SIGMortality* self, double dbh, LengthUnits_LengthUnitsEnum diameterUnits) {
+  self->setDiameterAtBreastHeight(dbh, diameterUnits);
+}
+
 void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGMortality_setEquationType_1(SIGMortality* self, EquationType equationType) {
   self->setEquationType(equationType);
 }
@@ -3066,6 +3147,10 @@ void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGMortality_setMidFlameWindSpeed_2(SI
 
 void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGMortality_setGACCRegion_1(SIGMortality* self, GACC region) {
   self->setGACCRegion(region);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGMortality_setGeographicAreaCoordinationCenter_1(SIGMortality* self, GACC region) {
+  self->setGeographicAreaCoordinationCenter(region);
 }
 
 void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGMortality_setScorchHeight_2(SIGMortality* self, double scorchHeight, LengthUnits_LengthUnitsEnum scorchHeightUnits) {
@@ -3534,6 +3619,1395 @@ void EMSCRIPTEN_KEEPALIVE emscripten_bind_SafeSeparationDistanceCalculator___des
   delete self;
 }
 
+// Interface: SIGFuelConsumption
+
+
+SIGFuelConsumption* EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_SIGFuelConsumption_0() {
+  return new SIGFuelConsumption();
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_initializeMembers_0(SIGFuelConsumption* self) {
+  self->initializeMembers();
+}
+
+bool EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_doFuelConsumptionRun_0(SIGFuelConsumption* self) {
+  return self->doFuelConsumptionRun();
+}
+
+const BurnSeason_BurnSeasonEnum EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getBurnSeason_0(SIGFuelConsumption* self) {
+  return self->getBurnSeason();
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonConsumed_2(SIGFuelConsumption* self, FuelConsumptionComponent_FuelConsumptionComponentEnum component, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonConsumed(component, loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonConsumedCrownBranch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonConsumedCrownBranch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonConsumedCrownFoliage_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonConsumedCrownFoliage(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonConsumedDuff_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonConsumedDuff(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonConsumedHerbaceous_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonConsumedHerbaceous(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonConsumedHundredHour_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonConsumedHundredHour(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonConsumedLitter_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonConsumedLitter(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonConsumedOneHour_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonConsumedOneHour(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonConsumedRottenNineToTwentyInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonConsumedRottenNineToTwentyInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonConsumedRottenSixToNineInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonConsumedRottenSixToNineInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonConsumedRottenThousandHour_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonConsumedRottenThousandHour(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonConsumedRottenThreeToSixInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonConsumedRottenThreeToSixInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonConsumedRottenTwentyInchAndLarger_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonConsumedRottenTwentyInchAndLarger(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonConsumedShrub_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonConsumedShrub(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonConsumedSoundNineToTwentyInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonConsumedSoundNineToTwentyInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonConsumedSoundSixToNineInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonConsumedSoundSixToNineInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonConsumedSoundThousandHour_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonConsumedSoundThousandHour(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonConsumedSoundThreeToSixInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonConsumedSoundThreeToSixInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonConsumedSoundTwentyInchAndLarger_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonConsumedSoundTwentyInchAndLarger(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonConsumedTenHour_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonConsumedTenHour(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonConsumedTotal_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonConsumedTotal(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPostfire_2(SIGFuelConsumption* self, FuelConsumptionComponent_FuelConsumptionComponentEnum component, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPostfire(component, loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPostfireCrownBranch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPostfireCrownBranch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPostfireCrownFoliage_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPostfireCrownFoliage(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPostfireDuff_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPostfireDuff(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPostfireHerbaceous_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPostfireHerbaceous(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPostfireHundredHour_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPostfireHundredHour(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPostfireLitter_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPostfireLitter(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPostfireOneHour_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPostfireOneHour(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPostfireRottenNineToTwentyInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPostfireRottenNineToTwentyInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPostfireRottenSixToNineInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPostfireRottenSixToNineInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPostfireRottenThousandHour_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPostfireRottenThousandHour(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPostfireRottenThreeToSixInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPostfireRottenThreeToSixInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPostfireRottenTwentyInchAndLarger_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPostfireRottenTwentyInchAndLarger(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPostfireShrub_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPostfireShrub(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPostfireSoundNineToTwentyInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPostfireSoundNineToTwentyInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPostfireSoundSixToNineInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPostfireSoundSixToNineInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPostfireSoundThousandHour_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPostfireSoundThousandHour(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPostfireSoundThreeToSixInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPostfireSoundThreeToSixInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPostfireSoundTwentyInchAndLarger_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPostfireSoundTwentyInchAndLarger(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPostfireTenHour_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPostfireTenHour(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPostfireTotal_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPostfireTotal(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPrefire_2(SIGFuelConsumption* self, FuelConsumptionComponent_FuelConsumptionComponentEnum component, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPrefire(component, loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPrefireCrownBranch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPrefireCrownBranch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPrefireCrownFoliage_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPrefireCrownFoliage(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPrefireDuff_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPrefireDuff(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPrefireHerbaceous_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPrefireHerbaceous(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPrefireHundredHour_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPrefireHundredHour(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPrefireLitter_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPrefireLitter(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPrefireOneHour_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPrefireOneHour(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPrefireRottenNineToTwentyInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPrefireRottenNineToTwentyInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPrefireRottenSixToNineInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPrefireRottenSixToNineInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPrefireRottenThousandHour_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPrefireRottenThousandHour(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPrefireRottenThreeToSixInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPrefireRottenThreeToSixInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPrefireRottenTwentyInchAndLarger_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPrefireRottenTwentyInchAndLarger(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPrefireShrub_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPrefireShrub(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPrefireSoundNineToTwentyInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPrefireSoundNineToTwentyInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPrefireSoundSixToNineInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPrefireSoundSixToNineInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPrefireSoundThousandHour_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPrefireSoundThousandHour(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPrefireSoundThreeToSixInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPrefireSoundThreeToSixInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPrefireSoundTwentyInchAndLarger_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPrefireSoundTwentyInchAndLarger(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPrefireTenHour_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPrefireTenHour(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCarbonPrefireTotal_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getCarbonPrefireTotal(loadingUnits);
+}
+
+const int EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCoarseWoodyEmissionFactorGroup_0(SIGFuelConsumption* self) {
+  return self->getCoarseWoodyEmissionFactorGroup();
+}
+
+const int EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumber_1(SIGFuelConsumption* self, FuelConsumptionComponent_FuelConsumptionComponentEnum component) {
+  return self->getConsumptionEquationNumber(component);
+}
+
+const int EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumberCrownBranch_0(SIGFuelConsumption* self) {
+  return self->getConsumptionEquationNumberCrownBranch();
+}
+
+const int EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumberCrownFoliage_0(SIGFuelConsumption* self) {
+  return self->getConsumptionEquationNumberCrownFoliage();
+}
+
+const int EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumberDuff_0(SIGFuelConsumption* self) {
+  return self->getConsumptionEquationNumberDuff();
+}
+
+const int EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumberHerbaceous_0(SIGFuelConsumption* self) {
+  return self->getConsumptionEquationNumberHerbaceous();
+}
+
+const int EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumberHundredHour_0(SIGFuelConsumption* self) {
+  return self->getConsumptionEquationNumberHundredHour();
+}
+
+const int EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumberLitter_0(SIGFuelConsumption* self) {
+  return self->getConsumptionEquationNumberLitter();
+}
+
+const int EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumberOneHour_0(SIGFuelConsumption* self) {
+  return self->getConsumptionEquationNumberOneHour();
+}
+
+const int EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumberRottenNineToTwentyInch_0(SIGFuelConsumption* self) {
+  return self->getConsumptionEquationNumberRottenNineToTwentyInch();
+}
+
+const int EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumberRottenSixToNineInch_0(SIGFuelConsumption* self) {
+  return self->getConsumptionEquationNumberRottenSixToNineInch();
+}
+
+const int EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumberRottenThousandHour_0(SIGFuelConsumption* self) {
+  return self->getConsumptionEquationNumberRottenThousandHour();
+}
+
+const int EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumberRottenThreeToSixInch_0(SIGFuelConsumption* self) {
+  return self->getConsumptionEquationNumberRottenThreeToSixInch();
+}
+
+const int EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumberRottenTwentyInchAndLarger_0(SIGFuelConsumption* self) {
+  return self->getConsumptionEquationNumberRottenTwentyInchAndLarger();
+}
+
+const int EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumberShrub_0(SIGFuelConsumption* self) {
+  return self->getConsumptionEquationNumberShrub();
+}
+
+const int EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumberSoundNineToTwentyInch_0(SIGFuelConsumption* self) {
+  return self->getConsumptionEquationNumberSoundNineToTwentyInch();
+}
+
+const int EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumberSoundSixToNineInch_0(SIGFuelConsumption* self) {
+  return self->getConsumptionEquationNumberSoundSixToNineInch();
+}
+
+const int EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumberSoundThousandHour_0(SIGFuelConsumption* self) {
+  return self->getConsumptionEquationNumberSoundThousandHour();
+}
+
+const int EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumberSoundThreeToSixInch_0(SIGFuelConsumption* self) {
+  return self->getConsumptionEquationNumberSoundThreeToSixInch();
+}
+
+const int EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumberSoundTwentyInchAndLarger_0(SIGFuelConsumption* self) {
+  return self->getConsumptionEquationNumberSoundTwentyInchAndLarger();
+}
+
+const int EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumberTenHour_0(SIGFuelConsumption* self) {
+  return self->getConsumptionEquationNumberTenHour();
+}
+
+const CoverGroup_CoverGroupEnum EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getCoverGroup_0(SIGFuelConsumption* self) {
+  return self->getCoverGroup();
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getDuffBurnTime_1(SIGFuelConsumption* self, TimeUnits_TimeUnitsEnum timeUnits) {
+  return self->getDuffBurnTime(timeUnits);
+}
+
+const DuffConsumptionEquation_DuffConsumptionEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getDuffConsumptionEquation_0(SIGFuelConsumption* self) {
+  return self->getDuffConsumptionEquation();
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getDuffDepth_1(SIGFuelConsumption* self, LengthUnits_LengthUnitsEnum lengthUnits) {
+  return self->getDuffDepth(lengthUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getDuffDepthPostfire_1(SIGFuelConsumption* self, LengthUnits_LengthUnitsEnum lengthUnits) {
+  return self->getDuffDepthPostfire(lengthUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getDuffDepthPrefire_1(SIGFuelConsumption* self, LengthUnits_LengthUnitsEnum lengthUnits) {
+  return self->getDuffDepthPrefire(lengthUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getDuffDepthReduction_1(SIGFuelConsumption* self, LengthUnits_LengthUnitsEnum lengthUnits) {
+  return self->getDuffDepthReduction(lengthUnits);
+}
+
+const DuffConsumptionEquation_DuffConsumptionEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getDuffDepthReductionEquation_0(SIGFuelConsumption* self) {
+  return self->getDuffDepthReductionEquation();
+}
+
+const int EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getDuffDepthReductionEquationNumber_0(SIGFuelConsumption* self) {
+  return self->getDuffDepthReductionEquationNumber();
+}
+
+const int EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getDuffEmissionFactorGroup_0(SIGFuelConsumption* self) {
+  return self->getDuffEmissionFactorGroup();
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getDuffFireIntensity_1(SIGFuelConsumption* self, HeatSourceAndReactionIntensityUnits_HeatSourceAndReactionIntensityUnitsEnum intensityUnits) {
+  return self->getDuffFireIntensity(intensityUnits);
+}
+
+const DuffMoistureMethod_DuffMoistureMethodEnum EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getDuffMoistureMethod_0(SIGFuelConsumption* self) {
+  return self->getDuffMoistureMethod();
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getDuffSmolderingEmission_2(SIGFuelConsumption* self, EmissionSpecies_EmissionSpeciesEnum species, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getDuffSmolderingEmission(species, loadingUnits);
+}
+
+const DuffType_DuffTypeEnum EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getDuffType_0(SIGFuelConsumption* self) {
+  return self->getDuffType();
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getEmissionsDuffSmolderingCarbonDioxide_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getEmissionsDuffSmolderingCarbonDioxide(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getEmissionsDuffSmolderingCarbonMonoxide_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getEmissionsDuffSmolderingCarbonMonoxide(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getEmissionsDuffSmolderingMethane_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getEmissionsDuffSmolderingMethane(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getEmissionsDuffSmolderingNitrogenOxides_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getEmissionsDuffSmolderingNitrogenOxides(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getEmissionsDuffSmolderingParticulateMatterTen_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getEmissionsDuffSmolderingParticulateMatterTen(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getEmissionsDuffSmolderingParticulateMatterTwoPointFive_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getEmissionsDuffSmolderingParticulateMatterTwoPointFive(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getEmissionsDuffSmolderingSulfurDioxide_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getEmissionsDuffSmolderingSulfurDioxide(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getEmissionsFlamingCarbonDioxide_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getEmissionsFlamingCarbonDioxide(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getEmissionsFlamingCarbonMonoxide_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getEmissionsFlamingCarbonMonoxide(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getEmissionsFlamingMethane_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getEmissionsFlamingMethane(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getEmissionsFlamingNitrogenOxides_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getEmissionsFlamingNitrogenOxides(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getEmissionsFlamingParticulateMatterTen_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getEmissionsFlamingParticulateMatterTen(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getEmissionsFlamingParticulateMatterTwoPointFive_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getEmissionsFlamingParticulateMatterTwoPointFive(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getEmissionsFlamingSulfurDioxide_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getEmissionsFlamingSulfurDioxide(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getEmissionsSmolderingCarbonDioxide_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getEmissionsSmolderingCarbonDioxide(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getEmissionsSmolderingCarbonMonoxide_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getEmissionsSmolderingCarbonMonoxide(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getEmissionsSmolderingMethane_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getEmissionsSmolderingMethane(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getEmissionsSmolderingNitrogenOxides_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getEmissionsSmolderingNitrogenOxides(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getEmissionsSmolderingParticulateMatterTen_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getEmissionsSmolderingParticulateMatterTen(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getEmissionsSmolderingParticulateMatterTwoPointFive_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getEmissionsSmolderingParticulateMatterTwoPointFive(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getEmissionsSmolderingSulfurDioxide_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getEmissionsSmolderingSulfurDioxide(loadingUnits);
+}
+
+const char* EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getErrorMessage_0(SIGFuelConsumption* self) {
+  return self->getErrorMessage();
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFlamingDuration_1(SIGFuelConsumption* self, TimeUnits_TimeUnitsEnum timeUnits) {
+  return self->getFlamingDuration(timeUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFlamingEmission_2(SIGFuelConsumption* self, EmissionSpecies_EmissionSpeciesEnum species, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFlamingEmission(species, loadingUnits);
+}
+
+const int EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFlamingEmissionFactorGroup_0(SIGFuelConsumption* self) {
+  return self->getFlamingEmissionFactorGroup();
+}
+
+const FuelCategory_FuelCategoryEnum EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelCategory_0(SIGFuelConsumption* self) {
+  return self->getFuelCategory();
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadConsumed_2(SIGFuelConsumption* self, FuelConsumptionComponent_FuelConsumptionComponentEnum component, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadConsumed(component, loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedCrownBranch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadConsumedCrownBranch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedCrownFoliage_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadConsumedCrownFoliage(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedDuff_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadConsumedDuff(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedFlaming_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadConsumedFlaming(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedHerbaceous_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadConsumedHerbaceous(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedHundredHour_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadConsumedHundredHour(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedLitter_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadConsumedLitter(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedOneHour_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadConsumedOneHour(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedRottenNineToTwentyInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadConsumedRottenNineToTwentyInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedRottenSixToNineInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadConsumedRottenSixToNineInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedRottenThousandHour_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadConsumedRottenThousandHour(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedRottenThreeToSixInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadConsumedRottenThreeToSixInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedRottenTwentyInchAndLarger_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadConsumedRottenTwentyInchAndLarger(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedShrub_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadConsumedShrub(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedSmoldering_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadConsumedSmoldering(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedSoundNineToTwentyInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadConsumedSoundNineToTwentyInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedSoundSixToNineInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadConsumedSoundSixToNineInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedSoundThousandHour_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadConsumedSoundThousandHour(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedSoundThreeToSixInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadConsumedSoundThreeToSixInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedSoundTwentyInchAndLarger_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadConsumedSoundTwentyInchAndLarger(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedTenHour_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadConsumedTenHour(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedTotal_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadConsumedTotal(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadCrownBranch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadCrownBranch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadCrownFoliage_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadCrownFoliage(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadDuff_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadDuff(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadHerbaceous_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadHerbaceous(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadHundredHour_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadHundredHour(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadLitter_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadLitter(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadOneHour_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadOneHour(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPostfire_2(SIGFuelConsumption* self, FuelConsumptionComponent_FuelConsumptionComponentEnum component, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPostfire(component, loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireCrownBranch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPostfireCrownBranch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireCrownFoliage_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPostfireCrownFoliage(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireDuff_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPostfireDuff(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireHerbaceous_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPostfireHerbaceous(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireHundredHour_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPostfireHundredHour(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireLitter_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPostfireLitter(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireOneHour_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPostfireOneHour(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireRottenNineToTwentyInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPostfireRottenNineToTwentyInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireRottenSixToNineInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPostfireRottenSixToNineInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireRottenThousandHour_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPostfireRottenThousandHour(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireRottenThreeToSixInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPostfireRottenThreeToSixInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireRottenTwentyInchAndLarger_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPostfireRottenTwentyInchAndLarger(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireShrub_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPostfireShrub(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireSoundNineToTwentyInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPostfireSoundNineToTwentyInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireSoundSixToNineInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPostfireSoundSixToNineInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireSoundThousandHour_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPostfireSoundThousandHour(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireSoundThreeToSixInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPostfireSoundThreeToSixInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireSoundTwentyInchAndLarger_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPostfireSoundTwentyInchAndLarger(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireTenHour_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPostfireTenHour(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireTotal_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPostfireTotal(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPrefire_2(SIGFuelConsumption* self, FuelConsumptionComponent_FuelConsumptionComponentEnum component, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPrefire(component, loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireCrownBranch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPrefireCrownBranch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireCrownFoliage_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPrefireCrownFoliage(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireDuff_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPrefireDuff(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireHerbaceous_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPrefireHerbaceous(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireHundredHour_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPrefireHundredHour(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireLitter_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPrefireLitter(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireOneHour_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPrefireOneHour(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireRottenNineToTwentyInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPrefireRottenNineToTwentyInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireRottenSixToNineInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPrefireRottenSixToNineInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireRottenThousandHour_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPrefireRottenThousandHour(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireRottenThreeToSixInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPrefireRottenThreeToSixInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireRottenTwentyInchAndLarger_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPrefireRottenTwentyInchAndLarger(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireShrub_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPrefireShrub(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireSoundNineToTwentyInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPrefireSoundNineToTwentyInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireSoundSixToNineInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPrefireSoundSixToNineInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireSoundThousandHour_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPrefireSoundThousandHour(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireSoundThreeToSixInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPrefireSoundThreeToSixInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireSoundTwentyInchAndLarger_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPrefireSoundTwentyInchAndLarger(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireTenHour_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPrefireTenHour(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireTotal_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadPrefireTotal(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadRottenNineToTwentyInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadRottenNineToTwentyInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadRottenSixToNineInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadRottenSixToNineInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadRottenThreeToSixInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadRottenThreeToSixInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadRottenTwentyInchAndLarger_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadRottenTwentyInchAndLarger(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadShrub_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadShrub(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadSoundNineToTwentyInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadSoundNineToTwentyInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadSoundSixToNineInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadSoundSixToNineInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadSoundThreeToSixInch_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadSoundThreeToSixInch(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadSoundTwentyInchAndLarger_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadSoundTwentyInchAndLarger(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadTenHour_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadTenHour(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getFuelLoadThousandHour_1(SIGFuelConsumption* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getFuelLoadThousandHour(loadingUnits);
+}
+
+const HerbaceousConsumptionEquation_HerbaceousConsumptionEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getHerbaceousConsumptionEquation_0(SIGFuelConsumption* self) {
+  return self->getHerbaceousConsumptionEquation();
+}
+
+const LitterConsumptionEquation_LitterConsumptionEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getLitterConsumptionEquation_0(SIGFuelConsumption* self) {
+  return self->getLitterConsumptionEquation();
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getMineralSoilExposed_1(SIGFuelConsumption* self, FractionUnits_FractionUnitsEnum fractionUnits) {
+  return self->getMineralSoilExposed(fractionUnits);
+}
+
+const MineralSoilExposureEquation_MineralSoilExposureEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getMineralSoilExposureEquation_0(SIGFuelConsumption* self) {
+  return self->getMineralSoilExposureEquation();
+}
+
+const int EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getMineralSoilExposureEquationNumber_0(SIGFuelConsumption* self) {
+  return self->getMineralSoilExposureEquationNumber();
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getMoistureDuff_1(SIGFuelConsumption* self, FractionUnits_FractionUnitsEnum moistureUnits) {
+  return self->getMoistureDuff(moistureUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getMoistureLitter_1(SIGFuelConsumption* self, FractionUnits_FractionUnitsEnum moistureUnits) {
+  return self->getMoistureLitter(moistureUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getMoistureTenHour_1(SIGFuelConsumption* self, FractionUnits_FractionUnitsEnum moistureUnits) {
+  return self->getMoistureTenHour(moistureUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getMoistureThousandHour_1(SIGFuelConsumption* self, FractionUnits_FractionUnitsEnum moistureUnits) {
+  return self->getMoistureThousandHour(moistureUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getPercentConsumed_2(SIGFuelConsumption* self, FuelConsumptionComponent_FuelConsumptionComponentEnum component, FractionUnits_FractionUnitsEnum fractionUnits) {
+  return self->getPercentConsumed(component, fractionUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getPercentConsumedCrownBranch_1(SIGFuelConsumption* self, FractionUnits_FractionUnitsEnum fractionUnits) {
+  return self->getPercentConsumedCrownBranch(fractionUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getPercentConsumedCrownFoliage_1(SIGFuelConsumption* self, FractionUnits_FractionUnitsEnum fractionUnits) {
+  return self->getPercentConsumedCrownFoliage(fractionUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getPercentConsumedDuff_1(SIGFuelConsumption* self, FractionUnits_FractionUnitsEnum fractionUnits) {
+  return self->getPercentConsumedDuff(fractionUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getPercentConsumedHerbaceous_1(SIGFuelConsumption* self, FractionUnits_FractionUnitsEnum fractionUnits) {
+  return self->getPercentConsumedHerbaceous(fractionUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getPercentConsumedHundredHour_1(SIGFuelConsumption* self, FractionUnits_FractionUnitsEnum fractionUnits) {
+  return self->getPercentConsumedHundredHour(fractionUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getPercentConsumedLitter_1(SIGFuelConsumption* self, FractionUnits_FractionUnitsEnum fractionUnits) {
+  return self->getPercentConsumedLitter(fractionUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getPercentConsumedOneHour_1(SIGFuelConsumption* self, FractionUnits_FractionUnitsEnum fractionUnits) {
+  return self->getPercentConsumedOneHour(fractionUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getPercentConsumedRottenNineToTwentyInch_1(SIGFuelConsumption* self, FractionUnits_FractionUnitsEnum fractionUnits) {
+  return self->getPercentConsumedRottenNineToTwentyInch(fractionUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getPercentConsumedRottenSixToNineInch_1(SIGFuelConsumption* self, FractionUnits_FractionUnitsEnum fractionUnits) {
+  return self->getPercentConsumedRottenSixToNineInch(fractionUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getPercentConsumedRottenThousandHour_1(SIGFuelConsumption* self, FractionUnits_FractionUnitsEnum fractionUnits) {
+  return self->getPercentConsumedRottenThousandHour(fractionUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getPercentConsumedRottenThreeToSixInch_1(SIGFuelConsumption* self, FractionUnits_FractionUnitsEnum fractionUnits) {
+  return self->getPercentConsumedRottenThreeToSixInch(fractionUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getPercentConsumedRottenTwentyInchAndLarger_1(SIGFuelConsumption* self, FractionUnits_FractionUnitsEnum fractionUnits) {
+  return self->getPercentConsumedRottenTwentyInchAndLarger(fractionUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getPercentConsumedShrub_1(SIGFuelConsumption* self, FractionUnits_FractionUnitsEnum fractionUnits) {
+  return self->getPercentConsumedShrub(fractionUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getPercentConsumedSoundNineToTwentyInch_1(SIGFuelConsumption* self, FractionUnits_FractionUnitsEnum fractionUnits) {
+  return self->getPercentConsumedSoundNineToTwentyInch(fractionUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getPercentConsumedSoundSixToNineInch_1(SIGFuelConsumption* self, FractionUnits_FractionUnitsEnum fractionUnits) {
+  return self->getPercentConsumedSoundSixToNineInch(fractionUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getPercentConsumedSoundThousandHour_1(SIGFuelConsumption* self, FractionUnits_FractionUnitsEnum fractionUnits) {
+  return self->getPercentConsumedSoundThousandHour(fractionUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getPercentConsumedSoundThreeToSixInch_1(SIGFuelConsumption* self, FractionUnits_FractionUnitsEnum fractionUnits) {
+  return self->getPercentConsumedSoundThreeToSixInch(fractionUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getPercentConsumedSoundTwentyInchAndLarger_1(SIGFuelConsumption* self, FractionUnits_FractionUnitsEnum fractionUnits) {
+  return self->getPercentConsumedSoundTwentyInchAndLarger(fractionUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getPercentConsumedTenHour_1(SIGFuelConsumption* self, FractionUnits_FractionUnitsEnum fractionUnits) {
+  return self->getPercentConsumedTenHour(fractionUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getPercentConsumedTotal_1(SIGFuelConsumption* self, FractionUnits_FractionUnitsEnum fractionUnits) {
+  return self->getPercentConsumedTotal(fractionUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getPercentDuffDepthReduction_1(SIGFuelConsumption* self, FractionUnits_FractionUnitsEnum fractionUnits) {
+  return self->getPercentDuffDepthReduction(fractionUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getPercentOfCrownBurned_1(SIGFuelConsumption* self, FractionUnits_FractionUnitsEnum fractionUnits) {
+  return self->getPercentOfCrownBurned(fractionUnits);
+}
+
+const FuelConsumptionRegion_FuelConsumptionRegionEnum EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getRegion_0(SIGFuelConsumption* self) {
+  return self->getRegion();
+}
+
+const ShrubConsumptionEquation_ShrubConsumptionEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getShrubConsumptionEquation_0(SIGFuelConsumption* self) {
+  return self->getShrubConsumptionEquation();
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getSmolderingDuration_1(SIGFuelConsumption* self, TimeUnits_TimeUnitsEnum timeUnits) {
+  return self->getSmolderingDuration(timeUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getSmolderingEmission_2(SIGFuelConsumption* self, EmissionSpecies_EmissionSpeciesEnum species, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getSmolderingEmission(species, loadingUnits);
+}
+
+const bool EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getUseConsumptionEquations_0(SIGFuelConsumption* self) {
+  return self->getUseConsumptionEquations();
+}
+
+const bool EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_getUseLegacyEmissionFactors_0(SIGFuelConsumption* self) {
+  return self->getUseLegacyEmissionFactors();
+}
+
+const bool EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_isFuelbedIgnited_0(SIGFuelConsumption* self) {
+  return self->isFuelbedIgnited();
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_distributeThousandHourFuelLoad_5(SIGFuelConsumption* self, double totalFuelLoad, LoadingUnits_LoadingUnitsEnum loadingUnits, double rottenFraction, FractionUnits_FractionUnitsEnum fractionUnits, ThousandHourLoadDistribution_ThousandHourLoadDistributionEnum distribution) {
+  self->distributeThousandHourFuelLoad(totalFuelLoad, loadingUnits, rottenFraction, fractionUnits, distribution);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_setBurnSeason_1(SIGFuelConsumption* self, BurnSeason_BurnSeasonEnum burnSeason) {
+  self->setBurnSeason(burnSeason);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_setCoverGroup_1(SIGFuelConsumption* self, CoverGroup_CoverGroupEnum coverGroup) {
+  self->setCoverGroup(coverGroup);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_setDuffConsumptionEquation_1(SIGFuelConsumption* self, DuffConsumptionEquation_DuffConsumptionEquationEnum equation) {
+  self->setDuffConsumptionEquation(equation);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_setDuffDepth_2(SIGFuelConsumption* self, double duffDepth, LengthUnits_LengthUnitsEnum lengthUnits) {
+  self->setDuffDepth(duffDepth, lengthUnits);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_setDuffDepthReductionEquation_1(SIGFuelConsumption* self, DuffConsumptionEquation_DuffConsumptionEquationEnum equation) {
+  self->setDuffDepthReductionEquation(equation);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_setDuffMoistureMethod_1(SIGFuelConsumption* self, DuffMoistureMethod_DuffMoistureMethodEnum duffMoistureMethod) {
+  self->setDuffMoistureMethod(duffMoistureMethod);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_setDuffType_1(SIGFuelConsumption* self, DuffType_DuffTypeEnum duffType) {
+  self->setDuffType(duffType);
+}
+
+bool EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_setEmissionFactorGroups_3(SIGFuelConsumption* self, int flamingGroupNumber, int coarseWoodyGroupNumber, int duffGroupNumber) {
+  return self->setEmissionFactorGroups(flamingGroupNumber, coarseWoodyGroupNumber, duffGroupNumber);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_setFuelCategory_1(SIGFuelConsumption* self, FuelCategory_FuelCategoryEnum fuelCategory) {
+  self->setFuelCategory(fuelCategory);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_setFuelLoadCrownBranch_2(SIGFuelConsumption* self, double fuelLoad, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  self->setFuelLoadCrownBranch(fuelLoad, loadingUnits);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_setFuelLoadCrownFoliage_2(SIGFuelConsumption* self, double fuelLoad, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  self->setFuelLoadCrownFoliage(fuelLoad, loadingUnits);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_setFuelLoadDuff_2(SIGFuelConsumption* self, double fuelLoad, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  self->setFuelLoadDuff(fuelLoad, loadingUnits);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_setFuelLoadHerbaceous_2(SIGFuelConsumption* self, double fuelLoad, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  self->setFuelLoadHerbaceous(fuelLoad, loadingUnits);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_setFuelLoadHundredHour_2(SIGFuelConsumption* self, double fuelLoad, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  self->setFuelLoadHundredHour(fuelLoad, loadingUnits);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_setFuelLoadLitter_2(SIGFuelConsumption* self, double fuelLoad, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  self->setFuelLoadLitter(fuelLoad, loadingUnits);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_setFuelLoadOneHour_2(SIGFuelConsumption* self, double fuelLoad, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  self->setFuelLoadOneHour(fuelLoad, loadingUnits);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_setFuelLoadRottenNineToTwentyInch_2(SIGFuelConsumption* self, double fuelLoad, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  self->setFuelLoadRottenNineToTwentyInch(fuelLoad, loadingUnits);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_setFuelLoadRottenSixToNineInch_2(SIGFuelConsumption* self, double fuelLoad, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  self->setFuelLoadRottenSixToNineInch(fuelLoad, loadingUnits);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_setFuelLoadRottenThreeToSixInch_2(SIGFuelConsumption* self, double fuelLoad, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  self->setFuelLoadRottenThreeToSixInch(fuelLoad, loadingUnits);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_setFuelLoadRottenTwentyInchAndLarger_2(SIGFuelConsumption* self, double fuelLoad, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  self->setFuelLoadRottenTwentyInchAndLarger(fuelLoad, loadingUnits);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_setFuelLoadShrub_2(SIGFuelConsumption* self, double fuelLoad, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  self->setFuelLoadShrub(fuelLoad, loadingUnits);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_setFuelLoadSoundNineToTwentyInch_2(SIGFuelConsumption* self, double fuelLoad, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  self->setFuelLoadSoundNineToTwentyInch(fuelLoad, loadingUnits);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_setFuelLoadSoundSixToNineInch_2(SIGFuelConsumption* self, double fuelLoad, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  self->setFuelLoadSoundSixToNineInch(fuelLoad, loadingUnits);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_setFuelLoadSoundThreeToSixInch_2(SIGFuelConsumption* self, double fuelLoad, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  self->setFuelLoadSoundThreeToSixInch(fuelLoad, loadingUnits);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_setFuelLoadSoundTwentyInchAndLarger_2(SIGFuelConsumption* self, double fuelLoad, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  self->setFuelLoadSoundTwentyInchAndLarger(fuelLoad, loadingUnits);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_setFuelLoadTenHour_2(SIGFuelConsumption* self, double fuelLoad, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  self->setFuelLoadTenHour(fuelLoad, loadingUnits);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_setHerbaceousConsumptionEquation_1(SIGFuelConsumption* self, HerbaceousConsumptionEquation_HerbaceousConsumptionEquationEnum equation) {
+  self->setHerbaceousConsumptionEquation(equation);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_setLitterConsumptionEquation_1(SIGFuelConsumption* self, LitterConsumptionEquation_LitterConsumptionEquationEnum equation) {
+  self->setLitterConsumptionEquation(equation);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_setMineralSoilExposureEquation_1(SIGFuelConsumption* self, MineralSoilExposureEquation_MineralSoilExposureEquationEnum equation) {
+  self->setMineralSoilExposureEquation(equation);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_setMoistureDuff_2(SIGFuelConsumption* self, double moisture, FractionUnits_FractionUnitsEnum moistureUnits) {
+  self->setMoistureDuff(moisture, moistureUnits);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_setMoistureLitter_2(SIGFuelConsumption* self, double moisture, FractionUnits_FractionUnitsEnum moistureUnits) {
+  self->setMoistureLitter(moisture, moistureUnits);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_setMoistureTenHour_2(SIGFuelConsumption* self, double moisture, FractionUnits_FractionUnitsEnum moistureUnits) {
+  self->setMoistureTenHour(moisture, moistureUnits);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_setMoistureThousandHour_2(SIGFuelConsumption* self, double moisture, FractionUnits_FractionUnitsEnum moistureUnits) {
+  self->setMoistureThousandHour(moisture, moistureUnits);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_setPercentOfCrownBurned_2(SIGFuelConsumption* self, double percentOfCrownBurned, FractionUnits_FractionUnitsEnum fractionUnits) {
+  self->setPercentOfCrownBurned(percentOfCrownBurned, fractionUnits);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_setRegion_1(SIGFuelConsumption* self, FuelConsumptionRegion_FuelConsumptionRegionEnum region) {
+  self->setRegion(region);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_setShrubConsumptionEquation_1(SIGFuelConsumption* self, ShrubConsumptionEquation_ShrubConsumptionEquationEnum equation) {
+  self->setShrubConsumptionEquation(equation);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_setUseConsumptionEquations_1(SIGFuelConsumption* self, bool useConsumptionEquations) {
+  self->setUseConsumptionEquations(useConsumptionEquations);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption_setUseLegacyEmissionFactors_1(SIGFuelConsumption* self, bool useLegacyEmissionFactors) {
+  self->setUseLegacyEmissionFactors(useLegacyEmissionFactors);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGFuelConsumption___destroy___0(SIGFuelConsumption* self) {
+  delete self;
+}
+
+// Interface: SIGSoilHeating
+
+
+SIGSoilHeating* EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_SIGSoilHeating_0() {
+  return new SIGSoilHeating();
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_initializeMembers_0(SIGSoilHeating* self) {
+  self->initializeMembers();
+}
+
+bool EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_doSoilHeatingRun_0(SIGSoilHeating* self) {
+  return self->doSoilHeatingRun();
+}
+
+const int EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_getDeepestLayerReachingSixtyDegreesCelsius_0(SIGSoilHeating* self) {
+  return self->getDeepestLayerReachingSixtyDegreesCelsius();
+}
+
+const int EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_getDeepestLayerReachingTwoHundredSeventyFiveDegreesCelsius_0(SIGSoilHeating* self) {
+  return self->getDeepestLayerReachingTwoHundredSeventyFiveDegreesCelsius();
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_getDuffConsumed_1(SIGSoilHeating* self, FractionUnits_FractionUnitsEnum fractionUnits) {
+  return self->getDuffConsumed(fractionUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_getDuffDepthPostfire_1(SIGSoilHeating* self, LengthUnits_LengthUnitsEnum lengthUnits) {
+  return self->getDuffDepthPostfire(lengthUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_getDuffDepthPrefire_1(SIGSoilHeating* self, LengthUnits_LengthUnitsEnum lengthUnits) {
+  return self->getDuffDepthPrefire(lengthUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_getDuffHeatEfficiency_1(SIGSoilHeating* self, FractionUnits_FractionUnitsEnum fractionUnits) {
+  return self->getDuffHeatEfficiency(fractionUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_getDuffLoadPrefire_1(SIGSoilHeating* self, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  return self->getDuffLoadPrefire(loadingUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_getDuffMoisture_1(SIGSoilHeating* self, FractionUnits_FractionUnitsEnum moistureUnits) {
+  return self->getDuffMoisture(moistureUnits);
+}
+
+const bool EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_getFuelbedIgnited_0(SIGSoilHeating* self) {
+  return self->getFuelbedIgnited();
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_getHerbShrubFireIntensity_2(SIGSoilHeating* self, int index, HeatSourceAndReactionIntensityUnits_HeatSourceAndReactionIntensityUnitsEnum intensityUnits) {
+  return self->getHerbShrubFireIntensity(index, intensityUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_getHerbShrubHeatEfficiency_1(SIGSoilHeating* self, FractionUnits_FractionUnitsEnum fractionUnits) {
+  return self->getHerbShrubHeatEfficiency(fractionUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_getMaximumTemperatureAtLayer_2(SIGSoilHeating* self, int layer, TemperatureUnits_TemperatureUnitsEnum temperatureUnits) {
+  return self->getMaximumTemperatureAtLayer(layer, temperatureUnits);
+}
+
+const char* EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_getMessage_0(SIGSoilHeating* self) {
+  return self->getMessage();
+}
+
+const int EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_getNumberOfFireIntensities_0(SIGSoilHeating* self) {
+  return self->getNumberOfFireIntensities();
+}
+
+const int EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_getNumberOfTimeSteps_0(SIGSoilHeating* self) {
+  return self->getNumberOfTimeSteps();
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_getProportionOfHeatReachingSoilThroughDuff_1(SIGSoilHeating* self, FractionUnits_FractionUnitsEnum fractionUnits) {
+  return self->getProportionOfHeatReachingSoilThroughDuff(fractionUnits);
+}
+
+const SoilFamily_SoilFamilyEnum EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_getSoilFamily_0(SIGSoilHeating* self) {
+  return self->getSoilFamily();
+}
+
+const SoilHeatingModel_SoilHeatingModelEnum EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_getSoilHeatingModelUsed_0(SIGSoilHeating* self) {
+  return self->getSoilHeatingModelUsed();
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_getSoilMoisture_1(SIGSoilHeating* self, FractionUnits_FractionUnitsEnum moistureUnits) {
+  return self->getSoilMoisture(moistureUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_getStartingSoilTemperature_1(SIGSoilHeating* self, TemperatureUnits_TemperatureUnitsEnum temperatureUnits) {
+  return self->getStartingSoilTemperature(temperatureUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_getTemperatureAtLayerAndTimeStep_3(SIGSoilHeating* self, int layer, int timeStep, TemperatureUnits_TemperatureUnitsEnum temperatureUnits) {
+  return self->getTemperatureAtLayerAndTimeStep(layer, timeStep, temperatureUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_getTimeOfMaximumTemperatureAtLayer_2(SIGSoilHeating* self, int layer, TimeUnits_TimeUnitsEnum timeUnits) {
+  return self->getTimeOfMaximumTemperatureAtLayer(layer, timeUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_getTimeStep_1(SIGSoilHeating* self, TimeUnits_TimeUnitsEnum timeUnits) {
+  return self->getTimeStep(timeUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_getWoodLitterFireIntensity_2(SIGSoilHeating* self, int index, HeatSourceAndReactionIntensityUnits_HeatSourceAndReactionIntensityUnitsEnum intensityUnits) {
+  return self->getWoodLitterFireIntensity(index, intensityUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_getWoodLitterHeatEfficiency_1(SIGSoilHeating* self, FractionUnits_FractionUnitsEnum fractionUnits) {
+  return self->getWoodLitterHeatEfficiency(fractionUnits);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_addFireIntensity_3(SIGSoilHeating* self, double woodLitterIntensity, double herbShrubIntensity, HeatSourceAndReactionIntensityUnits_HeatSourceAndReactionIntensityUnitsEnum intensityUnits) {
+  self->addFireIntensity(woodLitterIntensity, herbShrubIntensity, intensityUnits);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_clearFireIntensities_0(SIGSoilHeating* self) {
+  self->clearFireIntensities();
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_setDuffConsumed_2(SIGSoilHeating* self, double duffConsumed, FractionUnits_FractionUnitsEnum fractionUnits) {
+  self->setDuffConsumed(duffConsumed, fractionUnits);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_setDuffDepthPostfire_2(SIGSoilHeating* self, double duffDepth, LengthUnits_LengthUnitsEnum lengthUnits) {
+  self->setDuffDepthPostfire(duffDepth, lengthUnits);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_setDuffDepthPrefire_2(SIGSoilHeating* self, double duffDepth, LengthUnits_LengthUnitsEnum lengthUnits) {
+  self->setDuffDepthPrefire(duffDepth, lengthUnits);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_setDuffHeatEfficiency_2(SIGSoilHeating* self, double efficiency, FractionUnits_FractionUnitsEnum fractionUnits) {
+  self->setDuffHeatEfficiency(efficiency, fractionUnits);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_setDuffLoadPrefire_2(SIGSoilHeating* self, double duffLoad, LoadingUnits_LoadingUnitsEnum loadingUnits) {
+  self->setDuffLoadPrefire(duffLoad, loadingUnits);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_setDuffMoisture_2(SIGSoilHeating* self, double duffMoisture, FractionUnits_FractionUnitsEnum moistureUnits) {
+  self->setDuffMoisture(duffMoisture, moistureUnits);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_setFuelbedIgnited_1(SIGSoilHeating* self, bool isFuelbedIgnited) {
+  self->setFuelbedIgnited(isFuelbedIgnited);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_setHerbShrubHeatEfficiency_2(SIGSoilHeating* self, double efficiency, FractionUnits_FractionUnitsEnum fractionUnits) {
+  self->setHerbShrubHeatEfficiency(efficiency, fractionUnits);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_setInputsFromFuelConsumption_1(SIGSoilHeating* self, const SIGFuelConsumption* fuelConsumption) {
+  self->setInputsFromFuelConsumption(*fuelConsumption);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_setSoilFamily_1(SIGSoilHeating* self, SoilFamily_SoilFamilyEnum soilFamily) {
+  self->setSoilFamily(soilFamily);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_setSoilMoisture_2(SIGSoilHeating* self, double soilMoisture, FractionUnits_FractionUnitsEnum moistureUnits) {
+  self->setSoilMoisture(soilMoisture, moistureUnits);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_setStartingSoilTemperature_2(SIGSoilHeating* self, double temperature, TemperatureUnits_TemperatureUnitsEnum temperatureUnits) {
+  self->setStartingSoilTemperature(temperature, temperatureUnits);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating_setWoodLitterHeatEfficiency_2(SIGSoilHeating* self, double efficiency, FractionUnits_FractionUnitsEnum fractionUnits) {
+  self->setWoodLitterHeatEfficiency(efficiency, fractionUnits);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_SIGSoilHeating___destroy___0(SIGSoilHeating* self) {
+  delete self;
+}
+
+// Interface: EmissionFactorTable
+
+
+EmissionFactorTable* EMSCRIPTEN_KEEPALIVE emscripten_bind_EmissionFactorTable_EmissionFactorTable_0() {
+  return new EmissionFactorTable();
+}
+
+const char* EMSCRIPTEN_KEEPALIVE emscripten_bind_EmissionFactorTable_getCoverType_1(EmissionFactorTable* self, int groupNumber) {
+  return self->getCoverType(groupNumber);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_EmissionFactorTable_getEmissionFactor_3(EmissionFactorTable* self, int groupNumber, EmissionSpecies_EmissionSpeciesEnum species, EmissionFactorUnits_EmissionFactorUnitsEnum emissionFactorUnits) {
+  return self->getEmissionFactor(groupNumber, species, emissionFactorUnits);
+}
+
+const double EMSCRIPTEN_KEEPALIVE emscripten_bind_EmissionFactorTable_getEmissionFactorBySpeciesIndex_3(EmissionFactorTable* self, int groupNumber, int speciesIndex, EmissionFactorUnits_EmissionFactorUnitsEnum emissionFactorUnits) {
+  return self->getEmissionFactorBySpeciesIndex(groupNumber, speciesIndex, emissionFactorUnits);
+}
+
+const EmissionFactorGroupType_EmissionFactorGroupTypeEnum EMSCRIPTEN_KEEPALIVE emscripten_bind_EmissionFactorTable_getGroupType_1(EmissionFactorTable* self, int groupNumber) {
+  return self->getGroupType(groupNumber);
+}
+
+const int EMSCRIPTEN_KEEPALIVE emscripten_bind_EmissionFactorTable_getNumberOfGroups_0(EmissionFactorTable* self) {
+  return self->getNumberOfGroups();
+}
+
+const int EMSCRIPTEN_KEEPALIVE emscripten_bind_EmissionFactorTable_getNumberOfSpecies_0(EmissionFactorTable* self) {
+  return self->getNumberOfSpecies();
+}
+
+const char* EMSCRIPTEN_KEEPALIVE emscripten_bind_EmissionFactorTable_getSpeciesCode_1(EmissionFactorTable* self, int speciesIndex) {
+  return self->getSpeciesCode(speciesIndex);
+}
+
+const char* EMSCRIPTEN_KEEPALIVE emscripten_bind_EmissionFactorTable_getSpeciesName_1(EmissionFactorTable* self, int speciesIndex) {
+  return self->getSpeciesName(speciesIndex);
+}
+
+const bool EMSCRIPTEN_KEEPALIVE emscripten_bind_EmissionFactorTable_isValidGroup_1(EmissionFactorTable* self, int groupNumber) {
+  return self->isValidGroup(groupNumber);
+}
+
+void EMSCRIPTEN_KEEPALIVE emscripten_bind_EmissionFactorTable___destroy___0(EmissionFactorTable* self) {
+  delete self;
+}
+
 // $AreaUnits_AreaUnitsEnum
 AreaUnits_AreaUnitsEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_AreaUnits_AreaUnitsEnum_SquareFeet() {
   return AreaUnits::SquareFeet;
@@ -3608,6 +5082,12 @@ LoadingUnits_LoadingUnitsEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_LoadingUnits_
 }
 LoadingUnits_LoadingUnitsEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_LoadingUnits_LoadingUnitsEnum_KilogramsPerSquareMeter() {
   return LoadingUnits::KilogramsPerSquareMeter;
+}
+LoadingUnits_LoadingUnitsEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_LoadingUnits_LoadingUnitsEnum_PoundsPerAcre() {
+  return LoadingUnits::PoundsPerAcre;
+}
+LoadingUnits_LoadingUnitsEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_LoadingUnits_LoadingUnitsEnum_GramsPerSquareMeter() {
+  return LoadingUnits::GramsPerSquareMeter;
 }
 
 // $SurfaceAreaToVolumeUnits_SurfaceAreaToVolumeUnitsEnum
@@ -3782,6 +5262,464 @@ TimeUnits_TimeUnitsEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_TimeUnits_TimeUnits
 }
 TimeUnits_TimeUnitsEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_TimeUnits_TimeUnitsEnum_Years() {
   return TimeUnits::Years;
+}
+
+// $EmissionFactorUnits_EmissionFactorUnitsEnum
+EmissionFactorUnits_EmissionFactorUnitsEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_EmissionFactorUnits_EmissionFactorUnitsEnum_GramsPerKilogram() {
+  return EmissionFactorUnits::GramsPerKilogram;
+}
+EmissionFactorUnits_EmissionFactorUnitsEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_EmissionFactorUnits_EmissionFactorUnitsEnum_PoundsPerTon() {
+  return EmissionFactorUnits::PoundsPerTon;
+}
+
+// $HeatCapacityUnits_HeatCapacityUnitsEnum
+HeatCapacityUnits_HeatCapacityUnitsEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_HeatCapacityUnits_HeatCapacityUnitsEnum_BtusPerPoundPerFahrenheit() {
+  return HeatCapacityUnits::BtusPerPoundPerFahrenheit;
+}
+HeatCapacityUnits_HeatCapacityUnitsEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_HeatCapacityUnits_HeatCapacityUnitsEnum_JoulesPerKilogramPerKelvin() {
+  return HeatCapacityUnits::JoulesPerKilogramPerKelvin;
+}
+HeatCapacityUnits_HeatCapacityUnitsEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_HeatCapacityUnits_HeatCapacityUnitsEnum_KilojoulesPerKilogramPerKelvin() {
+  return HeatCapacityUnits::KilojoulesPerKilogramPerKelvin;
+}
+
+// $ThermalConductivityUnits_ThermalConductivityUnitsEnum
+ThermalConductivityUnits_ThermalConductivityUnitsEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_ThermalConductivityUnits_ThermalConductivityUnitsEnum_BtusPerHourPerFootPerFahrenheit() {
+  return ThermalConductivityUnits::BtusPerHourPerFootPerFahrenheit;
+}
+ThermalConductivityUnits_ThermalConductivityUnitsEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_ThermalConductivityUnits_ThermalConductivityUnitsEnum_WattsPerMeterPerKelvin() {
+  return ThermalConductivityUnits::WattsPerMeterPerKelvin;
+}
+
+// $FuelConsumptionRegion_FuelConsumptionRegionEnum
+FuelConsumptionRegion_FuelConsumptionRegionEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_FuelConsumptionRegion_FuelConsumptionRegionEnum_InteriorWest() {
+  return FuelConsumptionRegion::InteriorWest;
+}
+FuelConsumptionRegion_FuelConsumptionRegionEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_FuelConsumptionRegion_FuelConsumptionRegionEnum_PacificWest() {
+  return FuelConsumptionRegion::PacificWest;
+}
+FuelConsumptionRegion_FuelConsumptionRegionEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_FuelConsumptionRegion_FuelConsumptionRegionEnum_NorthEast() {
+  return FuelConsumptionRegion::NorthEast;
+}
+FuelConsumptionRegion_FuelConsumptionRegionEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_FuelConsumptionRegion_FuelConsumptionRegionEnum_SouthEast() {
+  return FuelConsumptionRegion::SouthEast;
+}
+
+// $BurnSeason_BurnSeasonEnum
+BurnSeason_BurnSeasonEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_BurnSeason_BurnSeasonEnum_Spring() {
+  return BurnSeason::Spring;
+}
+BurnSeason_BurnSeasonEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_BurnSeason_BurnSeasonEnum_Summer() {
+  return BurnSeason::Summer;
+}
+BurnSeason_BurnSeasonEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_BurnSeason_BurnSeasonEnum_Fall() {
+  return BurnSeason::Fall;
+}
+BurnSeason_BurnSeasonEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_BurnSeason_BurnSeasonEnum_Winter() {
+  return BurnSeason::Winter;
+}
+
+// $FuelCategory_FuelCategoryEnum
+FuelCategory_FuelCategoryEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_FuelCategory_FuelCategoryEnum_Natural() {
+  return FuelCategory::Natural;
+}
+FuelCategory_FuelCategoryEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_FuelCategory_FuelCategoryEnum_Piles() {
+  return FuelCategory::Piles;
+}
+FuelCategory_FuelCategoryEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_FuelCategory_FuelCategoryEnum_Slash() {
+  return FuelCategory::Slash;
+}
+
+// $CoverGroup_CoverGroupEnum
+CoverGroup_CoverGroupEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_CoverGroup_CoverGroupEnum_None() {
+  return CoverGroup::None;
+}
+CoverGroup_CoverGroupEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_CoverGroup_CoverGroupEnum_Grass() {
+  return CoverGroup::Grass;
+}
+CoverGroup_CoverGroupEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_CoverGroup_CoverGroupEnum_Shrub() {
+  return CoverGroup::Shrub;
+}
+CoverGroup_CoverGroupEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_CoverGroup_CoverGroupEnum_ShrubChaparral() {
+  return CoverGroup::ShrubChaparral;
+}
+CoverGroup_CoverGroupEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_CoverGroup_CoverGroupEnum_Sagebrush() {
+  return CoverGroup::Sagebrush;
+}
+CoverGroup_CoverGroupEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_CoverGroup_CoverGroupEnum_PonderosaPine() {
+  return CoverGroup::PonderosaPine;
+}
+CoverGroup_CoverGroupEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_CoverGroup_CoverGroupEnum_Pocosin() {
+  return CoverGroup::Pocosin;
+}
+CoverGroup_CoverGroupEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_CoverGroup_CoverGroupEnum_BalsamBlackRedWhiteSpruce() {
+  return CoverGroup::BalsamBlackRedWhiteSpruce;
+}
+CoverGroup_CoverGroupEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_CoverGroup_CoverGroupEnum_RedJackPine() {
+  return CoverGroup::RedJackPine;
+}
+CoverGroup_CoverGroupEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_CoverGroup_CoverGroupEnum_WhitePineHemlock() {
+  return CoverGroup::WhitePineHemlock;
+}
+CoverGroup_CoverGroupEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_CoverGroup_CoverGroupEnum_PineFlatwoods() {
+  return CoverGroup::PineFlatwoods;
+}
+CoverGroup_CoverGroupEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_CoverGroup_CoverGroupEnum_CoastalPlain() {
+  return CoverGroup::CoastalPlain;
+}
+
+// $DuffMoistureMethod_DuffMoistureMethodEnum
+DuffMoistureMethod_DuffMoistureMethodEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_DuffMoistureMethod_DuffMoistureMethodEnum_EntireDuffMoisture() {
+  return DuffMoistureMethod::EntireDuffMoisture;
+}
+DuffMoistureMethod_DuffMoistureMethodEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_DuffMoistureMethod_DuffMoistureMethodEnum_LowerDuffMoisture() {
+  return DuffMoistureMethod::LowerDuffMoisture;
+}
+DuffMoistureMethod_DuffMoistureMethodEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_DuffMoistureMethod_DuffMoistureMethodEnum_NationalFireDangerRatingThousandHour() {
+  return DuffMoistureMethod::NationalFireDangerRatingThousandHour;
+}
+DuffMoistureMethod_DuffMoistureMethodEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_DuffMoistureMethod_DuffMoistureMethodEnum_AdjustedNationalFireDangerRatingThousandHour() {
+  return DuffMoistureMethod::AdjustedNationalFireDangerRatingThousandHour;
+}
+
+// $ThousandHourLoadDistribution_ThousandHourLoadDistributionEnum
+ThousandHourLoadDistribution_ThousandHourLoadDistributionEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_ThousandHourLoadDistribution_ThousandHourLoadDistributionEnum_Even() {
+  return ThousandHourLoadDistribution::Even;
+}
+ThousandHourLoadDistribution_ThousandHourLoadDistributionEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_ThousandHourLoadDistribution_ThousandHourLoadDistributionEnum_Right() {
+  return ThousandHourLoadDistribution::Right;
+}
+ThousandHourLoadDistribution_ThousandHourLoadDistributionEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_ThousandHourLoadDistribution_ThousandHourLoadDistributionEnum_Left() {
+  return ThousandHourLoadDistribution::Left;
+}
+ThousandHourLoadDistribution_ThousandHourLoadDistributionEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_ThousandHourLoadDistribution_ThousandHourLoadDistributionEnum_End() {
+  return ThousandHourLoadDistribution::End;
+}
+ThousandHourLoadDistribution_ThousandHourLoadDistributionEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_ThousandHourLoadDistribution_ThousandHourLoadDistributionEnum_Center() {
+  return ThousandHourLoadDistribution::Center;
+}
+
+// $MoistureRegime_MoistureRegimeEnum
+MoistureRegime_MoistureRegimeEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_MoistureRegime_MoistureRegimeEnum_Wet() {
+  return MoistureRegime::Wet;
+}
+MoistureRegime_MoistureRegimeEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_MoistureRegime_MoistureRegimeEnum_Moderate() {
+  return MoistureRegime::Moderate;
+}
+MoistureRegime_MoistureRegimeEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_MoistureRegime_MoistureRegimeEnum_Dry() {
+  return MoistureRegime::Dry;
+}
+MoistureRegime_MoistureRegimeEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_MoistureRegime_MoistureRegimeEnum_VeryDry() {
+  return MoistureRegime::VeryDry;
+}
+
+// $SoilFamily_SoilFamilyEnum
+SoilFamily_SoilFamilyEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_SoilFamily_SoilFamilyEnum_LoamySkeletal() {
+  return SoilFamily::LoamySkeletal;
+}
+SoilFamily_SoilFamilyEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_SoilFamily_SoilFamilyEnum_FineSilt() {
+  return SoilFamily::FineSilt;
+}
+SoilFamily_SoilFamilyEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_SoilFamily_SoilFamilyEnum_Fine() {
+  return SoilFamily::Fine;
+}
+SoilFamily_SoilFamilyEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_SoilFamily_SoilFamilyEnum_CoarseSilt() {
+  return SoilFamily::CoarseSilt;
+}
+SoilFamily_SoilFamilyEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_SoilFamily_SoilFamilyEnum_CoarseLoamy() {
+  return SoilFamily::CoarseLoamy;
+}
+SoilFamily_SoilFamilyEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_SoilFamily_SoilFamilyEnum_QuartzSand() {
+  return SoilFamily::QuartzSand;
+}
+SoilFamily_SoilFamilyEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_SoilFamily_SoilFamilyEnum_BasaltSand() {
+  return SoilFamily::BasaltSand;
+}
+
+// $SoilHeatingModel_SoilHeatingModelEnum
+SoilHeatingModel_SoilHeatingModelEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_SoilHeatingModel_SoilHeatingModelEnum_Duff() {
+  return SoilHeatingModel::Duff;
+}
+SoilHeatingModel_SoilHeatingModelEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_SoilHeatingModel_SoilHeatingModelEnum_NonDuff() {
+  return SoilHeatingModel::NonDuff;
+}
+
+// $DuffType_DuffTypeEnum
+DuffType_DuffTypeEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_DuffType_DuffTypeEnum_PeatLow() {
+  return DuffType::PeatLow;
+}
+DuffType_DuffTypeEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_DuffType_DuffTypeEnum_PeatHigh() {
+  return DuffType::PeatHigh;
+}
+DuffType_DuffTypeEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_DuffType_DuffTypeEnum_DuffLow() {
+  return DuffType::DuffLow;
+}
+DuffType_DuffTypeEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_DuffType_DuffTypeEnum_DuffHigh() {
+  return DuffType::DuffHigh;
+}
+
+// $EmissionFactorGroupType_EmissionFactorGroupTypeEnum
+EmissionFactorGroupType_EmissionFactorGroupTypeEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_EmissionFactorGroupType_EmissionFactorGroupTypeEnum_ShortTermFlamingAndSmoldering() {
+  return EmissionFactorGroupType::ShortTermFlamingAndSmoldering;
+}
+EmissionFactorGroupType_EmissionFactorGroupTypeEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_EmissionFactorGroupType_EmissionFactorGroupTypeEnum_CoarseWoodyDebrisResidualSmolderingCombustion() {
+  return EmissionFactorGroupType::CoarseWoodyDebrisResidualSmolderingCombustion;
+}
+EmissionFactorGroupType_EmissionFactorGroupTypeEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_EmissionFactorGroupType_EmissionFactorGroupTypeEnum_DuffResidualSmolderingCombustion() {
+  return EmissionFactorGroupType::DuffResidualSmolderingCombustion;
+}
+
+// $BurnupFuelComponent_BurnupFuelComponentEnum
+BurnupFuelComponent_BurnupFuelComponentEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_BurnupFuelComponent_BurnupFuelComponentEnum_Litter() {
+  return BurnupFuelComponent::Litter;
+}
+BurnupFuelComponent_BurnupFuelComponentEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_BurnupFuelComponent_BurnupFuelComponentEnum_OneHour() {
+  return BurnupFuelComponent::OneHour;
+}
+BurnupFuelComponent_BurnupFuelComponentEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_BurnupFuelComponent_BurnupFuelComponentEnum_TenHour() {
+  return BurnupFuelComponent::TenHour;
+}
+BurnupFuelComponent_BurnupFuelComponentEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_BurnupFuelComponent_BurnupFuelComponentEnum_HundredHour() {
+  return BurnupFuelComponent::HundredHour;
+}
+BurnupFuelComponent_BurnupFuelComponentEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_BurnupFuelComponent_BurnupFuelComponentEnum_SoundThreeToSixInch() {
+  return BurnupFuelComponent::SoundThreeToSixInch;
+}
+BurnupFuelComponent_BurnupFuelComponentEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_BurnupFuelComponent_BurnupFuelComponentEnum_RottenThreeToSixInch() {
+  return BurnupFuelComponent::RottenThreeToSixInch;
+}
+BurnupFuelComponent_BurnupFuelComponentEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_BurnupFuelComponent_BurnupFuelComponentEnum_SoundSixToNineInch() {
+  return BurnupFuelComponent::SoundSixToNineInch;
+}
+BurnupFuelComponent_BurnupFuelComponentEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_BurnupFuelComponent_BurnupFuelComponentEnum_RottenSixToNineInch() {
+  return BurnupFuelComponent::RottenSixToNineInch;
+}
+BurnupFuelComponent_BurnupFuelComponentEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_BurnupFuelComponent_BurnupFuelComponentEnum_SoundNineToTwentyInch() {
+  return BurnupFuelComponent::SoundNineToTwentyInch;
+}
+BurnupFuelComponent_BurnupFuelComponentEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_BurnupFuelComponent_BurnupFuelComponentEnum_RottenNineToTwentyInch() {
+  return BurnupFuelComponent::RottenNineToTwentyInch;
+}
+BurnupFuelComponent_BurnupFuelComponentEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_BurnupFuelComponent_BurnupFuelComponentEnum_SoundTwentyInchAndLarger() {
+  return BurnupFuelComponent::SoundTwentyInchAndLarger;
+}
+BurnupFuelComponent_BurnupFuelComponentEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_BurnupFuelComponent_BurnupFuelComponentEnum_RottenTwentyInchAndLarger() {
+  return BurnupFuelComponent::RottenTwentyInchAndLarger;
+}
+
+// $LitterConsumptionEquation_LitterConsumptionEquationEnum
+LitterConsumptionEquation_LitterConsumptionEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_LitterConsumptionEquation_LitterConsumptionEquationEnum_Default() {
+  return LitterConsumptionEquation::Default;
+}
+LitterConsumptionEquation_LitterConsumptionEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_LitterConsumptionEquation_LitterConsumptionEquationEnum_PineFlatwoods() {
+  return LitterConsumptionEquation::PineFlatwoods;
+}
+LitterConsumptionEquation_LitterConsumptionEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_LitterConsumptionEquation_LitterConsumptionEquationEnum_SouthEast() {
+  return LitterConsumptionEquation::SouthEast;
+}
+LitterConsumptionEquation_LitterConsumptionEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_LitterConsumptionEquation_LitterConsumptionEquationEnum_Burnup() {
+  return LitterConsumptionEquation::Burnup;
+}
+
+// $DuffConsumptionEquation_DuffConsumptionEquationEnum
+DuffConsumptionEquation_DuffConsumptionEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_DuffConsumptionEquation_DuffConsumptionEquationEnum_Default() {
+  return DuffConsumptionEquation::Default;
+}
+DuffConsumptionEquation_DuffConsumptionEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_DuffConsumptionEquation_DuffConsumptionEquationEnum_LowerDuffMoistureWestern() {
+  return DuffConsumptionEquation::LowerDuffMoistureWestern;
+}
+DuffConsumptionEquation_DuffConsumptionEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_DuffConsumptionEquation_DuffConsumptionEquationEnum_EntireDuffMoisture() {
+  return DuffConsumptionEquation::EntireDuffMoisture;
+}
+DuffConsumptionEquation_DuffConsumptionEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_DuffConsumptionEquation_DuffConsumptionEquationEnum_ThousandHourMoisture() {
+  return DuffConsumptionEquation::ThousandHourMoisture;
+}
+DuffConsumptionEquation_DuffConsumptionEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_DuffConsumptionEquation_DuffConsumptionEquationEnum_LowerDuffMoisturePonderosaPine() {
+  return DuffConsumptionEquation::LowerDuffMoisturePonderosaPine;
+}
+DuffConsumptionEquation_DuffConsumptionEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_DuffConsumptionEquation_DuffConsumptionEquationEnum_DepthFromLowerDuffMoisture() {
+  return DuffConsumptionEquation::DepthFromLowerDuffMoisture;
+}
+DuffConsumptionEquation_DuffConsumptionEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_DuffConsumptionEquation_DuffConsumptionEquationEnum_DepthFromEntireDuffMoisture() {
+  return DuffConsumptionEquation::DepthFromEntireDuffMoisture;
+}
+DuffConsumptionEquation_DuffConsumptionEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_DuffConsumptionEquation_DuffConsumptionEquationEnum_DepthFromThousandHourMoisture() {
+  return DuffConsumptionEquation::DepthFromThousandHourMoisture;
+}
+DuffConsumptionEquation_DuffConsumptionEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_DuffConsumptionEquation_DuffConsumptionEquationEnum_ResidualDepthFromEntireDuffMoisture() {
+  return DuffConsumptionEquation::ResidualDepthFromEntireDuffMoisture;
+}
+DuffConsumptionEquation_DuffConsumptionEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_DuffConsumptionEquation_DuffConsumptionEquationEnum_SouthEast() {
+  return DuffConsumptionEquation::SouthEast;
+}
+DuffConsumptionEquation_DuffConsumptionEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_DuffConsumptionEquation_DuffConsumptionEquationEnum_Piles() {
+  return DuffConsumptionEquation::Piles;
+}
+DuffConsumptionEquation_DuffConsumptionEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_DuffConsumptionEquation_DuffConsumptionEquationEnum_Chaparral() {
+  return DuffConsumptionEquation::Chaparral;
+}
+DuffConsumptionEquation_DuffConsumptionEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_DuffConsumptionEquation_DuffConsumptionEquationEnum_PocosinRootMat() {
+  return DuffConsumptionEquation::PocosinRootMat;
+}
+
+// $MineralSoilExposureEquation_MineralSoilExposureEquationEnum
+MineralSoilExposureEquation_MineralSoilExposureEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_MineralSoilExposureEquation_MineralSoilExposureEquationEnum_Default() {
+  return MineralSoilExposureEquation::Default;
+}
+MineralSoilExposureEquation_MineralSoilExposureEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_MineralSoilExposureEquation_MineralSoilExposureEquationEnum_LowerDuffMoistureSlash() {
+  return MineralSoilExposureEquation::LowerDuffMoistureSlash;
+}
+MineralSoilExposureEquation_MineralSoilExposureEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_MineralSoilExposureEquation_MineralSoilExposureEquationEnum_EntireDuffMoisture() {
+  return MineralSoilExposureEquation::EntireDuffMoisture;
+}
+MineralSoilExposureEquation_MineralSoilExposureEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_MineralSoilExposureEquation_MineralSoilExposureEquationEnum_ThousandHourMoistureSlash() {
+  return MineralSoilExposureEquation::ThousandHourMoistureSlash;
+}
+MineralSoilExposureEquation_MineralSoilExposureEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_MineralSoilExposureEquation_MineralSoilExposureEquationEnum_ThousandHourMoistureNatural() {
+  return MineralSoilExposureEquation::ThousandHourMoistureNatural;
+}
+MineralSoilExposureEquation_MineralSoilExposureEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_MineralSoilExposureEquation_MineralSoilExposureEquationEnum_LowerDuffMoistureNatural() {
+  return MineralSoilExposureEquation::LowerDuffMoistureNatural;
+}
+MineralSoilExposureEquation_MineralSoilExposureEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_MineralSoilExposureEquation_MineralSoilExposureEquationEnum_PercentDuffReduction() {
+  return MineralSoilExposureEquation::PercentDuffReduction;
+}
+MineralSoilExposureEquation_MineralSoilExposureEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_MineralSoilExposureEquation_MineralSoilExposureEquationEnum_Piles() {
+  return MineralSoilExposureEquation::Piles;
+}
+MineralSoilExposureEquation_MineralSoilExposureEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_MineralSoilExposureEquation_MineralSoilExposureEquationEnum_Pocosin() {
+  return MineralSoilExposureEquation::Pocosin;
+}
+
+// $HerbaceousConsumptionEquation_HerbaceousConsumptionEquationEnum
+HerbaceousConsumptionEquation_HerbaceousConsumptionEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_HerbaceousConsumptionEquation_HerbaceousConsumptionEquationEnum_Default() {
+  return HerbaceousConsumptionEquation::Default;
+}
+HerbaceousConsumptionEquation_HerbaceousConsumptionEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_HerbaceousConsumptionEquation_HerbaceousConsumptionEquationEnum_AllConsumed() {
+  return HerbaceousConsumptionEquation::AllConsumed;
+}
+HerbaceousConsumptionEquation_HerbaceousConsumptionEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_HerbaceousConsumptionEquation_HerbaceousConsumptionEquationEnum_GrassSpring() {
+  return HerbaceousConsumptionEquation::GrassSpring;
+}
+HerbaceousConsumptionEquation_HerbaceousConsumptionEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_HerbaceousConsumptionEquation_HerbaceousConsumptionEquationEnum_SouthEast() {
+  return HerbaceousConsumptionEquation::SouthEast;
+}
+HerbaceousConsumptionEquation_HerbaceousConsumptionEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_HerbaceousConsumptionEquation_HerbaceousConsumptionEquationEnum_PineFlatwoods() {
+  return HerbaceousConsumptionEquation::PineFlatwoods;
+}
+
+// $ShrubConsumptionEquation_ShrubConsumptionEquationEnum
+ShrubConsumptionEquation_ShrubConsumptionEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_ShrubConsumptionEquation_ShrubConsumptionEquationEnum_Default() {
+  return ShrubConsumptionEquation::Default;
+}
+ShrubConsumptionEquation_ShrubConsumptionEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_ShrubConsumptionEquation_ShrubConsumptionEquationEnum_NonShrubCoverGroup() {
+  return ShrubConsumptionEquation::NonShrubCoverGroup;
+}
+ShrubConsumptionEquation_ShrubConsumptionEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_ShrubConsumptionEquation_ShrubConsumptionEquationEnum_ShrubCoverGroup() {
+  return ShrubConsumptionEquation::ShrubCoverGroup;
+}
+ShrubConsumptionEquation_ShrubConsumptionEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_ShrubConsumptionEquation_ShrubConsumptionEquationEnum_SagebrushNotFall() {
+  return ShrubConsumptionEquation::SagebrushNotFall;
+}
+ShrubConsumptionEquation_ShrubConsumptionEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_ShrubConsumptionEquation_ShrubConsumptionEquationEnum_PocosinSpringOrWinter() {
+  return ShrubConsumptionEquation::PocosinSpringOrWinter;
+}
+ShrubConsumptionEquation_ShrubConsumptionEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_ShrubConsumptionEquation_ShrubConsumptionEquationEnum_SagebrushFall() {
+  return ShrubConsumptionEquation::SagebrushFall;
+}
+ShrubConsumptionEquation_ShrubConsumptionEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_ShrubConsumptionEquation_ShrubConsumptionEquationEnum_SouthEast() {
+  return ShrubConsumptionEquation::SouthEast;
+}
+ShrubConsumptionEquation_ShrubConsumptionEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_ShrubConsumptionEquation_ShrubConsumptionEquationEnum_PocosinSummerOrFall() {
+  return ShrubConsumptionEquation::PocosinSummerOrFall;
+}
+ShrubConsumptionEquation_ShrubConsumptionEquationEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_ShrubConsumptionEquation_ShrubConsumptionEquationEnum_PineFlatwoods() {
+  return ShrubConsumptionEquation::PineFlatwoods;
+}
+
+// $EmissionSpecies_EmissionSpeciesEnum
+EmissionSpecies_EmissionSpeciesEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_EmissionSpecies_EmissionSpeciesEnum_CarbonDioxide() {
+  return EmissionSpecies::CarbonDioxide;
+}
+EmissionSpecies_EmissionSpeciesEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_EmissionSpecies_EmissionSpeciesEnum_CarbonMonoxide() {
+  return EmissionSpecies::CarbonMonoxide;
+}
+EmissionSpecies_EmissionSpeciesEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_EmissionSpecies_EmissionSpeciesEnum_Methane() {
+  return EmissionSpecies::Methane;
+}
+EmissionSpecies_EmissionSpeciesEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_EmissionSpecies_EmissionSpeciesEnum_NitrogenOxides() {
+  return EmissionSpecies::NitrogenOxides;
+}
+EmissionSpecies_EmissionSpeciesEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_EmissionSpecies_EmissionSpeciesEnum_SulfurDioxide() {
+  return EmissionSpecies::SulfurDioxide;
+}
+EmissionSpecies_EmissionSpeciesEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_EmissionSpecies_EmissionSpeciesEnum_ParticulateMatterTwoPointFive() {
+  return EmissionSpecies::ParticulateMatterTwoPointFive;
+}
+EmissionSpecies_EmissionSpeciesEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_EmissionSpecies_EmissionSpeciesEnum_ParticulateMatterTen() {
+  return EmissionSpecies::ParticulateMatterTen;
+}
+
+// $FuelConsumptionComponent_FuelConsumptionComponentEnum
+FuelConsumptionComponent_FuelConsumptionComponentEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_Litter() {
+  return FuelConsumptionComponent::Litter;
+}
+FuelConsumptionComponent_FuelConsumptionComponentEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_OneHour() {
+  return FuelConsumptionComponent::OneHour;
+}
+FuelConsumptionComponent_FuelConsumptionComponentEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_TenHour() {
+  return FuelConsumptionComponent::TenHour;
+}
+FuelConsumptionComponent_FuelConsumptionComponentEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_HundredHour() {
+  return FuelConsumptionComponent::HundredHour;
+}
+FuelConsumptionComponent_FuelConsumptionComponentEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_SoundThreeToSixInch() {
+  return FuelConsumptionComponent::SoundThreeToSixInch;
+}
+FuelConsumptionComponent_FuelConsumptionComponentEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_SoundSixToNineInch() {
+  return FuelConsumptionComponent::SoundSixToNineInch;
+}
+FuelConsumptionComponent_FuelConsumptionComponentEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_SoundNineToTwentyInch() {
+  return FuelConsumptionComponent::SoundNineToTwentyInch;
+}
+FuelConsumptionComponent_FuelConsumptionComponentEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_SoundTwentyInchAndLarger() {
+  return FuelConsumptionComponent::SoundTwentyInchAndLarger;
+}
+FuelConsumptionComponent_FuelConsumptionComponentEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_RottenThreeToSixInch() {
+  return FuelConsumptionComponent::RottenThreeToSixInch;
+}
+FuelConsumptionComponent_FuelConsumptionComponentEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_RottenSixToNineInch() {
+  return FuelConsumptionComponent::RottenSixToNineInch;
+}
+FuelConsumptionComponent_FuelConsumptionComponentEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_RottenNineToTwentyInch() {
+  return FuelConsumptionComponent::RottenNineToTwentyInch;
+}
+FuelConsumptionComponent_FuelConsumptionComponentEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_RottenTwentyInchAndLarger() {
+  return FuelConsumptionComponent::RottenTwentyInchAndLarger;
+}
+FuelConsumptionComponent_FuelConsumptionComponentEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_SoundThousandHour() {
+  return FuelConsumptionComponent::SoundThousandHour;
+}
+FuelConsumptionComponent_FuelConsumptionComponentEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_RottenThousandHour() {
+  return FuelConsumptionComponent::RottenThousandHour;
+}
+FuelConsumptionComponent_FuelConsumptionComponentEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_Duff() {
+  return FuelConsumptionComponent::Duff;
+}
+FuelConsumptionComponent_FuelConsumptionComponentEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_Herbaceous() {
+  return FuelConsumptionComponent::Herbaceous;
+}
+FuelConsumptionComponent_FuelConsumptionComponentEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_Shrub() {
+  return FuelConsumptionComponent::Shrub;
+}
+FuelConsumptionComponent_FuelConsumptionComponentEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_CrownFoliage() {
+  return FuelConsumptionComponent::CrownFoliage;
+}
+FuelConsumptionComponent_FuelConsumptionComponentEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_CrownBranch() {
+  return FuelConsumptionComponent::CrownBranch;
+}
+FuelConsumptionComponent_FuelConsumptionComponentEnum EMSCRIPTEN_KEEPALIVE emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_Total() {
+  return FuelConsumptionComponent::Total;
 }
 
 // $ContainTactic_ContainTacticEnum

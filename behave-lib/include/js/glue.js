@@ -985,6 +985,96 @@ TimeUnits.prototype['__destroy__'] = TimeUnits.prototype.__destroy__ = function(
   _emscripten_bind_TimeUnits___destroy___0(self);
 };
 
+// Interface: EmissionFactorUnits
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+function EmissionFactorUnits() { throw "cannot construct a EmissionFactorUnits, no constructor in IDL" }
+EmissionFactorUnits.prototype = Object.create(WrapperObject.prototype);
+EmissionFactorUnits.prototype.constructor = EmissionFactorUnits;
+EmissionFactorUnits.prototype.__class__ = EmissionFactorUnits;
+EmissionFactorUnits.__cache__ = {};
+Module['EmissionFactorUnits'] = EmissionFactorUnits;
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+EmissionFactorUnits.prototype['toBaseUnits'] = EmissionFactorUnits.prototype.toBaseUnits = function(value, units) {
+  if (value && typeof value === 'object') value = value.ptr;
+  if (units && typeof units === 'object') units = units.ptr;
+  return _emscripten_bind_EmissionFactorUnits_toBaseUnits_2(value, units);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+EmissionFactorUnits.prototype['fromBaseUnits'] = EmissionFactorUnits.prototype.fromBaseUnits = function(value, units) {
+  if (value && typeof value === 'object') value = value.ptr;
+  if (units && typeof units === 'object') units = units.ptr;
+  return _emscripten_bind_EmissionFactorUnits_fromBaseUnits_2(value, units);
+};
+
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+EmissionFactorUnits.prototype['__destroy__'] = EmissionFactorUnits.prototype.__destroy__ = function() {
+  var self = this.ptr;
+  _emscripten_bind_EmissionFactorUnits___destroy___0(self);
+};
+
+// Interface: HeatCapacityUnits
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+function HeatCapacityUnits() { throw "cannot construct a HeatCapacityUnits, no constructor in IDL" }
+HeatCapacityUnits.prototype = Object.create(WrapperObject.prototype);
+HeatCapacityUnits.prototype.constructor = HeatCapacityUnits;
+HeatCapacityUnits.prototype.__class__ = HeatCapacityUnits;
+HeatCapacityUnits.__cache__ = {};
+Module['HeatCapacityUnits'] = HeatCapacityUnits;
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+HeatCapacityUnits.prototype['toBaseUnits'] = HeatCapacityUnits.prototype.toBaseUnits = function(value, units) {
+  if (value && typeof value === 'object') value = value.ptr;
+  if (units && typeof units === 'object') units = units.ptr;
+  return _emscripten_bind_HeatCapacityUnits_toBaseUnits_2(value, units);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+HeatCapacityUnits.prototype['fromBaseUnits'] = HeatCapacityUnits.prototype.fromBaseUnits = function(value, units) {
+  if (value && typeof value === 'object') value = value.ptr;
+  if (units && typeof units === 'object') units = units.ptr;
+  return _emscripten_bind_HeatCapacityUnits_fromBaseUnits_2(value, units);
+};
+
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+HeatCapacityUnits.prototype['__destroy__'] = HeatCapacityUnits.prototype.__destroy__ = function() {
+  var self = this.ptr;
+  _emscripten_bind_HeatCapacityUnits___destroy___0(self);
+};
+
+// Interface: ThermalConductivityUnits
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+function ThermalConductivityUnits() { throw "cannot construct a ThermalConductivityUnits, no constructor in IDL" }
+ThermalConductivityUnits.prototype = Object.create(WrapperObject.prototype);
+ThermalConductivityUnits.prototype.constructor = ThermalConductivityUnits;
+ThermalConductivityUnits.prototype.__class__ = ThermalConductivityUnits;
+ThermalConductivityUnits.__cache__ = {};
+Module['ThermalConductivityUnits'] = ThermalConductivityUnits;
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+ThermalConductivityUnits.prototype['toBaseUnits'] = ThermalConductivityUnits.prototype.toBaseUnits = function(value, units) {
+  if (value && typeof value === 'object') value = value.ptr;
+  if (units && typeof units === 'object') units = units.ptr;
+  return _emscripten_bind_ThermalConductivityUnits_toBaseUnits_2(value, units);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+ThermalConductivityUnits.prototype['fromBaseUnits'] = ThermalConductivityUnits.prototype.fromBaseUnits = function(value, units) {
+  if (value && typeof value === 'object') value = value.ptr;
+  if (units && typeof units === 'object') units = units.ptr;
+  return _emscripten_bind_ThermalConductivityUnits_fromBaseUnits_2(value, units);
+};
+
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+ThermalConductivityUnits.prototype['__destroy__'] = ThermalConductivityUnits.prototype.__destroy__ = function() {
+  var self = this.ptr;
+  _emscripten_bind_ThermalConductivityUnits___destroy___0(self);
+};
+
 // Interface: FireSize
 
 /** @suppress {undefinedVars, duplicate} @this{Object} */
@@ -5375,6 +5465,14 @@ SIGMortality.prototype['checkIsInGACCRegionAtSpeciesTableIndex'] = SIGMortality.
 };
 
 /** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGMortality.prototype['checkIsInGeographicAreaCoordinationCenterAtSpeciesTableIndex'] = SIGMortality.prototype.checkIsInGeographicAreaCoordinationCenterAtSpeciesTableIndex = function(index, region) {
+  var self = this.ptr;
+  if (index && typeof index === 'object') index = index.ptr;
+  if (region && typeof region === 'object') region = region.ptr;
+  return !!(_emscripten_bind_SIGMortality_checkIsInGeographicAreaCoordinationCenterAtSpeciesTableIndex_2(self, index, region));
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
 SIGMortality.prototype['checkIsInGACCRegionFromSpeciesCode'] = SIGMortality.prototype.checkIsInGACCRegionFromSpeciesCode = function(speciesCode, region) {
   var self = this.ptr;
   ensureCache.prepare();
@@ -5382,6 +5480,16 @@ SIGMortality.prototype['checkIsInGACCRegionFromSpeciesCode'] = SIGMortality.prot
   else speciesCode = ensureString(speciesCode);
   if (region && typeof region === 'object') region = region.ptr;
   return !!(_emscripten_bind_SIGMortality_checkIsInGACCRegionFromSpeciesCode_2(self, speciesCode, region));
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGMortality.prototype['checkIsInGeographicAreaCoordinationCenterFromSpeciesCode'] = SIGMortality.prototype.checkIsInGeographicAreaCoordinationCenterFromSpeciesCode = function(speciesCode, region) {
+  var self = this.ptr;
+  ensureCache.prepare();
+  if (speciesCode && typeof speciesCode === 'object') speciesCode = speciesCode.ptr;
+  else speciesCode = ensureString(speciesCode);
+  if (region && typeof region === 'object') region = region.ptr;
+  return !!(_emscripten_bind_SIGMortality_checkIsInGeographicAreaCoordinationCenterFromSpeciesCode_2(self, speciesCode, region));
 };
 
 /** @suppress {undefinedVars, duplicate} @this{Object} */
@@ -5547,10 +5655,23 @@ SIGMortality.prototype['getGACCRegion'] = SIGMortality.prototype.getGACCRegion =
 };
 
 /** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGMortality.prototype['getGeographicAreaCoordinationCenter'] = SIGMortality.prototype.getGeographicAreaCoordinationCenter = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGMortality_getGeographicAreaCoordinationCenter_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
 SIGMortality.prototype['getSpeciesRecordVectorForGACCRegion'] = SIGMortality.prototype.getSpeciesRecordVectorForGACCRegion = function(region) {
   var self = this.ptr;
   if (region && typeof region === 'object') region = region.ptr;
   return wrapPointer(_emscripten_bind_SIGMortality_getSpeciesRecordVectorForGACCRegion_1(self, region), SpeciesMasterTableRecordVector);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGMortality.prototype['getSpeciesRecordVectorForGeographicAreaCoordinationCenter'] = SIGMortality.prototype.getSpeciesRecordVectorForGeographicAreaCoordinationCenter = function(region) {
+  var self = this.ptr;
+  if (region && typeof region === 'object') region = region.ptr;
+  return wrapPointer(_emscripten_bind_SIGMortality_getSpeciesRecordVectorForGeographicAreaCoordinationCenter_1(self, region), SpeciesMasterTableRecordVector);
 };
 
 /** @suppress {undefinedVars, duplicate} @this{Object} */
@@ -5559,6 +5680,14 @@ SIGMortality.prototype['getSpeciesRecordVectorForGACCRegionAndEquationType'] = S
   if (region && typeof region === 'object') region = region.ptr;
   if (equationType && typeof equationType === 'object') equationType = equationType.ptr;
   return wrapPointer(_emscripten_bind_SIGMortality_getSpeciesRecordVectorForGACCRegionAndEquationType_2(self, region, equationType), SpeciesMasterTableRecordVector);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGMortality.prototype['getSpeciesRecordVectorForGeographicAreaCoordinationCenterAndEquationType'] = SIGMortality.prototype.getSpeciesRecordVectorForGeographicAreaCoordinationCenterAndEquationType = function(region, equationType) {
+  var self = this.ptr;
+  if (region && typeof region === 'object') region = region.ptr;
+  if (equationType && typeof equationType === 'object') equationType = equationType.ptr;
+  return wrapPointer(_emscripten_bind_SIGMortality_getSpeciesRecordVectorForGeographicAreaCoordinationCenterAndEquationType_2(self, region, equationType), SpeciesMasterTableRecordVector);
 };
 
 /** @suppress {undefinedVars, duplicate} @this{Object} */
@@ -5572,6 +5701,12 @@ SIGMortality.prototype['getBarkThickness'] = SIGMortality.prototype.getBarkThick
 SIGMortality.prototype['getBasalAreaKillled'] = SIGMortality.prototype.getBasalAreaKillled = function() {
   var self = this.ptr;
   return _emscripten_bind_SIGMortality_getBasalAreaKillled_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGMortality.prototype['getBasalAreaKilled'] = SIGMortality.prototype.getBasalAreaKilled = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGMortality_getBasalAreaKilled_0(self);
 };
 
 /** @suppress {undefinedVars, duplicate} @this{Object} */
@@ -5770,9 +5905,21 @@ SIGMortality.prototype['postfireCanopyCover'] = SIGMortality.prototype.postfireC
 };
 
 /** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGMortality.prototype['getCanopyCoverPostfire'] = SIGMortality.prototype.getCanopyCoverPostfire = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGMortality_getCanopyCoverPostfire_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
 SIGMortality.prototype['prefireCanopyCover'] = SIGMortality.prototype.prefireCanopyCover = function() {
   var self = this.ptr;
   return _emscripten_bind_SIGMortality_prefireCanopyCover_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGMortality.prototype['getCanopyCoverPrefire'] = SIGMortality.prototype.getCanopyCoverPrefire = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGMortality_getCanopyCoverPrefire_0(self);
 };
 
 /** @suppress {undefinedVars, duplicate} @this{Object} */
@@ -5908,6 +6055,14 @@ SIGMortality.prototype['setDBH'] = SIGMortality.prototype.setDBH = function(dbh,
 };
 
 /** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGMortality.prototype['setDiameterAtBreastHeight'] = SIGMortality.prototype.setDiameterAtBreastHeight = function(dbh, diameterUnits) {
+  var self = this.ptr;
+  if (dbh && typeof dbh === 'object') dbh = dbh.ptr;
+  if (diameterUnits && typeof diameterUnits === 'object') diameterUnits = diameterUnits.ptr;
+  _emscripten_bind_SIGMortality_setDiameterAtBreastHeight_2(self, dbh, diameterUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
 SIGMortality.prototype['setEquationType'] = SIGMortality.prototype.setEquationType = function(equationType) {
   var self = this.ptr;
   if (equationType && typeof equationType === 'object') equationType = equationType.ptr;
@@ -5965,6 +6120,13 @@ SIGMortality.prototype['setGACCRegion'] = SIGMortality.prototype.setGACCRegion =
   var self = this.ptr;
   if (region && typeof region === 'object') region = region.ptr;
   _emscripten_bind_SIGMortality_setGACCRegion_1(self, region);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGMortality.prototype['setGeographicAreaCoordinationCenter'] = SIGMortality.prototype.setGeographicAreaCoordinationCenter = function(region) {
+  var self = this.ptr;
+  if (region && typeof region === 'object') region = region.ptr;
+  _emscripten_bind_SIGMortality_setGeographicAreaCoordinationCenter_1(self, region);
 };
 
 /** @suppress {undefinedVars, duplicate} @this{Object} */
@@ -6800,6 +6962,2445 @@ SafeSeparationDistanceCalculator.prototype['__destroy__'] = SafeSeparationDistan
   _emscripten_bind_SafeSeparationDistanceCalculator___destroy___0(self);
 };
 
+// Interface: SIGFuelConsumption
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+function SIGFuelConsumption() {
+  this.ptr = _emscripten_bind_SIGFuelConsumption_SIGFuelConsumption_0();
+  getCache(SIGFuelConsumption)[this.ptr] = this;
+};
+
+SIGFuelConsumption.prototype = Object.create(WrapperObject.prototype);
+SIGFuelConsumption.prototype.constructor = SIGFuelConsumption;
+SIGFuelConsumption.prototype.__class__ = SIGFuelConsumption;
+SIGFuelConsumption.__cache__ = {};
+Module['SIGFuelConsumption'] = SIGFuelConsumption;
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['initializeMembers'] = SIGFuelConsumption.prototype.initializeMembers = function() {
+  var self = this.ptr;
+  _emscripten_bind_SIGFuelConsumption_initializeMembers_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['doFuelConsumptionRun'] = SIGFuelConsumption.prototype.doFuelConsumptionRun = function() {
+  var self = this.ptr;
+  return !!(_emscripten_bind_SIGFuelConsumption_doFuelConsumptionRun_0(self));
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getBurnSeason'] = SIGFuelConsumption.prototype.getBurnSeason = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getBurnSeason_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonConsumed'] = SIGFuelConsumption.prototype.getCarbonConsumed = function(component, loadingUnits) {
+  var self = this.ptr;
+  if (component && typeof component === 'object') component = component.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonConsumed_2(self, component, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonConsumedCrownBranch'] = SIGFuelConsumption.prototype.getCarbonConsumedCrownBranch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonConsumedCrownBranch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonConsumedCrownFoliage'] = SIGFuelConsumption.prototype.getCarbonConsumedCrownFoliage = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonConsumedCrownFoliage_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonConsumedDuff'] = SIGFuelConsumption.prototype.getCarbonConsumedDuff = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonConsumedDuff_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonConsumedHerbaceous'] = SIGFuelConsumption.prototype.getCarbonConsumedHerbaceous = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonConsumedHerbaceous_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonConsumedHundredHour'] = SIGFuelConsumption.prototype.getCarbonConsumedHundredHour = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonConsumedHundredHour_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonConsumedLitter'] = SIGFuelConsumption.prototype.getCarbonConsumedLitter = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonConsumedLitter_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonConsumedOneHour'] = SIGFuelConsumption.prototype.getCarbonConsumedOneHour = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonConsumedOneHour_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonConsumedRottenNineToTwentyInch'] = SIGFuelConsumption.prototype.getCarbonConsumedRottenNineToTwentyInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonConsumedRottenNineToTwentyInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonConsumedRottenSixToNineInch'] = SIGFuelConsumption.prototype.getCarbonConsumedRottenSixToNineInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonConsumedRottenSixToNineInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonConsumedRottenThousandHour'] = SIGFuelConsumption.prototype.getCarbonConsumedRottenThousandHour = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonConsumedRottenThousandHour_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonConsumedRottenThreeToSixInch'] = SIGFuelConsumption.prototype.getCarbonConsumedRottenThreeToSixInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonConsumedRottenThreeToSixInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonConsumedRottenTwentyInchAndLarger'] = SIGFuelConsumption.prototype.getCarbonConsumedRottenTwentyInchAndLarger = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonConsumedRottenTwentyInchAndLarger_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonConsumedShrub'] = SIGFuelConsumption.prototype.getCarbonConsumedShrub = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonConsumedShrub_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonConsumedSoundNineToTwentyInch'] = SIGFuelConsumption.prototype.getCarbonConsumedSoundNineToTwentyInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonConsumedSoundNineToTwentyInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonConsumedSoundSixToNineInch'] = SIGFuelConsumption.prototype.getCarbonConsumedSoundSixToNineInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonConsumedSoundSixToNineInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonConsumedSoundThousandHour'] = SIGFuelConsumption.prototype.getCarbonConsumedSoundThousandHour = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonConsumedSoundThousandHour_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonConsumedSoundThreeToSixInch'] = SIGFuelConsumption.prototype.getCarbonConsumedSoundThreeToSixInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonConsumedSoundThreeToSixInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonConsumedSoundTwentyInchAndLarger'] = SIGFuelConsumption.prototype.getCarbonConsumedSoundTwentyInchAndLarger = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonConsumedSoundTwentyInchAndLarger_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonConsumedTenHour'] = SIGFuelConsumption.prototype.getCarbonConsumedTenHour = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonConsumedTenHour_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonConsumedTotal'] = SIGFuelConsumption.prototype.getCarbonConsumedTotal = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonConsumedTotal_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPostfire'] = SIGFuelConsumption.prototype.getCarbonPostfire = function(component, loadingUnits) {
+  var self = this.ptr;
+  if (component && typeof component === 'object') component = component.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPostfire_2(self, component, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPostfireCrownBranch'] = SIGFuelConsumption.prototype.getCarbonPostfireCrownBranch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPostfireCrownBranch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPostfireCrownFoliage'] = SIGFuelConsumption.prototype.getCarbonPostfireCrownFoliage = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPostfireCrownFoliage_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPostfireDuff'] = SIGFuelConsumption.prototype.getCarbonPostfireDuff = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPostfireDuff_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPostfireHerbaceous'] = SIGFuelConsumption.prototype.getCarbonPostfireHerbaceous = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPostfireHerbaceous_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPostfireHundredHour'] = SIGFuelConsumption.prototype.getCarbonPostfireHundredHour = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPostfireHundredHour_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPostfireLitter'] = SIGFuelConsumption.prototype.getCarbonPostfireLitter = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPostfireLitter_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPostfireOneHour'] = SIGFuelConsumption.prototype.getCarbonPostfireOneHour = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPostfireOneHour_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPostfireRottenNineToTwentyInch'] = SIGFuelConsumption.prototype.getCarbonPostfireRottenNineToTwentyInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPostfireRottenNineToTwentyInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPostfireRottenSixToNineInch'] = SIGFuelConsumption.prototype.getCarbonPostfireRottenSixToNineInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPostfireRottenSixToNineInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPostfireRottenThousandHour'] = SIGFuelConsumption.prototype.getCarbonPostfireRottenThousandHour = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPostfireRottenThousandHour_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPostfireRottenThreeToSixInch'] = SIGFuelConsumption.prototype.getCarbonPostfireRottenThreeToSixInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPostfireRottenThreeToSixInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPostfireRottenTwentyInchAndLarger'] = SIGFuelConsumption.prototype.getCarbonPostfireRottenTwentyInchAndLarger = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPostfireRottenTwentyInchAndLarger_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPostfireShrub'] = SIGFuelConsumption.prototype.getCarbonPostfireShrub = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPostfireShrub_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPostfireSoundNineToTwentyInch'] = SIGFuelConsumption.prototype.getCarbonPostfireSoundNineToTwentyInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPostfireSoundNineToTwentyInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPostfireSoundSixToNineInch'] = SIGFuelConsumption.prototype.getCarbonPostfireSoundSixToNineInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPostfireSoundSixToNineInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPostfireSoundThousandHour'] = SIGFuelConsumption.prototype.getCarbonPostfireSoundThousandHour = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPostfireSoundThousandHour_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPostfireSoundThreeToSixInch'] = SIGFuelConsumption.prototype.getCarbonPostfireSoundThreeToSixInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPostfireSoundThreeToSixInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPostfireSoundTwentyInchAndLarger'] = SIGFuelConsumption.prototype.getCarbonPostfireSoundTwentyInchAndLarger = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPostfireSoundTwentyInchAndLarger_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPostfireTenHour'] = SIGFuelConsumption.prototype.getCarbonPostfireTenHour = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPostfireTenHour_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPostfireTotal'] = SIGFuelConsumption.prototype.getCarbonPostfireTotal = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPostfireTotal_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPrefire'] = SIGFuelConsumption.prototype.getCarbonPrefire = function(component, loadingUnits) {
+  var self = this.ptr;
+  if (component && typeof component === 'object') component = component.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPrefire_2(self, component, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPrefireCrownBranch'] = SIGFuelConsumption.prototype.getCarbonPrefireCrownBranch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPrefireCrownBranch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPrefireCrownFoliage'] = SIGFuelConsumption.prototype.getCarbonPrefireCrownFoliage = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPrefireCrownFoliage_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPrefireDuff'] = SIGFuelConsumption.prototype.getCarbonPrefireDuff = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPrefireDuff_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPrefireHerbaceous'] = SIGFuelConsumption.prototype.getCarbonPrefireHerbaceous = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPrefireHerbaceous_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPrefireHundredHour'] = SIGFuelConsumption.prototype.getCarbonPrefireHundredHour = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPrefireHundredHour_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPrefireLitter'] = SIGFuelConsumption.prototype.getCarbonPrefireLitter = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPrefireLitter_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPrefireOneHour'] = SIGFuelConsumption.prototype.getCarbonPrefireOneHour = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPrefireOneHour_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPrefireRottenNineToTwentyInch'] = SIGFuelConsumption.prototype.getCarbonPrefireRottenNineToTwentyInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPrefireRottenNineToTwentyInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPrefireRottenSixToNineInch'] = SIGFuelConsumption.prototype.getCarbonPrefireRottenSixToNineInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPrefireRottenSixToNineInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPrefireRottenThousandHour'] = SIGFuelConsumption.prototype.getCarbonPrefireRottenThousandHour = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPrefireRottenThousandHour_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPrefireRottenThreeToSixInch'] = SIGFuelConsumption.prototype.getCarbonPrefireRottenThreeToSixInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPrefireRottenThreeToSixInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPrefireRottenTwentyInchAndLarger'] = SIGFuelConsumption.prototype.getCarbonPrefireRottenTwentyInchAndLarger = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPrefireRottenTwentyInchAndLarger_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPrefireShrub'] = SIGFuelConsumption.prototype.getCarbonPrefireShrub = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPrefireShrub_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPrefireSoundNineToTwentyInch'] = SIGFuelConsumption.prototype.getCarbonPrefireSoundNineToTwentyInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPrefireSoundNineToTwentyInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPrefireSoundSixToNineInch'] = SIGFuelConsumption.prototype.getCarbonPrefireSoundSixToNineInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPrefireSoundSixToNineInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPrefireSoundThousandHour'] = SIGFuelConsumption.prototype.getCarbonPrefireSoundThousandHour = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPrefireSoundThousandHour_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPrefireSoundThreeToSixInch'] = SIGFuelConsumption.prototype.getCarbonPrefireSoundThreeToSixInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPrefireSoundThreeToSixInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPrefireSoundTwentyInchAndLarger'] = SIGFuelConsumption.prototype.getCarbonPrefireSoundTwentyInchAndLarger = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPrefireSoundTwentyInchAndLarger_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPrefireTenHour'] = SIGFuelConsumption.prototype.getCarbonPrefireTenHour = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPrefireTenHour_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCarbonPrefireTotal'] = SIGFuelConsumption.prototype.getCarbonPrefireTotal = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCarbonPrefireTotal_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCoarseWoodyEmissionFactorGroup'] = SIGFuelConsumption.prototype.getCoarseWoodyEmissionFactorGroup = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCoarseWoodyEmissionFactorGroup_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getConsumptionEquationNumber'] = SIGFuelConsumption.prototype.getConsumptionEquationNumber = function(component) {
+  var self = this.ptr;
+  if (component && typeof component === 'object') component = component.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumber_1(self, component);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getConsumptionEquationNumberCrownBranch'] = SIGFuelConsumption.prototype.getConsumptionEquationNumberCrownBranch = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumberCrownBranch_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getConsumptionEquationNumberCrownFoliage'] = SIGFuelConsumption.prototype.getConsumptionEquationNumberCrownFoliage = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumberCrownFoliage_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getConsumptionEquationNumberDuff'] = SIGFuelConsumption.prototype.getConsumptionEquationNumberDuff = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumberDuff_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getConsumptionEquationNumberHerbaceous'] = SIGFuelConsumption.prototype.getConsumptionEquationNumberHerbaceous = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumberHerbaceous_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getConsumptionEquationNumberHundredHour'] = SIGFuelConsumption.prototype.getConsumptionEquationNumberHundredHour = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumberHundredHour_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getConsumptionEquationNumberLitter'] = SIGFuelConsumption.prototype.getConsumptionEquationNumberLitter = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumberLitter_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getConsumptionEquationNumberOneHour'] = SIGFuelConsumption.prototype.getConsumptionEquationNumberOneHour = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumberOneHour_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getConsumptionEquationNumberRottenNineToTwentyInch'] = SIGFuelConsumption.prototype.getConsumptionEquationNumberRottenNineToTwentyInch = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumberRottenNineToTwentyInch_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getConsumptionEquationNumberRottenSixToNineInch'] = SIGFuelConsumption.prototype.getConsumptionEquationNumberRottenSixToNineInch = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumberRottenSixToNineInch_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getConsumptionEquationNumberRottenThousandHour'] = SIGFuelConsumption.prototype.getConsumptionEquationNumberRottenThousandHour = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumberRottenThousandHour_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getConsumptionEquationNumberRottenThreeToSixInch'] = SIGFuelConsumption.prototype.getConsumptionEquationNumberRottenThreeToSixInch = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumberRottenThreeToSixInch_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getConsumptionEquationNumberRottenTwentyInchAndLarger'] = SIGFuelConsumption.prototype.getConsumptionEquationNumberRottenTwentyInchAndLarger = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumberRottenTwentyInchAndLarger_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getConsumptionEquationNumberShrub'] = SIGFuelConsumption.prototype.getConsumptionEquationNumberShrub = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumberShrub_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getConsumptionEquationNumberSoundNineToTwentyInch'] = SIGFuelConsumption.prototype.getConsumptionEquationNumberSoundNineToTwentyInch = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumberSoundNineToTwentyInch_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getConsumptionEquationNumberSoundSixToNineInch'] = SIGFuelConsumption.prototype.getConsumptionEquationNumberSoundSixToNineInch = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumberSoundSixToNineInch_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getConsumptionEquationNumberSoundThousandHour'] = SIGFuelConsumption.prototype.getConsumptionEquationNumberSoundThousandHour = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumberSoundThousandHour_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getConsumptionEquationNumberSoundThreeToSixInch'] = SIGFuelConsumption.prototype.getConsumptionEquationNumberSoundThreeToSixInch = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumberSoundThreeToSixInch_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getConsumptionEquationNumberSoundTwentyInchAndLarger'] = SIGFuelConsumption.prototype.getConsumptionEquationNumberSoundTwentyInchAndLarger = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumberSoundTwentyInchAndLarger_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getConsumptionEquationNumberTenHour'] = SIGFuelConsumption.prototype.getConsumptionEquationNumberTenHour = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getConsumptionEquationNumberTenHour_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getCoverGroup'] = SIGFuelConsumption.prototype.getCoverGroup = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getCoverGroup_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getDuffBurnTime'] = SIGFuelConsumption.prototype.getDuffBurnTime = function(timeUnits) {
+  var self = this.ptr;
+  if (timeUnits && typeof timeUnits === 'object') timeUnits = timeUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getDuffBurnTime_1(self, timeUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getDuffConsumptionEquation'] = SIGFuelConsumption.prototype.getDuffConsumptionEquation = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getDuffConsumptionEquation_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getDuffDepth'] = SIGFuelConsumption.prototype.getDuffDepth = function(lengthUnits) {
+  var self = this.ptr;
+  if (lengthUnits && typeof lengthUnits === 'object') lengthUnits = lengthUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getDuffDepth_1(self, lengthUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getDuffDepthPostfire'] = SIGFuelConsumption.prototype.getDuffDepthPostfire = function(lengthUnits) {
+  var self = this.ptr;
+  if (lengthUnits && typeof lengthUnits === 'object') lengthUnits = lengthUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getDuffDepthPostfire_1(self, lengthUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getDuffDepthPrefire'] = SIGFuelConsumption.prototype.getDuffDepthPrefire = function(lengthUnits) {
+  var self = this.ptr;
+  if (lengthUnits && typeof lengthUnits === 'object') lengthUnits = lengthUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getDuffDepthPrefire_1(self, lengthUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getDuffDepthReduction'] = SIGFuelConsumption.prototype.getDuffDepthReduction = function(lengthUnits) {
+  var self = this.ptr;
+  if (lengthUnits && typeof lengthUnits === 'object') lengthUnits = lengthUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getDuffDepthReduction_1(self, lengthUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getDuffDepthReductionEquation'] = SIGFuelConsumption.prototype.getDuffDepthReductionEquation = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getDuffDepthReductionEquation_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getDuffDepthReductionEquationNumber'] = SIGFuelConsumption.prototype.getDuffDepthReductionEquationNumber = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getDuffDepthReductionEquationNumber_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getDuffEmissionFactorGroup'] = SIGFuelConsumption.prototype.getDuffEmissionFactorGroup = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getDuffEmissionFactorGroup_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getDuffFireIntensity'] = SIGFuelConsumption.prototype.getDuffFireIntensity = function(intensityUnits) {
+  var self = this.ptr;
+  if (intensityUnits && typeof intensityUnits === 'object') intensityUnits = intensityUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getDuffFireIntensity_1(self, intensityUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getDuffMoistureMethod'] = SIGFuelConsumption.prototype.getDuffMoistureMethod = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getDuffMoistureMethod_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getDuffSmolderingEmission'] = SIGFuelConsumption.prototype.getDuffSmolderingEmission = function(species, loadingUnits) {
+  var self = this.ptr;
+  if (species && typeof species === 'object') species = species.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getDuffSmolderingEmission_2(self, species, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getDuffType'] = SIGFuelConsumption.prototype.getDuffType = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getDuffType_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getEmissionsDuffSmolderingCarbonDioxide'] = SIGFuelConsumption.prototype.getEmissionsDuffSmolderingCarbonDioxide = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getEmissionsDuffSmolderingCarbonDioxide_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getEmissionsDuffSmolderingCarbonMonoxide'] = SIGFuelConsumption.prototype.getEmissionsDuffSmolderingCarbonMonoxide = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getEmissionsDuffSmolderingCarbonMonoxide_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getEmissionsDuffSmolderingMethane'] = SIGFuelConsumption.prototype.getEmissionsDuffSmolderingMethane = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getEmissionsDuffSmolderingMethane_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getEmissionsDuffSmolderingNitrogenOxides'] = SIGFuelConsumption.prototype.getEmissionsDuffSmolderingNitrogenOxides = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getEmissionsDuffSmolderingNitrogenOxides_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getEmissionsDuffSmolderingParticulateMatterTen'] = SIGFuelConsumption.prototype.getEmissionsDuffSmolderingParticulateMatterTen = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getEmissionsDuffSmolderingParticulateMatterTen_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getEmissionsDuffSmolderingParticulateMatterTwoPointFive'] = SIGFuelConsumption.prototype.getEmissionsDuffSmolderingParticulateMatterTwoPointFive = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getEmissionsDuffSmolderingParticulateMatterTwoPointFive_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getEmissionsDuffSmolderingSulfurDioxide'] = SIGFuelConsumption.prototype.getEmissionsDuffSmolderingSulfurDioxide = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getEmissionsDuffSmolderingSulfurDioxide_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getEmissionsFlamingCarbonDioxide'] = SIGFuelConsumption.prototype.getEmissionsFlamingCarbonDioxide = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getEmissionsFlamingCarbonDioxide_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getEmissionsFlamingCarbonMonoxide'] = SIGFuelConsumption.prototype.getEmissionsFlamingCarbonMonoxide = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getEmissionsFlamingCarbonMonoxide_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getEmissionsFlamingMethane'] = SIGFuelConsumption.prototype.getEmissionsFlamingMethane = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getEmissionsFlamingMethane_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getEmissionsFlamingNitrogenOxides'] = SIGFuelConsumption.prototype.getEmissionsFlamingNitrogenOxides = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getEmissionsFlamingNitrogenOxides_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getEmissionsFlamingParticulateMatterTen'] = SIGFuelConsumption.prototype.getEmissionsFlamingParticulateMatterTen = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getEmissionsFlamingParticulateMatterTen_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getEmissionsFlamingParticulateMatterTwoPointFive'] = SIGFuelConsumption.prototype.getEmissionsFlamingParticulateMatterTwoPointFive = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getEmissionsFlamingParticulateMatterTwoPointFive_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getEmissionsFlamingSulfurDioxide'] = SIGFuelConsumption.prototype.getEmissionsFlamingSulfurDioxide = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getEmissionsFlamingSulfurDioxide_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getEmissionsSmolderingCarbonDioxide'] = SIGFuelConsumption.prototype.getEmissionsSmolderingCarbonDioxide = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getEmissionsSmolderingCarbonDioxide_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getEmissionsSmolderingCarbonMonoxide'] = SIGFuelConsumption.prototype.getEmissionsSmolderingCarbonMonoxide = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getEmissionsSmolderingCarbonMonoxide_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getEmissionsSmolderingMethane'] = SIGFuelConsumption.prototype.getEmissionsSmolderingMethane = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getEmissionsSmolderingMethane_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getEmissionsSmolderingNitrogenOxides'] = SIGFuelConsumption.prototype.getEmissionsSmolderingNitrogenOxides = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getEmissionsSmolderingNitrogenOxides_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getEmissionsSmolderingParticulateMatterTen'] = SIGFuelConsumption.prototype.getEmissionsSmolderingParticulateMatterTen = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getEmissionsSmolderingParticulateMatterTen_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getEmissionsSmolderingParticulateMatterTwoPointFive'] = SIGFuelConsumption.prototype.getEmissionsSmolderingParticulateMatterTwoPointFive = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getEmissionsSmolderingParticulateMatterTwoPointFive_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getEmissionsSmolderingSulfurDioxide'] = SIGFuelConsumption.prototype.getEmissionsSmolderingSulfurDioxide = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getEmissionsSmolderingSulfurDioxide_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getErrorMessage'] = SIGFuelConsumption.prototype.getErrorMessage = function() {
+  var self = this.ptr;
+  return UTF8ToString(_emscripten_bind_SIGFuelConsumption_getErrorMessage_0(self));
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFlamingDuration'] = SIGFuelConsumption.prototype.getFlamingDuration = function(timeUnits) {
+  var self = this.ptr;
+  if (timeUnits && typeof timeUnits === 'object') timeUnits = timeUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFlamingDuration_1(self, timeUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFlamingEmission'] = SIGFuelConsumption.prototype.getFlamingEmission = function(species, loadingUnits) {
+  var self = this.ptr;
+  if (species && typeof species === 'object') species = species.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFlamingEmission_2(self, species, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFlamingEmissionFactorGroup'] = SIGFuelConsumption.prototype.getFlamingEmissionFactorGroup = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFlamingEmissionFactorGroup_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelCategory'] = SIGFuelConsumption.prototype.getFuelCategory = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelCategory_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadConsumed'] = SIGFuelConsumption.prototype.getFuelLoadConsumed = function(component, loadingUnits) {
+  var self = this.ptr;
+  if (component && typeof component === 'object') component = component.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadConsumed_2(self, component, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadConsumedCrownBranch'] = SIGFuelConsumption.prototype.getFuelLoadConsumedCrownBranch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedCrownBranch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadConsumedCrownFoliage'] = SIGFuelConsumption.prototype.getFuelLoadConsumedCrownFoliage = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedCrownFoliage_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadConsumedDuff'] = SIGFuelConsumption.prototype.getFuelLoadConsumedDuff = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedDuff_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadConsumedFlaming'] = SIGFuelConsumption.prototype.getFuelLoadConsumedFlaming = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedFlaming_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadConsumedHerbaceous'] = SIGFuelConsumption.prototype.getFuelLoadConsumedHerbaceous = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedHerbaceous_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadConsumedHundredHour'] = SIGFuelConsumption.prototype.getFuelLoadConsumedHundredHour = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedHundredHour_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadConsumedLitter'] = SIGFuelConsumption.prototype.getFuelLoadConsumedLitter = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedLitter_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadConsumedOneHour'] = SIGFuelConsumption.prototype.getFuelLoadConsumedOneHour = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedOneHour_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadConsumedRottenNineToTwentyInch'] = SIGFuelConsumption.prototype.getFuelLoadConsumedRottenNineToTwentyInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedRottenNineToTwentyInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadConsumedRottenSixToNineInch'] = SIGFuelConsumption.prototype.getFuelLoadConsumedRottenSixToNineInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedRottenSixToNineInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadConsumedRottenThousandHour'] = SIGFuelConsumption.prototype.getFuelLoadConsumedRottenThousandHour = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedRottenThousandHour_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadConsumedRottenThreeToSixInch'] = SIGFuelConsumption.prototype.getFuelLoadConsumedRottenThreeToSixInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedRottenThreeToSixInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadConsumedRottenTwentyInchAndLarger'] = SIGFuelConsumption.prototype.getFuelLoadConsumedRottenTwentyInchAndLarger = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedRottenTwentyInchAndLarger_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadConsumedShrub'] = SIGFuelConsumption.prototype.getFuelLoadConsumedShrub = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedShrub_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadConsumedSmoldering'] = SIGFuelConsumption.prototype.getFuelLoadConsumedSmoldering = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedSmoldering_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadConsumedSoundNineToTwentyInch'] = SIGFuelConsumption.prototype.getFuelLoadConsumedSoundNineToTwentyInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedSoundNineToTwentyInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadConsumedSoundSixToNineInch'] = SIGFuelConsumption.prototype.getFuelLoadConsumedSoundSixToNineInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedSoundSixToNineInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadConsumedSoundThousandHour'] = SIGFuelConsumption.prototype.getFuelLoadConsumedSoundThousandHour = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedSoundThousandHour_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadConsumedSoundThreeToSixInch'] = SIGFuelConsumption.prototype.getFuelLoadConsumedSoundThreeToSixInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedSoundThreeToSixInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadConsumedSoundTwentyInchAndLarger'] = SIGFuelConsumption.prototype.getFuelLoadConsumedSoundTwentyInchAndLarger = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedSoundTwentyInchAndLarger_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadConsumedTenHour'] = SIGFuelConsumption.prototype.getFuelLoadConsumedTenHour = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedTenHour_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadConsumedTotal'] = SIGFuelConsumption.prototype.getFuelLoadConsumedTotal = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadConsumedTotal_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadCrownBranch'] = SIGFuelConsumption.prototype.getFuelLoadCrownBranch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadCrownBranch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadCrownFoliage'] = SIGFuelConsumption.prototype.getFuelLoadCrownFoliage = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadCrownFoliage_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadDuff'] = SIGFuelConsumption.prototype.getFuelLoadDuff = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadDuff_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadHerbaceous'] = SIGFuelConsumption.prototype.getFuelLoadHerbaceous = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadHerbaceous_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadHundredHour'] = SIGFuelConsumption.prototype.getFuelLoadHundredHour = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadHundredHour_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadLitter'] = SIGFuelConsumption.prototype.getFuelLoadLitter = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadLitter_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadOneHour'] = SIGFuelConsumption.prototype.getFuelLoadOneHour = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadOneHour_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPostfire'] = SIGFuelConsumption.prototype.getFuelLoadPostfire = function(component, loadingUnits) {
+  var self = this.ptr;
+  if (component && typeof component === 'object') component = component.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPostfire_2(self, component, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPostfireCrownBranch'] = SIGFuelConsumption.prototype.getFuelLoadPostfireCrownBranch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireCrownBranch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPostfireCrownFoliage'] = SIGFuelConsumption.prototype.getFuelLoadPostfireCrownFoliage = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireCrownFoliage_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPostfireDuff'] = SIGFuelConsumption.prototype.getFuelLoadPostfireDuff = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireDuff_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPostfireHerbaceous'] = SIGFuelConsumption.prototype.getFuelLoadPostfireHerbaceous = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireHerbaceous_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPostfireHundredHour'] = SIGFuelConsumption.prototype.getFuelLoadPostfireHundredHour = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireHundredHour_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPostfireLitter'] = SIGFuelConsumption.prototype.getFuelLoadPostfireLitter = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireLitter_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPostfireOneHour'] = SIGFuelConsumption.prototype.getFuelLoadPostfireOneHour = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireOneHour_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPostfireRottenNineToTwentyInch'] = SIGFuelConsumption.prototype.getFuelLoadPostfireRottenNineToTwentyInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireRottenNineToTwentyInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPostfireRottenSixToNineInch'] = SIGFuelConsumption.prototype.getFuelLoadPostfireRottenSixToNineInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireRottenSixToNineInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPostfireRottenThousandHour'] = SIGFuelConsumption.prototype.getFuelLoadPostfireRottenThousandHour = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireRottenThousandHour_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPostfireRottenThreeToSixInch'] = SIGFuelConsumption.prototype.getFuelLoadPostfireRottenThreeToSixInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireRottenThreeToSixInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPostfireRottenTwentyInchAndLarger'] = SIGFuelConsumption.prototype.getFuelLoadPostfireRottenTwentyInchAndLarger = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireRottenTwentyInchAndLarger_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPostfireShrub'] = SIGFuelConsumption.prototype.getFuelLoadPostfireShrub = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireShrub_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPostfireSoundNineToTwentyInch'] = SIGFuelConsumption.prototype.getFuelLoadPostfireSoundNineToTwentyInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireSoundNineToTwentyInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPostfireSoundSixToNineInch'] = SIGFuelConsumption.prototype.getFuelLoadPostfireSoundSixToNineInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireSoundSixToNineInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPostfireSoundThousandHour'] = SIGFuelConsumption.prototype.getFuelLoadPostfireSoundThousandHour = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireSoundThousandHour_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPostfireSoundThreeToSixInch'] = SIGFuelConsumption.prototype.getFuelLoadPostfireSoundThreeToSixInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireSoundThreeToSixInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPostfireSoundTwentyInchAndLarger'] = SIGFuelConsumption.prototype.getFuelLoadPostfireSoundTwentyInchAndLarger = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireSoundTwentyInchAndLarger_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPostfireTenHour'] = SIGFuelConsumption.prototype.getFuelLoadPostfireTenHour = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireTenHour_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPostfireTotal'] = SIGFuelConsumption.prototype.getFuelLoadPostfireTotal = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPostfireTotal_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPrefire'] = SIGFuelConsumption.prototype.getFuelLoadPrefire = function(component, loadingUnits) {
+  var self = this.ptr;
+  if (component && typeof component === 'object') component = component.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPrefire_2(self, component, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPrefireCrownBranch'] = SIGFuelConsumption.prototype.getFuelLoadPrefireCrownBranch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireCrownBranch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPrefireCrownFoliage'] = SIGFuelConsumption.prototype.getFuelLoadPrefireCrownFoliage = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireCrownFoliage_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPrefireDuff'] = SIGFuelConsumption.prototype.getFuelLoadPrefireDuff = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireDuff_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPrefireHerbaceous'] = SIGFuelConsumption.prototype.getFuelLoadPrefireHerbaceous = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireHerbaceous_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPrefireHundredHour'] = SIGFuelConsumption.prototype.getFuelLoadPrefireHundredHour = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireHundredHour_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPrefireLitter'] = SIGFuelConsumption.prototype.getFuelLoadPrefireLitter = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireLitter_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPrefireOneHour'] = SIGFuelConsumption.prototype.getFuelLoadPrefireOneHour = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireOneHour_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPrefireRottenNineToTwentyInch'] = SIGFuelConsumption.prototype.getFuelLoadPrefireRottenNineToTwentyInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireRottenNineToTwentyInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPrefireRottenSixToNineInch'] = SIGFuelConsumption.prototype.getFuelLoadPrefireRottenSixToNineInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireRottenSixToNineInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPrefireRottenThousandHour'] = SIGFuelConsumption.prototype.getFuelLoadPrefireRottenThousandHour = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireRottenThousandHour_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPrefireRottenThreeToSixInch'] = SIGFuelConsumption.prototype.getFuelLoadPrefireRottenThreeToSixInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireRottenThreeToSixInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPrefireRottenTwentyInchAndLarger'] = SIGFuelConsumption.prototype.getFuelLoadPrefireRottenTwentyInchAndLarger = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireRottenTwentyInchAndLarger_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPrefireShrub'] = SIGFuelConsumption.prototype.getFuelLoadPrefireShrub = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireShrub_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPrefireSoundNineToTwentyInch'] = SIGFuelConsumption.prototype.getFuelLoadPrefireSoundNineToTwentyInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireSoundNineToTwentyInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPrefireSoundSixToNineInch'] = SIGFuelConsumption.prototype.getFuelLoadPrefireSoundSixToNineInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireSoundSixToNineInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPrefireSoundThousandHour'] = SIGFuelConsumption.prototype.getFuelLoadPrefireSoundThousandHour = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireSoundThousandHour_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPrefireSoundThreeToSixInch'] = SIGFuelConsumption.prototype.getFuelLoadPrefireSoundThreeToSixInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireSoundThreeToSixInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPrefireSoundTwentyInchAndLarger'] = SIGFuelConsumption.prototype.getFuelLoadPrefireSoundTwentyInchAndLarger = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireSoundTwentyInchAndLarger_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPrefireTenHour'] = SIGFuelConsumption.prototype.getFuelLoadPrefireTenHour = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireTenHour_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadPrefireTotal'] = SIGFuelConsumption.prototype.getFuelLoadPrefireTotal = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadPrefireTotal_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadRottenNineToTwentyInch'] = SIGFuelConsumption.prototype.getFuelLoadRottenNineToTwentyInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadRottenNineToTwentyInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadRottenSixToNineInch'] = SIGFuelConsumption.prototype.getFuelLoadRottenSixToNineInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadRottenSixToNineInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadRottenThreeToSixInch'] = SIGFuelConsumption.prototype.getFuelLoadRottenThreeToSixInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadRottenThreeToSixInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadRottenTwentyInchAndLarger'] = SIGFuelConsumption.prototype.getFuelLoadRottenTwentyInchAndLarger = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadRottenTwentyInchAndLarger_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadShrub'] = SIGFuelConsumption.prototype.getFuelLoadShrub = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadShrub_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadSoundNineToTwentyInch'] = SIGFuelConsumption.prototype.getFuelLoadSoundNineToTwentyInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadSoundNineToTwentyInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadSoundSixToNineInch'] = SIGFuelConsumption.prototype.getFuelLoadSoundSixToNineInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadSoundSixToNineInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadSoundThreeToSixInch'] = SIGFuelConsumption.prototype.getFuelLoadSoundThreeToSixInch = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadSoundThreeToSixInch_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadSoundTwentyInchAndLarger'] = SIGFuelConsumption.prototype.getFuelLoadSoundTwentyInchAndLarger = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadSoundTwentyInchAndLarger_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadTenHour'] = SIGFuelConsumption.prototype.getFuelLoadTenHour = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadTenHour_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getFuelLoadThousandHour'] = SIGFuelConsumption.prototype.getFuelLoadThousandHour = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getFuelLoadThousandHour_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getHerbaceousConsumptionEquation'] = SIGFuelConsumption.prototype.getHerbaceousConsumptionEquation = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getHerbaceousConsumptionEquation_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getLitterConsumptionEquation'] = SIGFuelConsumption.prototype.getLitterConsumptionEquation = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getLitterConsumptionEquation_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getMineralSoilExposed'] = SIGFuelConsumption.prototype.getMineralSoilExposed = function(fractionUnits) {
+  var self = this.ptr;
+  if (fractionUnits && typeof fractionUnits === 'object') fractionUnits = fractionUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getMineralSoilExposed_1(self, fractionUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getMineralSoilExposureEquation'] = SIGFuelConsumption.prototype.getMineralSoilExposureEquation = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getMineralSoilExposureEquation_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getMineralSoilExposureEquationNumber'] = SIGFuelConsumption.prototype.getMineralSoilExposureEquationNumber = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getMineralSoilExposureEquationNumber_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getMoistureDuff'] = SIGFuelConsumption.prototype.getMoistureDuff = function(moistureUnits) {
+  var self = this.ptr;
+  if (moistureUnits && typeof moistureUnits === 'object') moistureUnits = moistureUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getMoistureDuff_1(self, moistureUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getMoistureLitter'] = SIGFuelConsumption.prototype.getMoistureLitter = function(moistureUnits) {
+  var self = this.ptr;
+  if (moistureUnits && typeof moistureUnits === 'object') moistureUnits = moistureUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getMoistureLitter_1(self, moistureUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getMoistureTenHour'] = SIGFuelConsumption.prototype.getMoistureTenHour = function(moistureUnits) {
+  var self = this.ptr;
+  if (moistureUnits && typeof moistureUnits === 'object') moistureUnits = moistureUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getMoistureTenHour_1(self, moistureUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getMoistureThousandHour'] = SIGFuelConsumption.prototype.getMoistureThousandHour = function(moistureUnits) {
+  var self = this.ptr;
+  if (moistureUnits && typeof moistureUnits === 'object') moistureUnits = moistureUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getMoistureThousandHour_1(self, moistureUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getPercentConsumed'] = SIGFuelConsumption.prototype.getPercentConsumed = function(component, fractionUnits) {
+  var self = this.ptr;
+  if (component && typeof component === 'object') component = component.ptr;
+  if (fractionUnits && typeof fractionUnits === 'object') fractionUnits = fractionUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getPercentConsumed_2(self, component, fractionUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getPercentConsumedCrownBranch'] = SIGFuelConsumption.prototype.getPercentConsumedCrownBranch = function(fractionUnits) {
+  var self = this.ptr;
+  if (fractionUnits && typeof fractionUnits === 'object') fractionUnits = fractionUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getPercentConsumedCrownBranch_1(self, fractionUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getPercentConsumedCrownFoliage'] = SIGFuelConsumption.prototype.getPercentConsumedCrownFoliage = function(fractionUnits) {
+  var self = this.ptr;
+  if (fractionUnits && typeof fractionUnits === 'object') fractionUnits = fractionUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getPercentConsumedCrownFoliage_1(self, fractionUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getPercentConsumedDuff'] = SIGFuelConsumption.prototype.getPercentConsumedDuff = function(fractionUnits) {
+  var self = this.ptr;
+  if (fractionUnits && typeof fractionUnits === 'object') fractionUnits = fractionUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getPercentConsumedDuff_1(self, fractionUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getPercentConsumedHerbaceous'] = SIGFuelConsumption.prototype.getPercentConsumedHerbaceous = function(fractionUnits) {
+  var self = this.ptr;
+  if (fractionUnits && typeof fractionUnits === 'object') fractionUnits = fractionUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getPercentConsumedHerbaceous_1(self, fractionUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getPercentConsumedHundredHour'] = SIGFuelConsumption.prototype.getPercentConsumedHundredHour = function(fractionUnits) {
+  var self = this.ptr;
+  if (fractionUnits && typeof fractionUnits === 'object') fractionUnits = fractionUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getPercentConsumedHundredHour_1(self, fractionUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getPercentConsumedLitter'] = SIGFuelConsumption.prototype.getPercentConsumedLitter = function(fractionUnits) {
+  var self = this.ptr;
+  if (fractionUnits && typeof fractionUnits === 'object') fractionUnits = fractionUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getPercentConsumedLitter_1(self, fractionUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getPercentConsumedOneHour'] = SIGFuelConsumption.prototype.getPercentConsumedOneHour = function(fractionUnits) {
+  var self = this.ptr;
+  if (fractionUnits && typeof fractionUnits === 'object') fractionUnits = fractionUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getPercentConsumedOneHour_1(self, fractionUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getPercentConsumedRottenNineToTwentyInch'] = SIGFuelConsumption.prototype.getPercentConsumedRottenNineToTwentyInch = function(fractionUnits) {
+  var self = this.ptr;
+  if (fractionUnits && typeof fractionUnits === 'object') fractionUnits = fractionUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getPercentConsumedRottenNineToTwentyInch_1(self, fractionUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getPercentConsumedRottenSixToNineInch'] = SIGFuelConsumption.prototype.getPercentConsumedRottenSixToNineInch = function(fractionUnits) {
+  var self = this.ptr;
+  if (fractionUnits && typeof fractionUnits === 'object') fractionUnits = fractionUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getPercentConsumedRottenSixToNineInch_1(self, fractionUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getPercentConsumedRottenThousandHour'] = SIGFuelConsumption.prototype.getPercentConsumedRottenThousandHour = function(fractionUnits) {
+  var self = this.ptr;
+  if (fractionUnits && typeof fractionUnits === 'object') fractionUnits = fractionUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getPercentConsumedRottenThousandHour_1(self, fractionUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getPercentConsumedRottenThreeToSixInch'] = SIGFuelConsumption.prototype.getPercentConsumedRottenThreeToSixInch = function(fractionUnits) {
+  var self = this.ptr;
+  if (fractionUnits && typeof fractionUnits === 'object') fractionUnits = fractionUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getPercentConsumedRottenThreeToSixInch_1(self, fractionUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getPercentConsumedRottenTwentyInchAndLarger'] = SIGFuelConsumption.prototype.getPercentConsumedRottenTwentyInchAndLarger = function(fractionUnits) {
+  var self = this.ptr;
+  if (fractionUnits && typeof fractionUnits === 'object') fractionUnits = fractionUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getPercentConsumedRottenTwentyInchAndLarger_1(self, fractionUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getPercentConsumedShrub'] = SIGFuelConsumption.prototype.getPercentConsumedShrub = function(fractionUnits) {
+  var self = this.ptr;
+  if (fractionUnits && typeof fractionUnits === 'object') fractionUnits = fractionUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getPercentConsumedShrub_1(self, fractionUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getPercentConsumedSoundNineToTwentyInch'] = SIGFuelConsumption.prototype.getPercentConsumedSoundNineToTwentyInch = function(fractionUnits) {
+  var self = this.ptr;
+  if (fractionUnits && typeof fractionUnits === 'object') fractionUnits = fractionUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getPercentConsumedSoundNineToTwentyInch_1(self, fractionUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getPercentConsumedSoundSixToNineInch'] = SIGFuelConsumption.prototype.getPercentConsumedSoundSixToNineInch = function(fractionUnits) {
+  var self = this.ptr;
+  if (fractionUnits && typeof fractionUnits === 'object') fractionUnits = fractionUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getPercentConsumedSoundSixToNineInch_1(self, fractionUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getPercentConsumedSoundThousandHour'] = SIGFuelConsumption.prototype.getPercentConsumedSoundThousandHour = function(fractionUnits) {
+  var self = this.ptr;
+  if (fractionUnits && typeof fractionUnits === 'object') fractionUnits = fractionUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getPercentConsumedSoundThousandHour_1(self, fractionUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getPercentConsumedSoundThreeToSixInch'] = SIGFuelConsumption.prototype.getPercentConsumedSoundThreeToSixInch = function(fractionUnits) {
+  var self = this.ptr;
+  if (fractionUnits && typeof fractionUnits === 'object') fractionUnits = fractionUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getPercentConsumedSoundThreeToSixInch_1(self, fractionUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getPercentConsumedSoundTwentyInchAndLarger'] = SIGFuelConsumption.prototype.getPercentConsumedSoundTwentyInchAndLarger = function(fractionUnits) {
+  var self = this.ptr;
+  if (fractionUnits && typeof fractionUnits === 'object') fractionUnits = fractionUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getPercentConsumedSoundTwentyInchAndLarger_1(self, fractionUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getPercentConsumedTenHour'] = SIGFuelConsumption.prototype.getPercentConsumedTenHour = function(fractionUnits) {
+  var self = this.ptr;
+  if (fractionUnits && typeof fractionUnits === 'object') fractionUnits = fractionUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getPercentConsumedTenHour_1(self, fractionUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getPercentConsumedTotal'] = SIGFuelConsumption.prototype.getPercentConsumedTotal = function(fractionUnits) {
+  var self = this.ptr;
+  if (fractionUnits && typeof fractionUnits === 'object') fractionUnits = fractionUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getPercentConsumedTotal_1(self, fractionUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getPercentDuffDepthReduction'] = SIGFuelConsumption.prototype.getPercentDuffDepthReduction = function(fractionUnits) {
+  var self = this.ptr;
+  if (fractionUnits && typeof fractionUnits === 'object') fractionUnits = fractionUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getPercentDuffDepthReduction_1(self, fractionUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getPercentOfCrownBurned'] = SIGFuelConsumption.prototype.getPercentOfCrownBurned = function(fractionUnits) {
+  var self = this.ptr;
+  if (fractionUnits && typeof fractionUnits === 'object') fractionUnits = fractionUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getPercentOfCrownBurned_1(self, fractionUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getRegion'] = SIGFuelConsumption.prototype.getRegion = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getRegion_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getShrubConsumptionEquation'] = SIGFuelConsumption.prototype.getShrubConsumptionEquation = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getShrubConsumptionEquation_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getSmolderingDuration'] = SIGFuelConsumption.prototype.getSmolderingDuration = function(timeUnits) {
+  var self = this.ptr;
+  if (timeUnits && typeof timeUnits === 'object') timeUnits = timeUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getSmolderingDuration_1(self, timeUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getSmolderingEmission'] = SIGFuelConsumption.prototype.getSmolderingEmission = function(species, loadingUnits) {
+  var self = this.ptr;
+  if (species && typeof species === 'object') species = species.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGFuelConsumption_getSmolderingEmission_2(self, species, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getUseConsumptionEquations'] = SIGFuelConsumption.prototype.getUseConsumptionEquations = function() {
+  var self = this.ptr;
+  return !!(_emscripten_bind_SIGFuelConsumption_getUseConsumptionEquations_0(self));
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['getUseLegacyEmissionFactors'] = SIGFuelConsumption.prototype.getUseLegacyEmissionFactors = function() {
+  var self = this.ptr;
+  return !!(_emscripten_bind_SIGFuelConsumption_getUseLegacyEmissionFactors_0(self));
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['isFuelbedIgnited'] = SIGFuelConsumption.prototype.isFuelbedIgnited = function() {
+  var self = this.ptr;
+  return !!(_emscripten_bind_SIGFuelConsumption_isFuelbedIgnited_0(self));
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['distributeThousandHourFuelLoad'] = SIGFuelConsumption.prototype.distributeThousandHourFuelLoad = function(totalFuelLoad, loadingUnits, rottenFraction, fractionUnits, distribution) {
+  var self = this.ptr;
+  if (totalFuelLoad && typeof totalFuelLoad === 'object') totalFuelLoad = totalFuelLoad.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  if (rottenFraction && typeof rottenFraction === 'object') rottenFraction = rottenFraction.ptr;
+  if (fractionUnits && typeof fractionUnits === 'object') fractionUnits = fractionUnits.ptr;
+  if (distribution && typeof distribution === 'object') distribution = distribution.ptr;
+  _emscripten_bind_SIGFuelConsumption_distributeThousandHourFuelLoad_5(self, totalFuelLoad, loadingUnits, rottenFraction, fractionUnits, distribution);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['setBurnSeason'] = SIGFuelConsumption.prototype.setBurnSeason = function(burnSeason) {
+  var self = this.ptr;
+  if (burnSeason && typeof burnSeason === 'object') burnSeason = burnSeason.ptr;
+  _emscripten_bind_SIGFuelConsumption_setBurnSeason_1(self, burnSeason);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['setCoverGroup'] = SIGFuelConsumption.prototype.setCoverGroup = function(coverGroup) {
+  var self = this.ptr;
+  if (coverGroup && typeof coverGroup === 'object') coverGroup = coverGroup.ptr;
+  _emscripten_bind_SIGFuelConsumption_setCoverGroup_1(self, coverGroup);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['setDuffConsumptionEquation'] = SIGFuelConsumption.prototype.setDuffConsumptionEquation = function(equation) {
+  var self = this.ptr;
+  if (equation && typeof equation === 'object') equation = equation.ptr;
+  _emscripten_bind_SIGFuelConsumption_setDuffConsumptionEquation_1(self, equation);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['setDuffDepth'] = SIGFuelConsumption.prototype.setDuffDepth = function(duffDepth, lengthUnits) {
+  var self = this.ptr;
+  if (duffDepth && typeof duffDepth === 'object') duffDepth = duffDepth.ptr;
+  if (lengthUnits && typeof lengthUnits === 'object') lengthUnits = lengthUnits.ptr;
+  _emscripten_bind_SIGFuelConsumption_setDuffDepth_2(self, duffDepth, lengthUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['setDuffDepthReductionEquation'] = SIGFuelConsumption.prototype.setDuffDepthReductionEquation = function(equation) {
+  var self = this.ptr;
+  if (equation && typeof equation === 'object') equation = equation.ptr;
+  _emscripten_bind_SIGFuelConsumption_setDuffDepthReductionEquation_1(self, equation);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['setDuffMoistureMethod'] = SIGFuelConsumption.prototype.setDuffMoistureMethod = function(duffMoistureMethod) {
+  var self = this.ptr;
+  if (duffMoistureMethod && typeof duffMoistureMethod === 'object') duffMoistureMethod = duffMoistureMethod.ptr;
+  _emscripten_bind_SIGFuelConsumption_setDuffMoistureMethod_1(self, duffMoistureMethod);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['setDuffType'] = SIGFuelConsumption.prototype.setDuffType = function(duffType) {
+  var self = this.ptr;
+  if (duffType && typeof duffType === 'object') duffType = duffType.ptr;
+  _emscripten_bind_SIGFuelConsumption_setDuffType_1(self, duffType);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['setEmissionFactorGroups'] = SIGFuelConsumption.prototype.setEmissionFactorGroups = function(flamingGroupNumber, coarseWoodyGroupNumber, duffGroupNumber) {
+  var self = this.ptr;
+  if (flamingGroupNumber && typeof flamingGroupNumber === 'object') flamingGroupNumber = flamingGroupNumber.ptr;
+  if (coarseWoodyGroupNumber && typeof coarseWoodyGroupNumber === 'object') coarseWoodyGroupNumber = coarseWoodyGroupNumber.ptr;
+  if (duffGroupNumber && typeof duffGroupNumber === 'object') duffGroupNumber = duffGroupNumber.ptr;
+  return !!(_emscripten_bind_SIGFuelConsumption_setEmissionFactorGroups_3(self, flamingGroupNumber, coarseWoodyGroupNumber, duffGroupNumber));
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['setFuelCategory'] = SIGFuelConsumption.prototype.setFuelCategory = function(fuelCategory) {
+  var self = this.ptr;
+  if (fuelCategory && typeof fuelCategory === 'object') fuelCategory = fuelCategory.ptr;
+  _emscripten_bind_SIGFuelConsumption_setFuelCategory_1(self, fuelCategory);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['setFuelLoadCrownBranch'] = SIGFuelConsumption.prototype.setFuelLoadCrownBranch = function(fuelLoad, loadingUnits) {
+  var self = this.ptr;
+  if (fuelLoad && typeof fuelLoad === 'object') fuelLoad = fuelLoad.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  _emscripten_bind_SIGFuelConsumption_setFuelLoadCrownBranch_2(self, fuelLoad, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['setFuelLoadCrownFoliage'] = SIGFuelConsumption.prototype.setFuelLoadCrownFoliage = function(fuelLoad, loadingUnits) {
+  var self = this.ptr;
+  if (fuelLoad && typeof fuelLoad === 'object') fuelLoad = fuelLoad.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  _emscripten_bind_SIGFuelConsumption_setFuelLoadCrownFoliage_2(self, fuelLoad, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['setFuelLoadDuff'] = SIGFuelConsumption.prototype.setFuelLoadDuff = function(fuelLoad, loadingUnits) {
+  var self = this.ptr;
+  if (fuelLoad && typeof fuelLoad === 'object') fuelLoad = fuelLoad.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  _emscripten_bind_SIGFuelConsumption_setFuelLoadDuff_2(self, fuelLoad, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['setFuelLoadHerbaceous'] = SIGFuelConsumption.prototype.setFuelLoadHerbaceous = function(fuelLoad, loadingUnits) {
+  var self = this.ptr;
+  if (fuelLoad && typeof fuelLoad === 'object') fuelLoad = fuelLoad.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  _emscripten_bind_SIGFuelConsumption_setFuelLoadHerbaceous_2(self, fuelLoad, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['setFuelLoadHundredHour'] = SIGFuelConsumption.prototype.setFuelLoadHundredHour = function(fuelLoad, loadingUnits) {
+  var self = this.ptr;
+  if (fuelLoad && typeof fuelLoad === 'object') fuelLoad = fuelLoad.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  _emscripten_bind_SIGFuelConsumption_setFuelLoadHundredHour_2(self, fuelLoad, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['setFuelLoadLitter'] = SIGFuelConsumption.prototype.setFuelLoadLitter = function(fuelLoad, loadingUnits) {
+  var self = this.ptr;
+  if (fuelLoad && typeof fuelLoad === 'object') fuelLoad = fuelLoad.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  _emscripten_bind_SIGFuelConsumption_setFuelLoadLitter_2(self, fuelLoad, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['setFuelLoadOneHour'] = SIGFuelConsumption.prototype.setFuelLoadOneHour = function(fuelLoad, loadingUnits) {
+  var self = this.ptr;
+  if (fuelLoad && typeof fuelLoad === 'object') fuelLoad = fuelLoad.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  _emscripten_bind_SIGFuelConsumption_setFuelLoadOneHour_2(self, fuelLoad, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['setFuelLoadRottenNineToTwentyInch'] = SIGFuelConsumption.prototype.setFuelLoadRottenNineToTwentyInch = function(fuelLoad, loadingUnits) {
+  var self = this.ptr;
+  if (fuelLoad && typeof fuelLoad === 'object') fuelLoad = fuelLoad.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  _emscripten_bind_SIGFuelConsumption_setFuelLoadRottenNineToTwentyInch_2(self, fuelLoad, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['setFuelLoadRottenSixToNineInch'] = SIGFuelConsumption.prototype.setFuelLoadRottenSixToNineInch = function(fuelLoad, loadingUnits) {
+  var self = this.ptr;
+  if (fuelLoad && typeof fuelLoad === 'object') fuelLoad = fuelLoad.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  _emscripten_bind_SIGFuelConsumption_setFuelLoadRottenSixToNineInch_2(self, fuelLoad, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['setFuelLoadRottenThreeToSixInch'] = SIGFuelConsumption.prototype.setFuelLoadRottenThreeToSixInch = function(fuelLoad, loadingUnits) {
+  var self = this.ptr;
+  if (fuelLoad && typeof fuelLoad === 'object') fuelLoad = fuelLoad.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  _emscripten_bind_SIGFuelConsumption_setFuelLoadRottenThreeToSixInch_2(self, fuelLoad, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['setFuelLoadRottenTwentyInchAndLarger'] = SIGFuelConsumption.prototype.setFuelLoadRottenTwentyInchAndLarger = function(fuelLoad, loadingUnits) {
+  var self = this.ptr;
+  if (fuelLoad && typeof fuelLoad === 'object') fuelLoad = fuelLoad.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  _emscripten_bind_SIGFuelConsumption_setFuelLoadRottenTwentyInchAndLarger_2(self, fuelLoad, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['setFuelLoadShrub'] = SIGFuelConsumption.prototype.setFuelLoadShrub = function(fuelLoad, loadingUnits) {
+  var self = this.ptr;
+  if (fuelLoad && typeof fuelLoad === 'object') fuelLoad = fuelLoad.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  _emscripten_bind_SIGFuelConsumption_setFuelLoadShrub_2(self, fuelLoad, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['setFuelLoadSoundNineToTwentyInch'] = SIGFuelConsumption.prototype.setFuelLoadSoundNineToTwentyInch = function(fuelLoad, loadingUnits) {
+  var self = this.ptr;
+  if (fuelLoad && typeof fuelLoad === 'object') fuelLoad = fuelLoad.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  _emscripten_bind_SIGFuelConsumption_setFuelLoadSoundNineToTwentyInch_2(self, fuelLoad, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['setFuelLoadSoundSixToNineInch'] = SIGFuelConsumption.prototype.setFuelLoadSoundSixToNineInch = function(fuelLoad, loadingUnits) {
+  var self = this.ptr;
+  if (fuelLoad && typeof fuelLoad === 'object') fuelLoad = fuelLoad.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  _emscripten_bind_SIGFuelConsumption_setFuelLoadSoundSixToNineInch_2(self, fuelLoad, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['setFuelLoadSoundThreeToSixInch'] = SIGFuelConsumption.prototype.setFuelLoadSoundThreeToSixInch = function(fuelLoad, loadingUnits) {
+  var self = this.ptr;
+  if (fuelLoad && typeof fuelLoad === 'object') fuelLoad = fuelLoad.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  _emscripten_bind_SIGFuelConsumption_setFuelLoadSoundThreeToSixInch_2(self, fuelLoad, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['setFuelLoadSoundTwentyInchAndLarger'] = SIGFuelConsumption.prototype.setFuelLoadSoundTwentyInchAndLarger = function(fuelLoad, loadingUnits) {
+  var self = this.ptr;
+  if (fuelLoad && typeof fuelLoad === 'object') fuelLoad = fuelLoad.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  _emscripten_bind_SIGFuelConsumption_setFuelLoadSoundTwentyInchAndLarger_2(self, fuelLoad, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['setFuelLoadTenHour'] = SIGFuelConsumption.prototype.setFuelLoadTenHour = function(fuelLoad, loadingUnits) {
+  var self = this.ptr;
+  if (fuelLoad && typeof fuelLoad === 'object') fuelLoad = fuelLoad.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  _emscripten_bind_SIGFuelConsumption_setFuelLoadTenHour_2(self, fuelLoad, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['setHerbaceousConsumptionEquation'] = SIGFuelConsumption.prototype.setHerbaceousConsumptionEquation = function(equation) {
+  var self = this.ptr;
+  if (equation && typeof equation === 'object') equation = equation.ptr;
+  _emscripten_bind_SIGFuelConsumption_setHerbaceousConsumptionEquation_1(self, equation);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['setLitterConsumptionEquation'] = SIGFuelConsumption.prototype.setLitterConsumptionEquation = function(equation) {
+  var self = this.ptr;
+  if (equation && typeof equation === 'object') equation = equation.ptr;
+  _emscripten_bind_SIGFuelConsumption_setLitterConsumptionEquation_1(self, equation);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['setMineralSoilExposureEquation'] = SIGFuelConsumption.prototype.setMineralSoilExposureEquation = function(equation) {
+  var self = this.ptr;
+  if (equation && typeof equation === 'object') equation = equation.ptr;
+  _emscripten_bind_SIGFuelConsumption_setMineralSoilExposureEquation_1(self, equation);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['setMoistureDuff'] = SIGFuelConsumption.prototype.setMoistureDuff = function(moisture, moistureUnits) {
+  var self = this.ptr;
+  if (moisture && typeof moisture === 'object') moisture = moisture.ptr;
+  if (moistureUnits && typeof moistureUnits === 'object') moistureUnits = moistureUnits.ptr;
+  _emscripten_bind_SIGFuelConsumption_setMoistureDuff_2(self, moisture, moistureUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['setMoistureLitter'] = SIGFuelConsumption.prototype.setMoistureLitter = function(moisture, moistureUnits) {
+  var self = this.ptr;
+  if (moisture && typeof moisture === 'object') moisture = moisture.ptr;
+  if (moistureUnits && typeof moistureUnits === 'object') moistureUnits = moistureUnits.ptr;
+  _emscripten_bind_SIGFuelConsumption_setMoistureLitter_2(self, moisture, moistureUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['setMoistureTenHour'] = SIGFuelConsumption.prototype.setMoistureTenHour = function(moisture, moistureUnits) {
+  var self = this.ptr;
+  if (moisture && typeof moisture === 'object') moisture = moisture.ptr;
+  if (moistureUnits && typeof moistureUnits === 'object') moistureUnits = moistureUnits.ptr;
+  _emscripten_bind_SIGFuelConsumption_setMoistureTenHour_2(self, moisture, moistureUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['setMoistureThousandHour'] = SIGFuelConsumption.prototype.setMoistureThousandHour = function(moisture, moistureUnits) {
+  var self = this.ptr;
+  if (moisture && typeof moisture === 'object') moisture = moisture.ptr;
+  if (moistureUnits && typeof moistureUnits === 'object') moistureUnits = moistureUnits.ptr;
+  _emscripten_bind_SIGFuelConsumption_setMoistureThousandHour_2(self, moisture, moistureUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['setPercentOfCrownBurned'] = SIGFuelConsumption.prototype.setPercentOfCrownBurned = function(percentOfCrownBurned, fractionUnits) {
+  var self = this.ptr;
+  if (percentOfCrownBurned && typeof percentOfCrownBurned === 'object') percentOfCrownBurned = percentOfCrownBurned.ptr;
+  if (fractionUnits && typeof fractionUnits === 'object') fractionUnits = fractionUnits.ptr;
+  _emscripten_bind_SIGFuelConsumption_setPercentOfCrownBurned_2(self, percentOfCrownBurned, fractionUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['setRegion'] = SIGFuelConsumption.prototype.setRegion = function(region) {
+  var self = this.ptr;
+  if (region && typeof region === 'object') region = region.ptr;
+  _emscripten_bind_SIGFuelConsumption_setRegion_1(self, region);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['setShrubConsumptionEquation'] = SIGFuelConsumption.prototype.setShrubConsumptionEquation = function(equation) {
+  var self = this.ptr;
+  if (equation && typeof equation === 'object') equation = equation.ptr;
+  _emscripten_bind_SIGFuelConsumption_setShrubConsumptionEquation_1(self, equation);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['setUseConsumptionEquations'] = SIGFuelConsumption.prototype.setUseConsumptionEquations = function(useConsumptionEquations) {
+  var self = this.ptr;
+  if (useConsumptionEquations && typeof useConsumptionEquations === 'object') useConsumptionEquations = useConsumptionEquations.ptr;
+  _emscripten_bind_SIGFuelConsumption_setUseConsumptionEquations_1(self, useConsumptionEquations);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['setUseLegacyEmissionFactors'] = SIGFuelConsumption.prototype.setUseLegacyEmissionFactors = function(useLegacyEmissionFactors) {
+  var self = this.ptr;
+  if (useLegacyEmissionFactors && typeof useLegacyEmissionFactors === 'object') useLegacyEmissionFactors = useLegacyEmissionFactors.ptr;
+  _emscripten_bind_SIGFuelConsumption_setUseLegacyEmissionFactors_1(self, useLegacyEmissionFactors);
+};
+
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGFuelConsumption.prototype['__destroy__'] = SIGFuelConsumption.prototype.__destroy__ = function() {
+  var self = this.ptr;
+  _emscripten_bind_SIGFuelConsumption___destroy___0(self);
+};
+
+// Interface: SIGSoilHeating
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+function SIGSoilHeating() {
+  this.ptr = _emscripten_bind_SIGSoilHeating_SIGSoilHeating_0();
+  getCache(SIGSoilHeating)[this.ptr] = this;
+};
+
+SIGSoilHeating.prototype = Object.create(WrapperObject.prototype);
+SIGSoilHeating.prototype.constructor = SIGSoilHeating;
+SIGSoilHeating.prototype.__class__ = SIGSoilHeating;
+SIGSoilHeating.__cache__ = {};
+Module['SIGSoilHeating'] = SIGSoilHeating;
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['initializeMembers'] = SIGSoilHeating.prototype.initializeMembers = function() {
+  var self = this.ptr;
+  _emscripten_bind_SIGSoilHeating_initializeMembers_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['doSoilHeatingRun'] = SIGSoilHeating.prototype.doSoilHeatingRun = function() {
+  var self = this.ptr;
+  return !!(_emscripten_bind_SIGSoilHeating_doSoilHeatingRun_0(self));
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['getDeepestLayerReachingSixtyDegreesCelsius'] = SIGSoilHeating.prototype.getDeepestLayerReachingSixtyDegreesCelsius = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGSoilHeating_getDeepestLayerReachingSixtyDegreesCelsius_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['getDeepestLayerReachingTwoHundredSeventyFiveDegreesCelsius'] = SIGSoilHeating.prototype.getDeepestLayerReachingTwoHundredSeventyFiveDegreesCelsius = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGSoilHeating_getDeepestLayerReachingTwoHundredSeventyFiveDegreesCelsius_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['getDuffConsumed'] = SIGSoilHeating.prototype.getDuffConsumed = function(fractionUnits) {
+  var self = this.ptr;
+  if (fractionUnits && typeof fractionUnits === 'object') fractionUnits = fractionUnits.ptr;
+  return _emscripten_bind_SIGSoilHeating_getDuffConsumed_1(self, fractionUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['getDuffDepthPostfire'] = SIGSoilHeating.prototype.getDuffDepthPostfire = function(lengthUnits) {
+  var self = this.ptr;
+  if (lengthUnits && typeof lengthUnits === 'object') lengthUnits = lengthUnits.ptr;
+  return _emscripten_bind_SIGSoilHeating_getDuffDepthPostfire_1(self, lengthUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['getDuffDepthPrefire'] = SIGSoilHeating.prototype.getDuffDepthPrefire = function(lengthUnits) {
+  var self = this.ptr;
+  if (lengthUnits && typeof lengthUnits === 'object') lengthUnits = lengthUnits.ptr;
+  return _emscripten_bind_SIGSoilHeating_getDuffDepthPrefire_1(self, lengthUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['getDuffHeatEfficiency'] = SIGSoilHeating.prototype.getDuffHeatEfficiency = function(fractionUnits) {
+  var self = this.ptr;
+  if (fractionUnits && typeof fractionUnits === 'object') fractionUnits = fractionUnits.ptr;
+  return _emscripten_bind_SIGSoilHeating_getDuffHeatEfficiency_1(self, fractionUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['getDuffLoadPrefire'] = SIGSoilHeating.prototype.getDuffLoadPrefire = function(loadingUnits) {
+  var self = this.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  return _emscripten_bind_SIGSoilHeating_getDuffLoadPrefire_1(self, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['getDuffMoisture'] = SIGSoilHeating.prototype.getDuffMoisture = function(moistureUnits) {
+  var self = this.ptr;
+  if (moistureUnits && typeof moistureUnits === 'object') moistureUnits = moistureUnits.ptr;
+  return _emscripten_bind_SIGSoilHeating_getDuffMoisture_1(self, moistureUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['getFuelbedIgnited'] = SIGSoilHeating.prototype.getFuelbedIgnited = function() {
+  var self = this.ptr;
+  return !!(_emscripten_bind_SIGSoilHeating_getFuelbedIgnited_0(self));
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['getHerbShrubFireIntensity'] = SIGSoilHeating.prototype.getHerbShrubFireIntensity = function(index, intensityUnits) {
+  var self = this.ptr;
+  if (index && typeof index === 'object') index = index.ptr;
+  if (intensityUnits && typeof intensityUnits === 'object') intensityUnits = intensityUnits.ptr;
+  return _emscripten_bind_SIGSoilHeating_getHerbShrubFireIntensity_2(self, index, intensityUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['getHerbShrubHeatEfficiency'] = SIGSoilHeating.prototype.getHerbShrubHeatEfficiency = function(fractionUnits) {
+  var self = this.ptr;
+  if (fractionUnits && typeof fractionUnits === 'object') fractionUnits = fractionUnits.ptr;
+  return _emscripten_bind_SIGSoilHeating_getHerbShrubHeatEfficiency_1(self, fractionUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['getMaximumTemperatureAtLayer'] = SIGSoilHeating.prototype.getMaximumTemperatureAtLayer = function(layer, temperatureUnits) {
+  var self = this.ptr;
+  if (layer && typeof layer === 'object') layer = layer.ptr;
+  if (temperatureUnits && typeof temperatureUnits === 'object') temperatureUnits = temperatureUnits.ptr;
+  return _emscripten_bind_SIGSoilHeating_getMaximumTemperatureAtLayer_2(self, layer, temperatureUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['getMessage'] = SIGSoilHeating.prototype.getMessage = function() {
+  var self = this.ptr;
+  return UTF8ToString(_emscripten_bind_SIGSoilHeating_getMessage_0(self));
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['getNumberOfFireIntensities'] = SIGSoilHeating.prototype.getNumberOfFireIntensities = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGSoilHeating_getNumberOfFireIntensities_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['getNumberOfTimeSteps'] = SIGSoilHeating.prototype.getNumberOfTimeSteps = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGSoilHeating_getNumberOfTimeSteps_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['getProportionOfHeatReachingSoilThroughDuff'] = SIGSoilHeating.prototype.getProportionOfHeatReachingSoilThroughDuff = function(fractionUnits) {
+  var self = this.ptr;
+  if (fractionUnits && typeof fractionUnits === 'object') fractionUnits = fractionUnits.ptr;
+  return _emscripten_bind_SIGSoilHeating_getProportionOfHeatReachingSoilThroughDuff_1(self, fractionUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['getSoilFamily'] = SIGSoilHeating.prototype.getSoilFamily = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGSoilHeating_getSoilFamily_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['getSoilHeatingModelUsed'] = SIGSoilHeating.prototype.getSoilHeatingModelUsed = function() {
+  var self = this.ptr;
+  return _emscripten_bind_SIGSoilHeating_getSoilHeatingModelUsed_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['getSoilMoisture'] = SIGSoilHeating.prototype.getSoilMoisture = function(moistureUnits) {
+  var self = this.ptr;
+  if (moistureUnits && typeof moistureUnits === 'object') moistureUnits = moistureUnits.ptr;
+  return _emscripten_bind_SIGSoilHeating_getSoilMoisture_1(self, moistureUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['getStartingSoilTemperature'] = SIGSoilHeating.prototype.getStartingSoilTemperature = function(temperatureUnits) {
+  var self = this.ptr;
+  if (temperatureUnits && typeof temperatureUnits === 'object') temperatureUnits = temperatureUnits.ptr;
+  return _emscripten_bind_SIGSoilHeating_getStartingSoilTemperature_1(self, temperatureUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['getTemperatureAtLayerAndTimeStep'] = SIGSoilHeating.prototype.getTemperatureAtLayerAndTimeStep = function(layer, timeStep, temperatureUnits) {
+  var self = this.ptr;
+  if (layer && typeof layer === 'object') layer = layer.ptr;
+  if (timeStep && typeof timeStep === 'object') timeStep = timeStep.ptr;
+  if (temperatureUnits && typeof temperatureUnits === 'object') temperatureUnits = temperatureUnits.ptr;
+  return _emscripten_bind_SIGSoilHeating_getTemperatureAtLayerAndTimeStep_3(self, layer, timeStep, temperatureUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['getTimeOfMaximumTemperatureAtLayer'] = SIGSoilHeating.prototype.getTimeOfMaximumTemperatureAtLayer = function(layer, timeUnits) {
+  var self = this.ptr;
+  if (layer && typeof layer === 'object') layer = layer.ptr;
+  if (timeUnits && typeof timeUnits === 'object') timeUnits = timeUnits.ptr;
+  return _emscripten_bind_SIGSoilHeating_getTimeOfMaximumTemperatureAtLayer_2(self, layer, timeUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['getTimeStep'] = SIGSoilHeating.prototype.getTimeStep = function(timeUnits) {
+  var self = this.ptr;
+  if (timeUnits && typeof timeUnits === 'object') timeUnits = timeUnits.ptr;
+  return _emscripten_bind_SIGSoilHeating_getTimeStep_1(self, timeUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['getWoodLitterFireIntensity'] = SIGSoilHeating.prototype.getWoodLitterFireIntensity = function(index, intensityUnits) {
+  var self = this.ptr;
+  if (index && typeof index === 'object') index = index.ptr;
+  if (intensityUnits && typeof intensityUnits === 'object') intensityUnits = intensityUnits.ptr;
+  return _emscripten_bind_SIGSoilHeating_getWoodLitterFireIntensity_2(self, index, intensityUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['getWoodLitterHeatEfficiency'] = SIGSoilHeating.prototype.getWoodLitterHeatEfficiency = function(fractionUnits) {
+  var self = this.ptr;
+  if (fractionUnits && typeof fractionUnits === 'object') fractionUnits = fractionUnits.ptr;
+  return _emscripten_bind_SIGSoilHeating_getWoodLitterHeatEfficiency_1(self, fractionUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['addFireIntensity'] = SIGSoilHeating.prototype.addFireIntensity = function(woodLitterIntensity, herbShrubIntensity, intensityUnits) {
+  var self = this.ptr;
+  if (woodLitterIntensity && typeof woodLitterIntensity === 'object') woodLitterIntensity = woodLitterIntensity.ptr;
+  if (herbShrubIntensity && typeof herbShrubIntensity === 'object') herbShrubIntensity = herbShrubIntensity.ptr;
+  if (intensityUnits && typeof intensityUnits === 'object') intensityUnits = intensityUnits.ptr;
+  _emscripten_bind_SIGSoilHeating_addFireIntensity_3(self, woodLitterIntensity, herbShrubIntensity, intensityUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['clearFireIntensities'] = SIGSoilHeating.prototype.clearFireIntensities = function() {
+  var self = this.ptr;
+  _emscripten_bind_SIGSoilHeating_clearFireIntensities_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['setDuffConsumed'] = SIGSoilHeating.prototype.setDuffConsumed = function(duffConsumed, fractionUnits) {
+  var self = this.ptr;
+  if (duffConsumed && typeof duffConsumed === 'object') duffConsumed = duffConsumed.ptr;
+  if (fractionUnits && typeof fractionUnits === 'object') fractionUnits = fractionUnits.ptr;
+  _emscripten_bind_SIGSoilHeating_setDuffConsumed_2(self, duffConsumed, fractionUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['setDuffDepthPostfire'] = SIGSoilHeating.prototype.setDuffDepthPostfire = function(duffDepth, lengthUnits) {
+  var self = this.ptr;
+  if (duffDepth && typeof duffDepth === 'object') duffDepth = duffDepth.ptr;
+  if (lengthUnits && typeof lengthUnits === 'object') lengthUnits = lengthUnits.ptr;
+  _emscripten_bind_SIGSoilHeating_setDuffDepthPostfire_2(self, duffDepth, lengthUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['setDuffDepthPrefire'] = SIGSoilHeating.prototype.setDuffDepthPrefire = function(duffDepth, lengthUnits) {
+  var self = this.ptr;
+  if (duffDepth && typeof duffDepth === 'object') duffDepth = duffDepth.ptr;
+  if (lengthUnits && typeof lengthUnits === 'object') lengthUnits = lengthUnits.ptr;
+  _emscripten_bind_SIGSoilHeating_setDuffDepthPrefire_2(self, duffDepth, lengthUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['setDuffHeatEfficiency'] = SIGSoilHeating.prototype.setDuffHeatEfficiency = function(efficiency, fractionUnits) {
+  var self = this.ptr;
+  if (efficiency && typeof efficiency === 'object') efficiency = efficiency.ptr;
+  if (fractionUnits && typeof fractionUnits === 'object') fractionUnits = fractionUnits.ptr;
+  _emscripten_bind_SIGSoilHeating_setDuffHeatEfficiency_2(self, efficiency, fractionUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['setDuffLoadPrefire'] = SIGSoilHeating.prototype.setDuffLoadPrefire = function(duffLoad, loadingUnits) {
+  var self = this.ptr;
+  if (duffLoad && typeof duffLoad === 'object') duffLoad = duffLoad.ptr;
+  if (loadingUnits && typeof loadingUnits === 'object') loadingUnits = loadingUnits.ptr;
+  _emscripten_bind_SIGSoilHeating_setDuffLoadPrefire_2(self, duffLoad, loadingUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['setDuffMoisture'] = SIGSoilHeating.prototype.setDuffMoisture = function(duffMoisture, moistureUnits) {
+  var self = this.ptr;
+  if (duffMoisture && typeof duffMoisture === 'object') duffMoisture = duffMoisture.ptr;
+  if (moistureUnits && typeof moistureUnits === 'object') moistureUnits = moistureUnits.ptr;
+  _emscripten_bind_SIGSoilHeating_setDuffMoisture_2(self, duffMoisture, moistureUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['setFuelbedIgnited'] = SIGSoilHeating.prototype.setFuelbedIgnited = function(isFuelbedIgnited) {
+  var self = this.ptr;
+  if (isFuelbedIgnited && typeof isFuelbedIgnited === 'object') isFuelbedIgnited = isFuelbedIgnited.ptr;
+  _emscripten_bind_SIGSoilHeating_setFuelbedIgnited_1(self, isFuelbedIgnited);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['setHerbShrubHeatEfficiency'] = SIGSoilHeating.prototype.setHerbShrubHeatEfficiency = function(efficiency, fractionUnits) {
+  var self = this.ptr;
+  if (efficiency && typeof efficiency === 'object') efficiency = efficiency.ptr;
+  if (fractionUnits && typeof fractionUnits === 'object') fractionUnits = fractionUnits.ptr;
+  _emscripten_bind_SIGSoilHeating_setHerbShrubHeatEfficiency_2(self, efficiency, fractionUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['setInputsFromFuelConsumption'] = SIGSoilHeating.prototype.setInputsFromFuelConsumption = function(fuelConsumption) {
+  var self = this.ptr;
+  if (fuelConsumption && typeof fuelConsumption === 'object') fuelConsumption = fuelConsumption.ptr;
+  _emscripten_bind_SIGSoilHeating_setInputsFromFuelConsumption_1(self, fuelConsumption);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['setSoilFamily'] = SIGSoilHeating.prototype.setSoilFamily = function(soilFamily) {
+  var self = this.ptr;
+  if (soilFamily && typeof soilFamily === 'object') soilFamily = soilFamily.ptr;
+  _emscripten_bind_SIGSoilHeating_setSoilFamily_1(self, soilFamily);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['setSoilMoisture'] = SIGSoilHeating.prototype.setSoilMoisture = function(soilMoisture, moistureUnits) {
+  var self = this.ptr;
+  if (soilMoisture && typeof soilMoisture === 'object') soilMoisture = soilMoisture.ptr;
+  if (moistureUnits && typeof moistureUnits === 'object') moistureUnits = moistureUnits.ptr;
+  _emscripten_bind_SIGSoilHeating_setSoilMoisture_2(self, soilMoisture, moistureUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['setStartingSoilTemperature'] = SIGSoilHeating.prototype.setStartingSoilTemperature = function(temperature, temperatureUnits) {
+  var self = this.ptr;
+  if (temperature && typeof temperature === 'object') temperature = temperature.ptr;
+  if (temperatureUnits && typeof temperatureUnits === 'object') temperatureUnits = temperatureUnits.ptr;
+  _emscripten_bind_SIGSoilHeating_setStartingSoilTemperature_2(self, temperature, temperatureUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['setWoodLitterHeatEfficiency'] = SIGSoilHeating.prototype.setWoodLitterHeatEfficiency = function(efficiency, fractionUnits) {
+  var self = this.ptr;
+  if (efficiency && typeof efficiency === 'object') efficiency = efficiency.ptr;
+  if (fractionUnits && typeof fractionUnits === 'object') fractionUnits = fractionUnits.ptr;
+  _emscripten_bind_SIGSoilHeating_setWoodLitterHeatEfficiency_2(self, efficiency, fractionUnits);
+};
+
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+SIGSoilHeating.prototype['__destroy__'] = SIGSoilHeating.prototype.__destroy__ = function() {
+  var self = this.ptr;
+  _emscripten_bind_SIGSoilHeating___destroy___0(self);
+};
+
+// Interface: EmissionFactorTable
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+function EmissionFactorTable() {
+  this.ptr = _emscripten_bind_EmissionFactorTable_EmissionFactorTable_0();
+  getCache(EmissionFactorTable)[this.ptr] = this;
+};
+
+EmissionFactorTable.prototype = Object.create(WrapperObject.prototype);
+EmissionFactorTable.prototype.constructor = EmissionFactorTable;
+EmissionFactorTable.prototype.__class__ = EmissionFactorTable;
+EmissionFactorTable.__cache__ = {};
+Module['EmissionFactorTable'] = EmissionFactorTable;
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+EmissionFactorTable.prototype['getCoverType'] = EmissionFactorTable.prototype.getCoverType = function(groupNumber) {
+  var self = this.ptr;
+  if (groupNumber && typeof groupNumber === 'object') groupNumber = groupNumber.ptr;
+  return UTF8ToString(_emscripten_bind_EmissionFactorTable_getCoverType_1(self, groupNumber));
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+EmissionFactorTable.prototype['getEmissionFactor'] = EmissionFactorTable.prototype.getEmissionFactor = function(groupNumber, species, emissionFactorUnits) {
+  var self = this.ptr;
+  if (groupNumber && typeof groupNumber === 'object') groupNumber = groupNumber.ptr;
+  if (species && typeof species === 'object') species = species.ptr;
+  if (emissionFactorUnits && typeof emissionFactorUnits === 'object') emissionFactorUnits = emissionFactorUnits.ptr;
+  return _emscripten_bind_EmissionFactorTable_getEmissionFactor_3(self, groupNumber, species, emissionFactorUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+EmissionFactorTable.prototype['getEmissionFactorBySpeciesIndex'] = EmissionFactorTable.prototype.getEmissionFactorBySpeciesIndex = function(groupNumber, speciesIndex, emissionFactorUnits) {
+  var self = this.ptr;
+  if (groupNumber && typeof groupNumber === 'object') groupNumber = groupNumber.ptr;
+  if (speciesIndex && typeof speciesIndex === 'object') speciesIndex = speciesIndex.ptr;
+  if (emissionFactorUnits && typeof emissionFactorUnits === 'object') emissionFactorUnits = emissionFactorUnits.ptr;
+  return _emscripten_bind_EmissionFactorTable_getEmissionFactorBySpeciesIndex_3(self, groupNumber, speciesIndex, emissionFactorUnits);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+EmissionFactorTable.prototype['getGroupType'] = EmissionFactorTable.prototype.getGroupType = function(groupNumber) {
+  var self = this.ptr;
+  if (groupNumber && typeof groupNumber === 'object') groupNumber = groupNumber.ptr;
+  return _emscripten_bind_EmissionFactorTable_getGroupType_1(self, groupNumber);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+EmissionFactorTable.prototype['getNumberOfGroups'] = EmissionFactorTable.prototype.getNumberOfGroups = function() {
+  var self = this.ptr;
+  return _emscripten_bind_EmissionFactorTable_getNumberOfGroups_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+EmissionFactorTable.prototype['getNumberOfSpecies'] = EmissionFactorTable.prototype.getNumberOfSpecies = function() {
+  var self = this.ptr;
+  return _emscripten_bind_EmissionFactorTable_getNumberOfSpecies_0(self);
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+EmissionFactorTable.prototype['getSpeciesCode'] = EmissionFactorTable.prototype.getSpeciesCode = function(speciesIndex) {
+  var self = this.ptr;
+  if (speciesIndex && typeof speciesIndex === 'object') speciesIndex = speciesIndex.ptr;
+  return UTF8ToString(_emscripten_bind_EmissionFactorTable_getSpeciesCode_1(self, speciesIndex));
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+EmissionFactorTable.prototype['getSpeciesName'] = EmissionFactorTable.prototype.getSpeciesName = function(speciesIndex) {
+  var self = this.ptr;
+  if (speciesIndex && typeof speciesIndex === 'object') speciesIndex = speciesIndex.ptr;
+  return UTF8ToString(_emscripten_bind_EmissionFactorTable_getSpeciesName_1(self, speciesIndex));
+};
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+EmissionFactorTable.prototype['isValidGroup'] = EmissionFactorTable.prototype.isValidGroup = function(groupNumber) {
+  var self = this.ptr;
+  if (groupNumber && typeof groupNumber === 'object') groupNumber = groupNumber.ptr;
+  return !!(_emscripten_bind_EmissionFactorTable_isValidGroup_1(self, groupNumber));
+};
+
+
+/** @suppress {undefinedVars, duplicate} @this{Object} */
+EmissionFactorTable.prototype['__destroy__'] = EmissionFactorTable.prototype.__destroy__ = function() {
+  var self = this.ptr;
+  _emscripten_bind_EmissionFactorTable___destroy___0(self);
+};
+
 (function() {
   function setupEnums() {
     
@@ -6860,6 +9461,10 @@ SafeSeparationDistanceCalculator.prototype['__destroy__'] = SafeSeparationDistan
     Module['LoadingUnits']['TonnesPerHectare'] = _emscripten_enum_LoadingUnits_LoadingUnitsEnum_TonnesPerHectare();
 
     Module['LoadingUnits']['KilogramsPerSquareMeter'] = _emscripten_enum_LoadingUnits_LoadingUnitsEnum_KilogramsPerSquareMeter();
+
+    Module['LoadingUnits']['PoundsPerAcre'] = _emscripten_enum_LoadingUnits_LoadingUnitsEnum_PoundsPerAcre();
+
+    Module['LoadingUnits']['GramsPerSquareMeter'] = _emscripten_enum_LoadingUnits_LoadingUnitsEnum_GramsPerSquareMeter();
 
     
 // $SurfaceAreaToVolumeUnits_SurfaceAreaToVolumeUnitsEnum
@@ -6996,6 +9601,348 @@ SafeSeparationDistanceCalculator.prototype['__destroy__'] = SafeSeparationDistan
     Module['TimeUnits']['Days'] = _emscripten_enum_TimeUnits_TimeUnitsEnum_Days();
 
     Module['TimeUnits']['Years'] = _emscripten_enum_TimeUnits_TimeUnitsEnum_Years();
+
+    
+// $EmissionFactorUnits_EmissionFactorUnitsEnum
+
+    Module['EmissionFactorUnits']['GramsPerKilogram'] = _emscripten_enum_EmissionFactorUnits_EmissionFactorUnitsEnum_GramsPerKilogram();
+
+    Module['EmissionFactorUnits']['PoundsPerTon'] = _emscripten_enum_EmissionFactorUnits_EmissionFactorUnitsEnum_PoundsPerTon();
+
+    
+// $HeatCapacityUnits_HeatCapacityUnitsEnum
+
+    Module['HeatCapacityUnits']['BtusPerPoundPerFahrenheit'] = _emscripten_enum_HeatCapacityUnits_HeatCapacityUnitsEnum_BtusPerPoundPerFahrenheit();
+
+    Module['HeatCapacityUnits']['JoulesPerKilogramPerKelvin'] = _emscripten_enum_HeatCapacityUnits_HeatCapacityUnitsEnum_JoulesPerKilogramPerKelvin();
+
+    Module['HeatCapacityUnits']['KilojoulesPerKilogramPerKelvin'] = _emscripten_enum_HeatCapacityUnits_HeatCapacityUnitsEnum_KilojoulesPerKilogramPerKelvin();
+
+    
+// $ThermalConductivityUnits_ThermalConductivityUnitsEnum
+
+    Module['ThermalConductivityUnits']['BtusPerHourPerFootPerFahrenheit'] = _emscripten_enum_ThermalConductivityUnits_ThermalConductivityUnitsEnum_BtusPerHourPerFootPerFahrenheit();
+
+    Module['ThermalConductivityUnits']['WattsPerMeterPerKelvin'] = _emscripten_enum_ThermalConductivityUnits_ThermalConductivityUnitsEnum_WattsPerMeterPerKelvin();
+
+    
+// $FuelConsumptionRegion_FuelConsumptionRegionEnum
+
+    Module['InteriorWest'] = _emscripten_enum_FuelConsumptionRegion_FuelConsumptionRegionEnum_InteriorWest();
+
+    Module['PacificWest'] = _emscripten_enum_FuelConsumptionRegion_FuelConsumptionRegionEnum_PacificWest();
+
+    Module['NorthEast'] = _emscripten_enum_FuelConsumptionRegion_FuelConsumptionRegionEnum_NorthEast();
+
+    Module['SouthEast'] = _emscripten_enum_FuelConsumptionRegion_FuelConsumptionRegionEnum_SouthEast();
+
+    
+// $BurnSeason_BurnSeasonEnum
+
+    Module['Spring'] = _emscripten_enum_BurnSeason_BurnSeasonEnum_Spring();
+
+    Module['Summer'] = _emscripten_enum_BurnSeason_BurnSeasonEnum_Summer();
+
+    Module['Fall'] = _emscripten_enum_BurnSeason_BurnSeasonEnum_Fall();
+
+    Module['Winter'] = _emscripten_enum_BurnSeason_BurnSeasonEnum_Winter();
+
+    
+// $FuelCategory_FuelCategoryEnum
+
+    Module['Natural'] = _emscripten_enum_FuelCategory_FuelCategoryEnum_Natural();
+
+    Module['Piles'] = _emscripten_enum_FuelCategory_FuelCategoryEnum_Piles();
+
+    Module['Slash'] = _emscripten_enum_FuelCategory_FuelCategoryEnum_Slash();
+
+    
+// $CoverGroup_CoverGroupEnum
+
+    Module['None'] = _emscripten_enum_CoverGroup_CoverGroupEnum_None();
+
+    Module['Grass'] = _emscripten_enum_CoverGroup_CoverGroupEnum_Grass();
+
+    Module['Shrub'] = _emscripten_enum_CoverGroup_CoverGroupEnum_Shrub();
+
+    Module['ShrubChaparral'] = _emscripten_enum_CoverGroup_CoverGroupEnum_ShrubChaparral();
+
+    Module['Sagebrush'] = _emscripten_enum_CoverGroup_CoverGroupEnum_Sagebrush();
+
+    Module['PonderosaPine'] = _emscripten_enum_CoverGroup_CoverGroupEnum_PonderosaPine();
+
+    Module['Pocosin'] = _emscripten_enum_CoverGroup_CoverGroupEnum_Pocosin();
+
+    Module['BalsamBlackRedWhiteSpruce'] = _emscripten_enum_CoverGroup_CoverGroupEnum_BalsamBlackRedWhiteSpruce();
+
+    Module['RedJackPine'] = _emscripten_enum_CoverGroup_CoverGroupEnum_RedJackPine();
+
+    Module['WhitePineHemlock'] = _emscripten_enum_CoverGroup_CoverGroupEnum_WhitePineHemlock();
+
+    Module['PineFlatwoods'] = _emscripten_enum_CoverGroup_CoverGroupEnum_PineFlatwoods();
+
+    Module['CoastalPlain'] = _emscripten_enum_CoverGroup_CoverGroupEnum_CoastalPlain();
+
+    
+// $DuffMoistureMethod_DuffMoistureMethodEnum
+
+    Module['EntireDuffMoisture'] = _emscripten_enum_DuffMoistureMethod_DuffMoistureMethodEnum_EntireDuffMoisture();
+
+    Module['LowerDuffMoisture'] = _emscripten_enum_DuffMoistureMethod_DuffMoistureMethodEnum_LowerDuffMoisture();
+
+    Module['NationalFireDangerRatingThousandHour'] = _emscripten_enum_DuffMoistureMethod_DuffMoistureMethodEnum_NationalFireDangerRatingThousandHour();
+
+    Module['AdjustedNationalFireDangerRatingThousandHour'] = _emscripten_enum_DuffMoistureMethod_DuffMoistureMethodEnum_AdjustedNationalFireDangerRatingThousandHour();
+
+    
+// $ThousandHourLoadDistribution_ThousandHourLoadDistributionEnum
+
+    Module['Even'] = _emscripten_enum_ThousandHourLoadDistribution_ThousandHourLoadDistributionEnum_Even();
+
+    Module['Right'] = _emscripten_enum_ThousandHourLoadDistribution_ThousandHourLoadDistributionEnum_Right();
+
+    Module['Left'] = _emscripten_enum_ThousandHourLoadDistribution_ThousandHourLoadDistributionEnum_Left();
+
+    Module['End'] = _emscripten_enum_ThousandHourLoadDistribution_ThousandHourLoadDistributionEnum_End();
+
+    Module['Center'] = _emscripten_enum_ThousandHourLoadDistribution_ThousandHourLoadDistributionEnum_Center();
+
+    
+// $MoistureRegime_MoistureRegimeEnum
+
+    Module['Wet'] = _emscripten_enum_MoistureRegime_MoistureRegimeEnum_Wet();
+
+    Module['Moderate'] = _emscripten_enum_MoistureRegime_MoistureRegimeEnum_Moderate();
+
+    Module['Dry'] = _emscripten_enum_MoistureRegime_MoistureRegimeEnum_Dry();
+
+    Module['VeryDry'] = _emscripten_enum_MoistureRegime_MoistureRegimeEnum_VeryDry();
+
+    
+// $SoilFamily_SoilFamilyEnum
+
+    Module['LoamySkeletal'] = _emscripten_enum_SoilFamily_SoilFamilyEnum_LoamySkeletal();
+
+    Module['FineSilt'] = _emscripten_enum_SoilFamily_SoilFamilyEnum_FineSilt();
+
+    Module['Fine'] = _emscripten_enum_SoilFamily_SoilFamilyEnum_Fine();
+
+    Module['CoarseSilt'] = _emscripten_enum_SoilFamily_SoilFamilyEnum_CoarseSilt();
+
+    Module['CoarseLoamy'] = _emscripten_enum_SoilFamily_SoilFamilyEnum_CoarseLoamy();
+
+    Module['QuartzSand'] = _emscripten_enum_SoilFamily_SoilFamilyEnum_QuartzSand();
+
+    Module['BasaltSand'] = _emscripten_enum_SoilFamily_SoilFamilyEnum_BasaltSand();
+
+    
+// $SoilHeatingModel_SoilHeatingModelEnum
+
+    Module['Duff'] = _emscripten_enum_SoilHeatingModel_SoilHeatingModelEnum_Duff();
+
+    Module['NonDuff'] = _emscripten_enum_SoilHeatingModel_SoilHeatingModelEnum_NonDuff();
+
+    
+// $DuffType_DuffTypeEnum
+
+    Module['PeatLow'] = _emscripten_enum_DuffType_DuffTypeEnum_PeatLow();
+
+    Module['PeatHigh'] = _emscripten_enum_DuffType_DuffTypeEnum_PeatHigh();
+
+    Module['DuffLow'] = _emscripten_enum_DuffType_DuffTypeEnum_DuffLow();
+
+    Module['DuffHigh'] = _emscripten_enum_DuffType_DuffTypeEnum_DuffHigh();
+
+    
+// $EmissionFactorGroupType_EmissionFactorGroupTypeEnum
+
+    Module['ShortTermFlamingAndSmoldering'] = _emscripten_enum_EmissionFactorGroupType_EmissionFactorGroupTypeEnum_ShortTermFlamingAndSmoldering();
+
+    Module['CoarseWoodyDebrisResidualSmolderingCombustion'] = _emscripten_enum_EmissionFactorGroupType_EmissionFactorGroupTypeEnum_CoarseWoodyDebrisResidualSmolderingCombustion();
+
+    Module['DuffResidualSmolderingCombustion'] = _emscripten_enum_EmissionFactorGroupType_EmissionFactorGroupTypeEnum_DuffResidualSmolderingCombustion();
+
+    
+// $BurnupFuelComponent_BurnupFuelComponentEnum
+
+    Module['Litter'] = _emscripten_enum_BurnupFuelComponent_BurnupFuelComponentEnum_Litter();
+
+    Module['OneHour'] = _emscripten_enum_BurnupFuelComponent_BurnupFuelComponentEnum_OneHour();
+
+    Module['TenHour'] = _emscripten_enum_BurnupFuelComponent_BurnupFuelComponentEnum_TenHour();
+
+    Module['HundredHour'] = _emscripten_enum_BurnupFuelComponent_BurnupFuelComponentEnum_HundredHour();
+
+    Module['SoundThreeToSixInch'] = _emscripten_enum_BurnupFuelComponent_BurnupFuelComponentEnum_SoundThreeToSixInch();
+
+    Module['RottenThreeToSixInch'] = _emscripten_enum_BurnupFuelComponent_BurnupFuelComponentEnum_RottenThreeToSixInch();
+
+    Module['SoundSixToNineInch'] = _emscripten_enum_BurnupFuelComponent_BurnupFuelComponentEnum_SoundSixToNineInch();
+
+    Module['RottenSixToNineInch'] = _emscripten_enum_BurnupFuelComponent_BurnupFuelComponentEnum_RottenSixToNineInch();
+
+    Module['SoundNineToTwentyInch'] = _emscripten_enum_BurnupFuelComponent_BurnupFuelComponentEnum_SoundNineToTwentyInch();
+
+    Module['RottenNineToTwentyInch'] = _emscripten_enum_BurnupFuelComponent_BurnupFuelComponentEnum_RottenNineToTwentyInch();
+
+    Module['SoundTwentyInchAndLarger'] = _emscripten_enum_BurnupFuelComponent_BurnupFuelComponentEnum_SoundTwentyInchAndLarger();
+
+    Module['RottenTwentyInchAndLarger'] = _emscripten_enum_BurnupFuelComponent_BurnupFuelComponentEnum_RottenTwentyInchAndLarger();
+
+    
+// $LitterConsumptionEquation_LitterConsumptionEquationEnum
+
+    Module['Default'] = _emscripten_enum_LitterConsumptionEquation_LitterConsumptionEquationEnum_Default();
+
+    Module['PineFlatwoods'] = _emscripten_enum_LitterConsumptionEquation_LitterConsumptionEquationEnum_PineFlatwoods();
+
+    Module['SouthEast'] = _emscripten_enum_LitterConsumptionEquation_LitterConsumptionEquationEnum_SouthEast();
+
+    Module['Burnup'] = _emscripten_enum_LitterConsumptionEquation_LitterConsumptionEquationEnum_Burnup();
+
+    
+// $DuffConsumptionEquation_DuffConsumptionEquationEnum
+
+    Module['Default'] = _emscripten_enum_DuffConsumptionEquation_DuffConsumptionEquationEnum_Default();
+
+    Module['LowerDuffMoistureWestern'] = _emscripten_enum_DuffConsumptionEquation_DuffConsumptionEquationEnum_LowerDuffMoistureWestern();
+
+    Module['EntireDuffMoisture'] = _emscripten_enum_DuffConsumptionEquation_DuffConsumptionEquationEnum_EntireDuffMoisture();
+
+    Module['ThousandHourMoisture'] = _emscripten_enum_DuffConsumptionEquation_DuffConsumptionEquationEnum_ThousandHourMoisture();
+
+    Module['LowerDuffMoisturePonderosaPine'] = _emscripten_enum_DuffConsumptionEquation_DuffConsumptionEquationEnum_LowerDuffMoisturePonderosaPine();
+
+    Module['DepthFromLowerDuffMoisture'] = _emscripten_enum_DuffConsumptionEquation_DuffConsumptionEquationEnum_DepthFromLowerDuffMoisture();
+
+    Module['DepthFromEntireDuffMoisture'] = _emscripten_enum_DuffConsumptionEquation_DuffConsumptionEquationEnum_DepthFromEntireDuffMoisture();
+
+    Module['DepthFromThousandHourMoisture'] = _emscripten_enum_DuffConsumptionEquation_DuffConsumptionEquationEnum_DepthFromThousandHourMoisture();
+
+    Module['ResidualDepthFromEntireDuffMoisture'] = _emscripten_enum_DuffConsumptionEquation_DuffConsumptionEquationEnum_ResidualDepthFromEntireDuffMoisture();
+
+    Module['SouthEast'] = _emscripten_enum_DuffConsumptionEquation_DuffConsumptionEquationEnum_SouthEast();
+
+    Module['Piles'] = _emscripten_enum_DuffConsumptionEquation_DuffConsumptionEquationEnum_Piles();
+
+    Module['Chaparral'] = _emscripten_enum_DuffConsumptionEquation_DuffConsumptionEquationEnum_Chaparral();
+
+    Module['PocosinRootMat'] = _emscripten_enum_DuffConsumptionEquation_DuffConsumptionEquationEnum_PocosinRootMat();
+
+    
+// $MineralSoilExposureEquation_MineralSoilExposureEquationEnum
+
+    Module['Default'] = _emscripten_enum_MineralSoilExposureEquation_MineralSoilExposureEquationEnum_Default();
+
+    Module['LowerDuffMoistureSlash'] = _emscripten_enum_MineralSoilExposureEquation_MineralSoilExposureEquationEnum_LowerDuffMoistureSlash();
+
+    Module['EntireDuffMoisture'] = _emscripten_enum_MineralSoilExposureEquation_MineralSoilExposureEquationEnum_EntireDuffMoisture();
+
+    Module['ThousandHourMoistureSlash'] = _emscripten_enum_MineralSoilExposureEquation_MineralSoilExposureEquationEnum_ThousandHourMoistureSlash();
+
+    Module['ThousandHourMoistureNatural'] = _emscripten_enum_MineralSoilExposureEquation_MineralSoilExposureEquationEnum_ThousandHourMoistureNatural();
+
+    Module['LowerDuffMoistureNatural'] = _emscripten_enum_MineralSoilExposureEquation_MineralSoilExposureEquationEnum_LowerDuffMoistureNatural();
+
+    Module['PercentDuffReduction'] = _emscripten_enum_MineralSoilExposureEquation_MineralSoilExposureEquationEnum_PercentDuffReduction();
+
+    Module['Piles'] = _emscripten_enum_MineralSoilExposureEquation_MineralSoilExposureEquationEnum_Piles();
+
+    Module['Pocosin'] = _emscripten_enum_MineralSoilExposureEquation_MineralSoilExposureEquationEnum_Pocosin();
+
+    
+// $HerbaceousConsumptionEquation_HerbaceousConsumptionEquationEnum
+
+    Module['Default'] = _emscripten_enum_HerbaceousConsumptionEquation_HerbaceousConsumptionEquationEnum_Default();
+
+    Module['AllConsumed'] = _emscripten_enum_HerbaceousConsumptionEquation_HerbaceousConsumptionEquationEnum_AllConsumed();
+
+    Module['GrassSpring'] = _emscripten_enum_HerbaceousConsumptionEquation_HerbaceousConsumptionEquationEnum_GrassSpring();
+
+    Module['SouthEast'] = _emscripten_enum_HerbaceousConsumptionEquation_HerbaceousConsumptionEquationEnum_SouthEast();
+
+    Module['PineFlatwoods'] = _emscripten_enum_HerbaceousConsumptionEquation_HerbaceousConsumptionEquationEnum_PineFlatwoods();
+
+    
+// $ShrubConsumptionEquation_ShrubConsumptionEquationEnum
+
+    Module['Default'] = _emscripten_enum_ShrubConsumptionEquation_ShrubConsumptionEquationEnum_Default();
+
+    Module['NonShrubCoverGroup'] = _emscripten_enum_ShrubConsumptionEquation_ShrubConsumptionEquationEnum_NonShrubCoverGroup();
+
+    Module['ShrubCoverGroup'] = _emscripten_enum_ShrubConsumptionEquation_ShrubConsumptionEquationEnum_ShrubCoverGroup();
+
+    Module['SagebrushNotFall'] = _emscripten_enum_ShrubConsumptionEquation_ShrubConsumptionEquationEnum_SagebrushNotFall();
+
+    Module['PocosinSpringOrWinter'] = _emscripten_enum_ShrubConsumptionEquation_ShrubConsumptionEquationEnum_PocosinSpringOrWinter();
+
+    Module['SagebrushFall'] = _emscripten_enum_ShrubConsumptionEquation_ShrubConsumptionEquationEnum_SagebrushFall();
+
+    Module['SouthEast'] = _emscripten_enum_ShrubConsumptionEquation_ShrubConsumptionEquationEnum_SouthEast();
+
+    Module['PocosinSummerOrFall'] = _emscripten_enum_ShrubConsumptionEquation_ShrubConsumptionEquationEnum_PocosinSummerOrFall();
+
+    Module['PineFlatwoods'] = _emscripten_enum_ShrubConsumptionEquation_ShrubConsumptionEquationEnum_PineFlatwoods();
+
+    
+// $EmissionSpecies_EmissionSpeciesEnum
+
+    Module['CarbonDioxide'] = _emscripten_enum_EmissionSpecies_EmissionSpeciesEnum_CarbonDioxide();
+
+    Module['CarbonMonoxide'] = _emscripten_enum_EmissionSpecies_EmissionSpeciesEnum_CarbonMonoxide();
+
+    Module['Methane'] = _emscripten_enum_EmissionSpecies_EmissionSpeciesEnum_Methane();
+
+    Module['NitrogenOxides'] = _emscripten_enum_EmissionSpecies_EmissionSpeciesEnum_NitrogenOxides();
+
+    Module['SulfurDioxide'] = _emscripten_enum_EmissionSpecies_EmissionSpeciesEnum_SulfurDioxide();
+
+    Module['ParticulateMatterTwoPointFive'] = _emscripten_enum_EmissionSpecies_EmissionSpeciesEnum_ParticulateMatterTwoPointFive();
+
+    Module['ParticulateMatterTen'] = _emscripten_enum_EmissionSpecies_EmissionSpeciesEnum_ParticulateMatterTen();
+
+    
+// $FuelConsumptionComponent_FuelConsumptionComponentEnum
+
+    Module['Litter'] = _emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_Litter();
+
+    Module['OneHour'] = _emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_OneHour();
+
+    Module['TenHour'] = _emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_TenHour();
+
+    Module['HundredHour'] = _emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_HundredHour();
+
+    Module['SoundThreeToSixInch'] = _emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_SoundThreeToSixInch();
+
+    Module['SoundSixToNineInch'] = _emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_SoundSixToNineInch();
+
+    Module['SoundNineToTwentyInch'] = _emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_SoundNineToTwentyInch();
+
+    Module['SoundTwentyInchAndLarger'] = _emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_SoundTwentyInchAndLarger();
+
+    Module['RottenThreeToSixInch'] = _emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_RottenThreeToSixInch();
+
+    Module['RottenSixToNineInch'] = _emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_RottenSixToNineInch();
+
+    Module['RottenNineToTwentyInch'] = _emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_RottenNineToTwentyInch();
+
+    Module['RottenTwentyInchAndLarger'] = _emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_RottenTwentyInchAndLarger();
+
+    Module['SoundThousandHour'] = _emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_SoundThousandHour();
+
+    Module['RottenThousandHour'] = _emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_RottenThousandHour();
+
+    Module['Duff'] = _emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_Duff();
+
+    Module['Herbaceous'] = _emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_Herbaceous();
+
+    Module['Shrub'] = _emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_Shrub();
+
+    Module['CrownFoliage'] = _emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_CrownFoliage();
+
+    Module['CrownBranch'] = _emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_CrownBranch();
+
+    Module['Total'] = _emscripten_enum_FuelConsumptionComponent_FuelConsumptionComponentEnum_Total();
 
     
 // $ContainTactic_ContainTacticEnum
