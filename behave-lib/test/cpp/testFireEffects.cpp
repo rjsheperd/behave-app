@@ -1,4 +1,5 @@
-// testFireEffects: behave-lib's adapters for the FOFEM modules.
+// testFireEffects: behave-lib's adapters for the FOFEM modules, and
+// SIGMortality's full-name methods.
 // SIGFuelConsumption and SIGSoilHeating forward their inputs' setters and
 // getters, so the app can call them on the module. This runs one plot
 // through the adapters and through the behave-mirror classes and requires
@@ -10,6 +11,7 @@
 #include <string>
 
 #include "SIGFuelConsumption.h"
+#include "SIGMortality.h"
 #include "SIGSoilHeating.h"
 
 namespace
@@ -130,6 +132,46 @@ void testSoilHeatingAdapter(const SIGFuelConsumption& consumption)
         copy.getMaximumTemperatureAtLayer(0, TemperatureUnits::Celsius)
         == adapter.getMaximumTemperatureAtLayer(0, TemperatureUnits::Celsius));
 }
+// SIGMortality's full names (behave Mortality's renames, kept under the old
+// names too until the app has moved)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+void testMortalityNames()
+{
+    std::cout << "Testing SIGMortality's full names\n";
+    SpeciesMasterTable table;
+    // ABAM uses crown scorch equation 1, whose bark thickness comes from DBH
+    auto tree = [&table](bool fullNames, double dbh) {
+        SIGMortality mortality(table);
+        char species[] = "ABAM";
+        mortality.setEquationType(EquationType::crown_scorch);
+        mortality.setSpeciesCode(species);
+        mortality.updateInputsForSpeciesCodeAndEquationType(species, EquationType::crown_scorch);
+        if (fullNames)
+        {
+            mortality.setDiameterAtBreastHeight(dbh, LengthUnits::Inches);
+        }
+        else
+        {
+            mortality.setDBH(dbh, LengthUnits::Inches);
+        }
+        mortality.setTreeHeight(60, LengthUnits::Feet);
+        mortality.setCrownRatio(0.5, FractionUnits::Fraction);
+        mortality.setSurfaceFireScorchHeight(45, LengthUnits::Feet);
+        mortality.calculateMortalityAllDirections(FractionUnits::Fraction);
+        return mortality.getProbabilityOfMortality(FractionUnits::Fraction);
+    };
+    double full = tree(true, 12);
+    check("setDiameterAtBreastHeight reaches the heading tree", full > 0 && tree(true, 30) != full);
+    check("setDBH and setDiameterAtBreastHeight agree", tree(false, 12) == full);
+    SIGMortality mortality(table);
+    SpeciesMasterTableRecordVector* a = mortality.getSpeciesRecordVectorForGeographicAreaCoordinationCenter(GACC::Northwest);
+    SpeciesMasterTableRecordVector* b = mortality.getSpeciesRecordVectorForGACCRegion(GACC::Northwest);
+    check("the species vector under both names", a->vec.size() == b->vec.size() && a->vec.size() > 0);
+    delete a;
+    delete b;
+}
+#pragma GCC diagnostic pop
 } // namespace
 
 int main()
@@ -137,6 +179,7 @@ int main()
     SIGFuelConsumption consumption;
     testFuelConsumptionAdapter(consumption);
     testSoilHeatingAdapter(consumption);
+    testMortalityNames();
     std::cout << "Total tests performed: " << numberOfTests << "\n";
     std::cout << "Total tests failed: " << numberOfFailures << "\n";
     return numberOfFailures > 0 ? 1 : 0;

@@ -65,11 +65,17 @@ void SIGMortality::setCrownRatio(double crownRatio, FractionUnits::FractionUnits
     flanking_.setCrownRatio(crownRatio, crownRatioUnits);
 }
 
+void SIGMortality::setDiameterAtBreastHeight(double dbh, LengthUnits::LengthUnitsEnum diameterUnits)
+{
+    heading_.setDiameterAtBreastHeight(dbh, diameterUnits);
+    backing_.setDiameterAtBreastHeight(dbh, diameterUnits);
+    flanking_.setDiameterAtBreastHeight(dbh, diameterUnits);
+}
+
+// Deprecated: use setDiameterAtBreastHeight (behave Mortality's full names)
 void SIGMortality::setDBH(double dbh, LengthUnits::LengthUnitsEnum diameterUnits)
 {
-    heading_.setDBH(dbh, diameterUnits);
-    backing_.setDBH(dbh, diameterUnits);
-    flanking_.setDBH(dbh, diameterUnits);
+    setDiameterAtBreastHeight(dbh, diameterUnits);
 }
 
 void SIGMortality::setBoleCharHeight(double boleCharHeight, LengthUnits::LengthUnitsEnum boleCharHeightUnits)
@@ -291,16 +297,26 @@ BoolVector* SIGMortality::getRequiredFieldVector()
     return ptr;
 }
 
-SpeciesMasterTableRecordVector* SIGMortality::getSpeciesRecordVectorForGACCRegion(GACC region) {
-    vector<SpeciesMasterTableRecord> results = Mortality::getSpeciesRecordVectorForGACCRegion(region);
+SpeciesMasterTableRecordVector* SIGMortality::getSpeciesRecordVectorForGeographicAreaCoordinationCenter(GACC region) {
+    vector<SpeciesMasterTableRecord> results = Mortality::getSpeciesRecordVectorForGeographicAreaCoordinationCenter(region);
     SpeciesMasterTableRecordVector *ptr = new SpeciesMasterTableRecordVector(results);
     return ptr;
 }
 
-SpeciesMasterTableRecordVector* SIGMortality::getSpeciesRecordVectorForGACCRegionAndEquationType(GACC region, EquationType equationType) {
-    vector<SpeciesMasterTableRecord> results = Mortality::getSpeciesRecordVectorForGACCRegionAndEquationType(region, equationType);
+SpeciesMasterTableRecordVector* SIGMortality::getSpeciesRecordVectorForGeographicAreaCoordinationCenterAndEquationType(GACC region, EquationType equationType) {
+    vector<SpeciesMasterTableRecord> results = Mortality::getSpeciesRecordVectorForGeographicAreaCoordinationCenterAndEquationType(region, equationType);
     SpeciesMasterTableRecordVector *ptr = new SpeciesMasterTableRecordVector(results);
     return ptr;
+}
+
+// Deprecated: use getSpeciesRecordVectorForGeographicAreaCoordinationCenter
+SpeciesMasterTableRecordVector* SIGMortality::getSpeciesRecordVectorForGACCRegion(GACC region) {
+    return getSpeciesRecordVectorForGeographicAreaCoordinationCenter(region);
+}
+
+// Deprecated: use getSpeciesRecordVectorForGeographicAreaCoordinationCenterAndEquationType
+SpeciesMasterTableRecordVector* SIGMortality::getSpeciesRecordVectorForGACCRegionAndEquationType(GACC region, EquationType equationType) {
+    return getSpeciesRecordVectorForGeographicAreaCoordinationCenterAndEquationType(region, equationType);
 }
 
 void SIGMortality::calculateMortalityAllDirections(FractionUnits::FractionUnitsEnum probablityUnits) {

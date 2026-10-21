@@ -29,7 +29,8 @@ public:
   void setSpeciesCode(char *speciesCode);
   void setTreeHeight(double treeHeight, LengthUnits::LengthUnitsEnum treeHeightUnits);
   void setCrownRatio(double crownRatio, FractionUnits::FractionUnitsEnum crownRatioUnits);
-  void setDBH(double dbh, LengthUnits::LengthUnitsEnum diameterUnits);
+  void setDiameterAtBreastHeight(double dbh, LengthUnits::LengthUnitsEnum diameterUnits);
+  void setDBH(double dbh, LengthUnits::LengthUnitsEnum diameterUnits); // deprecated: setDiameterAtBreastHeight
   void setBoleCharHeight(double boleCharHeight, LengthUnits::LengthUnitsEnum boleCharHeightUnits);
   void setEquationType(EquationType equationType);
   void setAirTemperature(double airTemperature, TemperatureUnits::TemperatureUnitsEnum temperatureUnits);
@@ -71,6 +72,10 @@ public:
   SpeciesMasterTableRecord getSpeciesRecordBySpeciesCodeAndEquationType(char *speciesCode,
                                                                         EquationType equationType) const;
   BoolVector *getRequiredFieldVector();
+  SpeciesMasterTableRecordVector *getSpeciesRecordVectorForGeographicAreaCoordinationCenter(GACC region);
+  SpeciesMasterTableRecordVector *getSpeciesRecordVectorForGeographicAreaCoordinationCenterAndEquationType(GACC region,
+                                                                                                        EquationType equationType);
+  // Deprecated names: use the GeographicAreaCoordinationCenter forms above
   SpeciesMasterTableRecordVector *getSpeciesRecordVectorForGACCRegion(GACC region);
   SpeciesMasterTableRecordVector *getSpeciesRecordVectorForGACCRegionAndEquationType(GACC region,
                                                                                  EquationType equationType);
